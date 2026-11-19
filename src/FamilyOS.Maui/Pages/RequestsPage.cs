@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FamilyOS.Maui.Services;
 using Microsoft.Maui.Layouts;
 
@@ -140,8 +141,67 @@ public sealed class RequestsPage : ContentPage
                 placeholder: type.Description ?? type.Name, maxLength: 120);
             if (string.IsNullOrWhiteSpace(title)) return;
 
+            var answers = new Dictionary<string, object?>();
+            decimal? amount = null;
+            foreach (var question in type.Questions.OrderBy(q => ReadInt(q, "sortOrder")))
+            {
+                var key = ReadString(question, "key");
+                var label = ReadString(question, "label");
+                if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(label)) continue;
+                var required = ReadBool(question, "required");
+                var questionType = ReadInt(question, "type");
+                var placeholder = ReadString(question, "placeholder");
+                var options = ReadStringArray(question, "options");
+                string? value;
+
+                if (questionType == 2 || questionType == 8)
+                {
+                    var choice = await DisplayActionSheetAsync(label, "Skip", null, "Yes", "No");
+                    value = choice == "Yes" ? "true" : choice == "No" ? "false" : null;
+                }
+                else if (questionType == 3 && options.Length > 0)
+                    value = await DisplayActionSheetAsync(label, "Skip", null, options);
+                else
+                    value = await DisplayPromptAsync(label, placeholder ?? label, "Continue", "Skip",
+                        placeholder: placeholder, maxLength: 500,
+                        keyboard: questionType == 1 || questionType == 9 ? Keyboard.Numeric : Keyboard.Default);
+
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    if (required)
+                    {
+                        _status.Text = $"{label} is required. The request was not created.";
+                        return;
+                    }
+                    continue;
+                }
+
+                if (questionType == 2 || questionType == 8)
+                    answers[key] = value == "true";
+                else if (questionType == 1 || questionType == 9)
+                {
+                    if (!decimal.TryParse(value, System.Globalization.NumberStyles.Number,
+                        System.Globalization.CultureInfo.CurrentCulture, out var number))
+                    {
+                        _status.Text = $"{label} must be a valid number.";
+                        return;
+                    }
+                    answers[key] = number;
+                    if (questionType == 9 || key.Equals("amount", StringComparison.OrdinalIgnoreCase))
+                        amount = number;
+                }
+                else answers[key] = value.Trim();
+            }
+
+            if (answers.TryGetValue("where", out var where) && !answers.ContainsKey("location"))
+                answers["location"] = where;
+            if (answers.TryGetValue("leave", out var leave) && !answers.ContainsKey("when"))
+                answers["when"] = leave;
+            if (answers.TryGetValue("item", out var item) && !answers.ContainsKey("items"))
+                answers["items"] = item;
+
             _status.Text = "Creating request…";
-            await _api.CreateAsync(type.Code, title.Trim());
+            await _api.CreateAsync(type.Code, title.Trim(), answers, amount);
             _showQueue = false;
             await LoadAsync();
         }
@@ -161,6 +221,39 @@ public sealed class RequestsPage : ContentPage
         {
             _createButton.IsEnabled = true;
         }
+    }
+
+    private static string ReadString(JsonElement element, string property)
+        => element.ValueKind == JsonValueKind.Object && element.TryGetProperty(property, out var value)
+            && value.ValueKind == JsonValueKind.String ? value.GetString() ?? string.Empty : string.Empty;
+
+    private static int ReadInt(JsonElement element, string property)
+        => element.ValueKind == JsonValueKind.Object && element.TryGetProperty(property, out var value)
+            && value.TryGetInt32(out var number) ? number : 0;
+
+    private static bool ReadBool(JsonElement element, string property)
+        => element.ValueKind == JsonValueKind.Object && element.TryGetProperty(property, out var value)
+            && value.ValueKind == JsonValueKind.True;
+
+    private static string[] ReadStringArray(JsonElement element, string property)
+        => element.ValueKind == JsonValueKind.Object && element.TryGetProperty(property, out var value)
+            && value.ValueKind == JsonValueKind.Array
+            ? value.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String)
+                .Select(x => x.GetString() ?? string.Empty).Where(x => x.Length > 0).ToArray()
+            : Array.Empty<string>();
+
+    private async Task AnswerQuestionAsync(Guid requestId, Guid questionId, string prompt)
+    {
+        var answer = await DisplayPromptAsync("Request information", prompt, "Send answer", "Cancel",
+            maxLength: 1000);
+        if (string.IsNullOrWhiteSpace(answer)) return;
+        try
+        {
+            await _api.AnswerQuestionAsync(requestId, questionId, answer.Trim());
+            await LoadAsync();
+        }
+        catch (FamilyApiException ex) { _status.Text = ex.Message; }
+        catch (Exception) { _status.Text = "Could not send that answer. Try again."; }
     }
 
     private void UpdateTabs()
@@ -193,6 +286,20 @@ public sealed class RequestsPage : ContentPage
             var denial = new Label { Text = $"Reason: {request.DenialReason}", FontSize = 13 };
             denial.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
             stack.Children.Add(denial);
+        }
+
+        foreach (var question in request.PendingQuestions?.Where(q => !q.IsAnswered) ?? Enumerable.Empty<PendingRequestQuestionDto>())
+        {
+            var prompt = new Label { Text = $"Question: {question.QuestionText}", FontSize = 14 };
+            prompt.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
+            stack.Children.Add(prompt);
+            if (!_showQueue)
+            {
+                var answerButton = new Button { Text = "Answer question", FontSize = 13, HorizontalOptions = LayoutOptions.Start };
+                answerButton.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+                answerButton.Clicked += async (_, _) => await AnswerQuestionAsync(request.Id, question.Id, question.QuestionText);
+                stack.Children.Add(answerButton);
+            }
         }
 
         var actions = new FlexLayout { Wrap = FlexWrap.Wrap, Direction = FlexDirection.Row };

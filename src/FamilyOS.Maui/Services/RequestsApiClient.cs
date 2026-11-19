@@ -28,17 +28,29 @@ public sealed class RequestsApiClient
     public Task<List<RequestTypeOptionDto>> GetTypesAsync(CancellationToken ct = default)
         => SendAsync<List<RequestTypeOptionDto>>(HttpMethod.Get, "api/requests/types", null, ct);
 
-    public Task<FamilyRequestDto> CreateAsync(string type, string title, CancellationToken ct = default)
+    public Task<FamilyRequestDto> GetAsync(Guid id, CancellationToken ct = default)
+        => SendAsync<FamilyRequestDto>(HttpMethod.Get, $"api/requests/{id:D}", null, ct);
+
+    public Task<FamilyRequestDto> CreateAsync(string type, string title, Dictionary<string, object?> answers,
+        decimal? amount = null, DateTime? neededBy = null, CancellationToken ct = default)
     {
-        var body = JsonSerializer.Serialize(new
-        {
-            type,
-            title,
-            answers = new Dictionary<string, object?>(),
-            amount = (decimal?)null,
-            neededBy = (DateTime?)null
-        }, JsonOptions);
+        var body = JsonSerializer.Serialize(new { type, title, answers, amount, neededBy }, JsonOptions);
         return SendAsync<FamilyRequestDto>(HttpMethod.Post, "api/requests",
+            new StringContent(body, Encoding.UTF8, "application/json"), ct);
+    }
+
+    public Task<FamilyRequestDto> UpdateDraftAsync(Guid id, string title, Dictionary<string, object?> answers,
+        decimal? amount = null, DateTime? neededBy = null, CancellationToken ct = default)
+    {
+        var body = JsonSerializer.Serialize(new { title, answers, amount, neededBy }, JsonOptions);
+        return SendAsync<FamilyRequestDto>(HttpMethod.Put, $"api/requests/{id:D}",
+            new StringContent(body, Encoding.UTF8, "application/json"), ct);
+    }
+
+    public Task<FamilyRequestDto> AnswerQuestionAsync(Guid id, Guid questionId, string answer, CancellationToken ct = default)
+    {
+        var body = JsonSerializer.Serialize(new { questionId, answer }, JsonOptions);
+        return SendAsync<FamilyRequestDto>(HttpMethod.Post, $"api/requests/{id:D}/answer",
             new StringContent(body, Encoding.UTF8, "application/json"), ct);
     }
 
@@ -92,7 +104,11 @@ public sealed class RequestsApiClient
 public sealed record FamilyRequestDto(
     Guid Id, string Type, string Status, string Title, string? Summary,
     decimal? Amount, DateTime? NeededByUtc, Guid RequesterMemberId, string RequesterName,
-    Guid? CurrentApproverMemberId, string? DenialReason, DateTime CreatedAtUtc);
+    Guid? CurrentApproverMemberId, string? DenialReason, DateTime CreatedAtUtc,
+    Dictionary<string, JsonElement>? Answers = null, Guid? ExecutionPlanId = null,
+    List<PendingRequestQuestionDto>? PendingQuestions = null);
+
+public sealed record PendingRequestQuestionDto(Guid Id, string QuestionText, bool IsAnswered, string? Answer);
 
 
 public sealed record RequestTypeOptionDto(Guid Id, string Code, string Name, string? Description, List<JsonElement> Questions);
