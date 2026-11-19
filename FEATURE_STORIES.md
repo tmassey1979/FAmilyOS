@@ -21,6 +21,7 @@ This index replaces the previous story-number mapping, which referenced issue ID
 | Production security, data lifecycle, backups, observability and recovery | [#13](https://github.com/tmassey1979/FamilyOS/issues/13) |
 | Settings, onboarding guidance, accessibility and Android release UX | [#14](https://github.com/tmassey1979/FamilyOS/issues/14) |
 | Module flags, entitlements, consent and optional-module boundaries | [#15](https://github.com/tmassey1979/FamilyOS/issues/15) |
+| Google Play subscriptions, Core trial, add-on packaging and billing lifecycle | [#17](https://github.com/tmassey1979/FamilyOS/issues/17) |
 
 ## Product scenarios / release acceptance
 
