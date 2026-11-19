@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 """Generate crisp monochrome menu icons for FamilyOS MAUI Shell tabs + More menu.
 
-Outputs 64x64 RGBA PNGs under src/FamilyOS.Maui/Resources/Images/Menu/
-with transparent backgrounds so Shell can tint via theme if needed.
-Stroke color is near-white (#F8FAFC) for dark-first chrome; works on light too
-when used as template-ish assets on navy tab bars.
+Outputs 64x64 RGBA PNGs as Resources/Images/Menu/menu_{name}.png
 """
 from __future__ import annotations
 
@@ -22,7 +19,7 @@ except ImportError:
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "src" / "FamilyOS.Maui" / "Resources" / "Images" / "Menu"
 SIZE = 64
-STROKE = (248, 250, 252, 255)  # slate-50
+STROKE = (248, 250, 252, 255)
 WIDTH = 4
 
 
@@ -33,20 +30,17 @@ def canvas() -> tuple[Image.Image, ImageDraw.ImageDraw]:
 
 def save(name: str, im: Image.Image) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    path = OUT / f"{name}.png"
+    path = OUT / f"menu_{name}.png"
     im.save(path, format="PNG", optimize=True)
     print(f"  {path.relative_to(ROOT)} ({path.stat().st_size}b)")
 
 
 def icon_home() -> None:
     im, d = canvas()
-    # Roof
     d.line([(12, 30), (32, 12), (52, 30)], fill=STROKE, width=WIDTH, joint="curve")
-    # Walls
     d.line([(18, 28), (18, 52)], fill=STROKE, width=WIDTH)
     d.line([(46, 28), (46, 52)], fill=STROKE, width=WIDTH)
     d.line([(18, 52), (46, 52)], fill=STROKE, width=WIDTH)
-    # Door
     d.rectangle([28, 38, 36, 52], outline=STROKE, width=WIDTH - 1)
     save("home", im)
 
@@ -66,7 +60,6 @@ def icon_calendar() -> None:
     d.line([(12, 28), (52, 28)], fill=STROKE, width=WIDTH - 1)
     d.line([(22, 12), (22, 22)], fill=STROKE, width=WIDTH)
     d.line([(42, 12), (42, 22)], fill=STROKE, width=WIDTH)
-    # Dots for days
     for x, y in [(22, 36), (32, 36), (42, 36), (22, 44), (32, 44)]:
         d.ellipse([x - 2, y - 2, x + 2, y + 2], fill=STROKE)
     save("calendar", im)
@@ -74,7 +67,6 @@ def icon_calendar() -> None:
 
 def icon_family() -> None:
     im, d = canvas()
-    # Two simple person marks
     d.ellipse([16, 14, 28, 26], outline=STROKE, width=WIDTH - 1)
     d.arc([12, 28, 32, 52], start=0, end=180, fill=STROKE, width=WIDTH - 1)
     d.ellipse([36, 14, 48, 26], outline=STROKE, width=WIDTH - 1)
@@ -100,10 +92,8 @@ def icon_requests() -> None:
 
 def icon_meals() -> None:
     im, d = canvas()
-    # Bowl
     d.arc([14, 28, 50, 54], start=0, end=180, fill=STROKE, width=WIDTH)
     d.line([(14, 40), (50, 40)], fill=STROKE, width=WIDTH - 1)
-    # Steam
     for x in (26, 32, 38):
         d.arc([x - 4, 14, x + 4, 28], start=200, end=340, fill=STROKE, width=WIDTH - 1)
     save("meals", im)
@@ -119,7 +109,6 @@ def icon_chat() -> None:
 
 def icon_outcomes() -> None:
     im, d = canvas()
-    # Simple bars
     d.rectangle([16, 36, 24, 50], outline=STROKE, width=WIDTH - 1)
     d.rectangle([28, 24, 36, 50], outline=STROKE, width=WIDTH - 1)
     d.rectangle([40, 16, 48, 50], outline=STROKE, width=WIDTH - 1)
@@ -159,18 +148,21 @@ def icon_gallery() -> None:
 
 def main() -> None:
     print("Generating MAUI menu icons…")
-    icon_home()
-    icon_tasks()
-    icon_calendar()
-    icon_family()
-    icon_more()
-    icon_requests()
-    icon_meals()
-    icon_chat()
-    icon_outcomes()
-    icon_notifications()
-    icon_settings()
-    icon_gallery()
+    for fn in (
+        icon_home,
+        icon_tasks,
+        icon_calendar,
+        icon_family,
+        icon_more,
+        icon_requests,
+        icon_meals,
+        icon_chat,
+        icon_outcomes,
+        icon_notifications,
+        icon_settings,
+        icon_gallery,
+    ):
+        fn()
     print("Done.")
 
 
