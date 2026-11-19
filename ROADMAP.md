@@ -2,10 +2,10 @@
 
 **Production target:** Android release candidate and production readiness by **2027-01-16**.  
 **Delivery window:** 58 days beginning 2026-11-19.  
-**Canonical tracker:** [Issue #1 — FamilyOS Android production release](https://github.com/tmassey1979/FAmilyOS/issues/1).  
+**Canonical tracker:** [Issue #1 — FamilyOS Android production release](https://github.com/tmassey1979/FamilyOS/issues/1).  
 **Detailed plan:** [docs/RELEASE_PLAN_2027-01-16.md](docs/RELEASE_PLAN_2027-01-16.md).
 
-This roadmap supersedes the stale issue-number references in the previous roadmap. Delivery work is tracked in issues #2–#15. The November 14 source audit is a starting baseline only; implementation status must be re-verified against current main and runtime evidence.
+This roadmap supersedes the stale issue-number references in the previous roadmap. Delivery work is tracked in issues #2–#15 and #17. The November 14 source audit is a starting baseline only; implementation status must be re-verified against current main and runtime evidence.
 
 ## Release strategy
 
@@ -38,11 +38,12 @@ This roadmap supersedes the stale issue-number references in the previous roadma
 
 **Exit:** household members can onboard, coordinate responsibilities, submit and decide requests, manage events, communicate, shop and plan meals through complete and permission-safe Android journeys.
 
-## P2 — Optional boundaries and post-release scope
+## P2 — Optional boundaries and commercial readiness
 
 - [ ] [#15 Feature flags, entitlements and optional module boundaries](https://github.com/tmassey1979/FamilyOS/issues/15)
+- [ ] [#17 Google Play subscriptions, 30-day trial and commercial entitlement lifecycle](https://github.com/tmassey1979/FamilyOS/issues/17)
 
-GPS/geofencing/SOS, finance/banking, smart home, health, school-provider integrations, advanced AI and other provider-dependent capabilities are not assumed to ship in this release. They require independent consent, privacy, security, provider and commercial validation.
+GPS/geofencing/SOS, finance/banking, smart home, health, school-provider integrations, advanced AI and other provider-dependent capabilities are not assumed to ship in this release. They require independent consent, privacy, security, provider and device validation. Paid pricing/trials must not be advertised until billing, entitlement verification, cancellation/refund handling and store compliance pass their own acceptance criteria.
 
 ## 58-day cadence
 
