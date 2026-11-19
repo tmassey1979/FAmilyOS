@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+       xmlns:pages="clr-namespace:FamilyOS.Maui.Pages"
+       x:Class="FamilyOS.Maui.AppShell"
+       FlyoutBehavior="Disabled">
+
+    <TabBar>
+        <Tab Title="Home" Route="home">
+            <ShellContent Title="Pulse" ContentTemplate="{DataTemplate pages:HomePage}" />
+        </Tab>
+        <Tab Title="Tasks" Route="tasks">
+            <ShellContent Title="Tasks" ContentTemplate="{DataTemplate pages:TasksPage}" />
+        </Tab>
+        <Tab Title="Calendar" Route="calendar">
+            <ShellContent Title="Calendar" ContentTemplate="{DataTemplate pages:CalendarPage}" />
+        </Tab>
+        <Tab Title="Family" Route="family">
+            <ShellContent Title="Family" ContentTemplate="{DataTemplate pages:FamilyPage}" />
+        </Tab>
+        <Tab Title="More" Route="more">
+            <ShellContent Title="More" ContentTemplate="{DataTemplate pages:MorePage}" />
+        </Tab>
+    </TabBar>
+</Shell>
