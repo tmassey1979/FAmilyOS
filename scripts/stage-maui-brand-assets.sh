@@ -7,6 +7,28 @@ APPICON_DIR="$ROOT/src/FamilyOS.Maui/Resources/AppIcon"
 SPLASH_DIR="$ROOT/src/FamilyOS.Maui/Resources/Splash"
 mkdir -p "$APPICON_DIR" "$SPLASH_DIR"
 
+ensure_pillow() {
+  if python3 -c "from PIL import Image" 2>/dev/null; then
+    return 0
+  fi
+  echo "Installing Pillow…"
+  python3 -m pip install --user --upgrade pip -q || true
+  if python3 -m pip install --user pillow -q 2>/dev/null; then
+    return 0
+  fi
+  if python3 -m pip install --break-system-packages pillow -q 2>/dev/null; then
+    return 0
+  fi
+  # Last resort on Debian/Ubuntu runners
+  if command -v apt-get >/dev/null 2>&1; then
+    sudo apt-get update -qq && sudo apt-get install -y -qq python3-pil && return 0
+  fi
+  echo "::error::Could not install Pillow (python3-pil)"
+  return 1
+}
+
+ensure_pillow
+
 ICON_SIZE=1024
 SPLASH_SIZE=512
 ICON_LOGO_RATIO=0.72
@@ -17,36 +39,35 @@ find_src() {
   local c
   for c in "$@"; do
     if [[ -f "$c" ]]; then
-      echo "$c"
+      printf '%s' "$c"
       return 0
     fi
   done
   return 1
 }
 
+ICON_SRC=""
+SPLASH_SRC=""
 ICON_SRC="$(find_src \
   "$ROOT/mobile/assets/brand/icon-app-1024.png" \
   "$ROOT/mobile/assets/icon.png" \
   "$ROOT/mobile/assets/adaptive-icon.png" \
   "$ROOT/mobile/assets/brand/play-icon-512.png" || true)"
-
 SPLASH_SRC="$(find_src \
   "$ROOT/mobile/assets/splash-icon.png" \
   "$ROOT/mobile/assets/brand/icon-app-1024.png" \
   "$ROOT/mobile/assets/icon.png" \
   "$ROOT/mobile/assets/adaptive-icon.png" || true)"
 
-python3 - "$ICON_SRC" "$SPLASH_SRC" "$APPICON_DIR" "$SPLASH_DIR" "$ICON_SIZE" "$SPLASH_SIZE" \
+echo "ICON_SRC=${ICON_SRC:-<none>}"
+echo "SPLASH_SRC=${SPLASH_SRC:-<none>}"
+
+python3 - "${ICON_SRC:-}" "${SPLASH_SRC:-}" "$APPICON_DIR" "$SPLASH_DIR" "$ICON_SIZE" "$SPLASH_SIZE" \
   "$ICON_LOGO_RATIO" "$SPLASH_LOGO_RATIO" "$NAVY" <<'PY'
 import sys
 from pathlib import Path
 
-try:
-    from PIL import Image
-except ImportError:
-    import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "pillow", "-q"])
-    from PIL import Image
+from PIL import Image
 
 icon_src, splash_src, appicon_dir, splash_dir = sys.argv[1:5]
 icon_size, splash_size = int(sys.argv[5]), int(sys.argv[6])

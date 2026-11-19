@@ -6,15 +6,23 @@ Outputs 64x64 RGBA PNGs as Resources/Images/Menu/menu_{name}.png
 from __future__ import annotations
 
 import math
+import subprocess
+import sys
 from pathlib import Path
 
 try:
     from PIL import Image, ImageDraw
 except ImportError:
-    import subprocess, sys
-
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "pillow", "-q"])
-    from PIL import Image, ImageDraw
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "pillow", "-q"],
+    )
+    try:
+        from PIL import Image, ImageDraw
+    except ImportError:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "--break-system-packages", "pillow", "-q"],
+        )
+        from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "src" / "FamilyOS.Maui" / "Resources" / "Images" / "Menu"
@@ -37,11 +45,12 @@ def save(name: str, im: Image.Image) -> None:
 
 def icon_home() -> None:
     im, d = canvas()
-    d.line([(12, 30), (32, 12), (52, 30)], fill=STROKE, width=WIDTH, joint="curve")
+    d.line([(12, 30), (32, 12)], fill=STROKE, width=WIDTH)
+    d.line([(32, 12), (52, 30)], fill=STROKE, width=WIDTH)
     d.line([(18, 28), (18, 52)], fill=STROKE, width=WIDTH)
     d.line([(46, 28), (46, 52)], fill=STROKE, width=WIDTH)
     d.line([(18, 52), (46, 52)], fill=STROKE, width=WIDTH)
-    d.rectangle([28, 38, 36, 52], outline=STROKE, width=WIDTH - 1)
+    d.rectangle([28, 38, 36, 52], outline=STROKE, width=max(1, WIDTH - 1))
     save("home", im)
 
 
@@ -49,15 +58,15 @@ def icon_tasks() -> None:
     im, d = canvas()
     d.rounded_rectangle([14, 12, 50, 52], radius=6, outline=STROKE, width=WIDTH)
     for y in (24, 34, 44):
-        d.line([(22, y), (30, y)], fill=STROKE, width=WIDTH - 1)
-        d.line([(34, y), (44, y)], fill=STROKE, width=WIDTH - 1)
+        d.line([(22, y), (30, y)], fill=STROKE, width=max(1, WIDTH - 1))
+        d.line([(34, y), (44, y)], fill=STROKE, width=max(1, WIDTH - 1))
     save("tasks", im)
 
 
 def icon_calendar() -> None:
     im, d = canvas()
     d.rounded_rectangle([12, 16, 52, 52], radius=6, outline=STROKE, width=WIDTH)
-    d.line([(12, 28), (52, 28)], fill=STROKE, width=WIDTH - 1)
+    d.line([(12, 28), (52, 28)], fill=STROKE, width=max(1, WIDTH - 1))
     d.line([(22, 12), (22, 22)], fill=STROKE, width=WIDTH)
     d.line([(42, 12), (42, 22)], fill=STROKE, width=WIDTH)
     for x, y in [(22, 36), (32, 36), (42, 36), (22, 44), (32, 44)]:
@@ -67,10 +76,10 @@ def icon_calendar() -> None:
 
 def icon_family() -> None:
     im, d = canvas()
-    d.ellipse([16, 14, 28, 26], outline=STROKE, width=WIDTH - 1)
-    d.arc([12, 28, 32, 52], start=0, end=180, fill=STROKE, width=WIDTH - 1)
-    d.ellipse([36, 14, 48, 26], outline=STROKE, width=WIDTH - 1)
-    d.arc([32, 28, 52, 52], start=0, end=180, fill=STROKE, width=WIDTH - 1)
+    d.ellipse([16, 14, 28, 26], outline=STROKE, width=max(1, WIDTH - 1))
+    d.arc([12, 28, 32, 52], start=0, end=180, fill=STROKE, width=max(1, WIDTH - 1))
+    d.ellipse([36, 14, 48, 26], outline=STROKE, width=max(1, WIDTH - 1))
+    d.arc([32, 28, 52, 52], start=0, end=180, fill=STROKE, width=max(1, WIDTH - 1))
     save("family", im)
 
 
@@ -84,18 +93,18 @@ def icon_more() -> None:
 def icon_requests() -> None:
     im, d = canvas()
     d.rounded_rectangle([16, 12, 48, 52], radius=6, outline=STROKE, width=WIDTH)
-    d.line([(24, 24), (40, 24)], fill=STROKE, width=WIDTH - 1)
-    d.line([(24, 34), (40, 34)], fill=STROKE, width=WIDTH - 1)
-    d.line([(24, 44), (34, 44)], fill=STROKE, width=WIDTH - 1)
+    d.line([(24, 24), (40, 24)], fill=STROKE, width=max(1, WIDTH - 1))
+    d.line([(24, 34), (40, 34)], fill=STROKE, width=max(1, WIDTH - 1))
+    d.line([(24, 44), (34, 44)], fill=STROKE, width=max(1, WIDTH - 1))
     save("requests", im)
 
 
 def icon_meals() -> None:
     im, d = canvas()
     d.arc([14, 28, 50, 54], start=0, end=180, fill=STROKE, width=WIDTH)
-    d.line([(14, 40), (50, 40)], fill=STROKE, width=WIDTH - 1)
+    d.line([(14, 40), (50, 40)], fill=STROKE, width=max(1, WIDTH - 1))
     for x in (26, 32, 38):
-        d.arc([x - 4, 14, x + 4, 28], start=200, end=340, fill=STROKE, width=WIDTH - 1)
+        d.arc([x - 4, 14, x + 4, 28], start=200, end=340, fill=STROKE, width=max(1, WIDTH - 1))
     save("meals", im)
 
 
@@ -103,15 +112,15 @@ def icon_chat() -> None:
     im, d = canvas()
     d.rounded_rectangle([12, 14, 52, 42], radius=8, outline=STROKE, width=WIDTH)
     d.polygon([(24, 42), (20, 52), (34, 42)], outline=STROKE)
-    d.line([(24, 42), (34, 42)], fill=STROKE, width=WIDTH - 1)
+    d.line([(24, 42), (34, 42)], fill=STROKE, width=max(1, WIDTH - 1))
     save("chat", im)
 
 
 def icon_outcomes() -> None:
     im, d = canvas()
-    d.rectangle([16, 36, 24, 50], outline=STROKE, width=WIDTH - 1)
-    d.rectangle([28, 24, 36, 50], outline=STROKE, width=WIDTH - 1)
-    d.rectangle([40, 16, 48, 50], outline=STROKE, width=WIDTH - 1)
+    d.rectangle([16, 36, 24, 50], outline=STROKE, width=max(1, WIDTH - 1))
+    d.rectangle([28, 24, 36, 50], outline=STROKE, width=max(1, WIDTH - 1))
+    d.rectangle([40, 16, 48, 50], outline=STROKE, width=max(1, WIDTH - 1))
     save("outcomes", im)
 
 
@@ -120,7 +129,7 @@ def icon_notifications() -> None:
     d.arc([18, 16, 46, 44], start=0, end=180, fill=STROKE, width=WIDTH)
     d.line([(18, 36), (46, 36)], fill=STROKE, width=WIDTH)
     d.line([(32, 14), (32, 18)], fill=STROKE, width=WIDTH)
-    d.arc([28, 44, 36, 52], start=0, end=180, fill=STROKE, width=WIDTH - 1)
+    d.arc([28, 44, 36, 52], start=0, end=180, fill=STROKE, width=max(1, WIDTH - 1))
     save("notifications", im)
 
 
@@ -134,14 +143,14 @@ def icon_settings() -> None:
         y0 = cy + int(math.sin(ang) * 16)
         x1 = cx + int(math.cos(ang) * 22)
         y1 = cy + int(math.sin(ang) * 22)
-        d.line([(x0, y0), (x1, y1)], fill=STROKE, width=WIDTH - 1)
+        d.line([(x0, y0), (x1, y1)], fill=STROKE, width=max(1, WIDTH - 1))
     save("settings", im)
 
 
 def icon_gallery() -> None:
     im, d = canvas()
     d.rounded_rectangle([12, 16, 52, 48], radius=6, outline=STROKE, width=WIDTH)
-    d.ellipse([18, 22, 28, 32], outline=STROKE, width=WIDTH - 1)
+    d.ellipse([18, 22, 28, 32], outline=STROKE, width=max(1, WIDTH - 1))
     d.polygon([(22, 44), (32, 30), (40, 40), (46, 34), (50, 44)], outline=STROKE)
     save("gallery", im)
 
