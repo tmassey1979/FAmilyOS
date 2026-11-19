@@ -216,7 +216,7 @@ public sealed class OnboardingPage : ContentPage
     private async Task FinishAsync(string message)
     {
         _status.Text = message;
-        await DisplayAlert("FamilyOS", message, "Continue");
+        await DisplayAlertAsync("FamilyOS", message, "Continue");
         await Shell.Current.GoToAsync("//home");
     }
 
