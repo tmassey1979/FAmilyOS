@@ -204,7 +204,7 @@ jobs:
     secrets: inherit
 
   publish-coordinated-release:
-    name: Publish release after server deployment
+    name: Publish release with installable MAUI APK
     needs: [build-server-images, build-android, deploy-server]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -225,20 +225,20 @@ jobs:
           APK=$(find release-assets -maxdepth 1 -type f -name '*.apk' -print -quit)
           test -n "$APK"
           TAG="v${VERSION}-build${BUILD_NUMBER}"
-          gh release create "$TAG" "$APK" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --target "${GITHUB_SHA}" \
-            --title "FamilyOS v${VERSION} (build ${BUILD_NUMBER})" \
-            --notes "Coordinated FamilyOS release. The Android APK was built and verified, and the matching API and Keycloak images were deployed to AWS with successful health checks. Source commit: ${GITHUB_SHA}." \
+          gh release create "$TAG" "$APK" release-assets/SHA256SUMS.txt \\
+            --repo "${GITHUB_REPOSITORY}" \\
+            --target "${GITHUB_SHA}" \\
+            --title "FamilyOS v${VERSION} (build ${BUILD_NUMBER})" \\
+            --notes "FamilyOS MAUI Android release. versionName: ${VERSION}. versionCode: ${VERSION_CODE}. Source commit: ${GITHUB_SHA}. API and Keycloak images were deployed and health-checked by this coordinated release." \\
             --latest
 
       - name: Release summary
         run: |
           {
             echo "## FamilyOS coordinated release"
-            echo "- App version: ${{ needs.build-android.outputs.version }}"\n            echo "- Android versionCode: ${{ needs.build-android.outputs.version_code }}"
+            echo "- App version: ${{ needs.build-android.outputs.version }}"
+            echo "- Android versionCode: ${{ needs.build-android.outputs.version_code }}"
             echo "- Commit: ${GITHUB_SHA}"
-            echo "- EAS build: https://expo.dev/accounts/tmassey1979/projects/familyos/builds/${{ needs.build-android.outputs.eas_build_id }}"
-            echo "- Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/familyos-android-v${{ needs.build-android.outputs.version }}-build${{ github.run_number }}"
-            echo "- Server deployment and health checks completed before publishing this release."
+            echo "- APK release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${{ needs.build-android.outputs.version }}-build${{ github.run_number }}"
+            echo "- The APK is attached to the GitHub Release."
           } >> "$GITHUB_STEP_SUMMARY"
