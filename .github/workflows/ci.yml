@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Expand migrations
+        run: python3 scripts/expand-migrations.py || true
+      - name: Restore
+        run: dotnet restore FamilyOS.sln
+      - name: Build
+        run: dotnet build FamilyOS.sln -c Release --no-restore
+      - name: Test Domain
+        run: dotnet test tests/FamilyOS.Domain.Tests/FamilyOS.Domain.Tests.csproj -c Release --no-build --verbosity normal
+
+  mobile-typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Expand brand assets
+        run: |
+          python3 ../scripts/expand-assets.py || python3 ../scripts/seed-brand-assets.py || true
+        working-directory: .
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
