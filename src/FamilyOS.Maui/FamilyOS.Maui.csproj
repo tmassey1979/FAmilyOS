@@ -14,14 +14,32 @@
 
     <ApplicationTitle>Family OS</ApplicationTitle>
     <ApplicationId>com.familyos.app</ApplicationId>
-    <ApplicationDisplayVersion>0.1.0</ApplicationDisplayVersion>
-    <ApplicationVersion>1</ApplicationVersion>
+    <!-- Display version tracks VersionPrefix (Directory.Build.props); CI can override. -->
+    <ApplicationDisplayVersion Condition="'$(ApplicationDisplayVersion)' == ''">$(VersionPrefix)</ApplicationDisplayVersion>
+    <ApplicationVersion Condition="'$(ApplicationVersion)' == ''">1</ApplicationVersion>
 
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">17.0</SupportedOSPlatformVersion>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Brand assets staged by scripts/stage-maui-brand-assets.sh
+      - appicon.png: 1024² navy plate + logo (launcher)
+      - appicon_foreground.png: transparent adaptive FG with ~28% safe inset
+      - splash.png: 512² transparent logo @ ~55% scale (Android 12 circular safe zone)
+      Color=#0F172A is the FamilyOS navy brand background.
+    -->
+    <MauiIcon Include="Resources/AppIcon/appicon.png"
+              ForegroundFile="Resources/AppIcon/appicon_foreground.png"
+              Color="#0F172A" />
+    <MauiSplashScreen Include="Resources/Splash/splash.png"
+                      Color="#0F172A"
+                      BaseSize="512,512"
+                      Resize="true" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="11.0.10" />

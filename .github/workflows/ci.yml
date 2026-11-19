@@ -14,7 +14,6 @@ concurrency:
 env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
-  # Report-only until domain coverage is filled (#14). Set true to enforce.
   DOMAIN_COVERAGE_ENFORCE: "false"
   DOMAIN_COVERAGE_MIN: "70"
 
@@ -49,8 +48,6 @@ jobs:
             RAW_VERSION=$(grep -oP '(?<=<VersionPrefix>)[^<]+' Directory.Build.props || echo "0.1.0")
           fi
 
-          # NuGet Version must be SemVer. Historical Android release tags such as
-          # android-v0.1.1-build1 are normalized to 0.1.1-build.1.
           if [[ "$RAW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
             VERSION="$RAW_VERSION"
           elif [[ "$RAW_VERSION" =~ ([0-9]+\.[0-9]+\.[0-9]+)[-.]?build[-.]?([0-9]+) ]]; then
@@ -154,6 +151,32 @@ jobs:
           path: coverage
           retention-days: 14
 
+      # A successful compile is not enough: install and launch the produced APK.
+      - name: Install and launch MAUI app in Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            adb install -r artifacts/FamilyOS-android-debug.apk
+            adb logcat -c
+            adb shell monkey -p com.familyos.app 1
+            sleep 12
+            if ! adb shell pidof com.familyos.app >/dev/null; then
+              echo "::error::FamilyOS process exited after launch."
+              adb logcat -d -t 3000
+              exit 1
+            fi
+            if adb logcat -d -t 3000 | grep -E "FATAL EXCEPTION|Fatal signal [0-9]+|Process: com\\.familyos\\.app"; then
+              echo "::error::Android reported a fatal FamilyOS startup error."
+              exit 1
+            fi
+            echo "FamilyOS remained running after Android emulator launch."
+
   maui-design-system:
     name: MAUI design-system tests
     runs-on: ubuntu-latest
@@ -204,8 +227,12 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          # Legacy `tools` package removed from current Android SDK repos.
           packages: platform-tools platforms;android-35 build-tools;35.0.0
+
+      - name: Stage MAUI brand assets
+        run: |
+          chmod +x scripts/stage-maui-brand-assets.sh
+          ./scripts/stage-maui-brand-assets.sh
 
       - name: Install MAUI Android workload
         run: dotnet workload install maui-android --ignore-failed-sources
@@ -219,6 +246,8 @@ jobs:
           --configuration Debug
           --framework net11.0-android
           -p:AndroidPackageFormat=apk
+          -p:ApplicationDisplayVersion=0.1.0
+          -p:ApplicationVersion=${{ github.run_number }}
 
       - name: Stage APK
         shell: bash
@@ -235,7 +264,6 @@ jobs:
           fi
           mkdir -p artifacts
           cp "$APK" artifacts/FamilyOS-android-debug.apk
-          echo "APK_PATH=artifacts/FamilyOS-android-debug.apk" >> "$GITHUB_ENV"
           ls -lh artifacts/FamilyOS-android-debug.apk
 
       - name: Upload installable APK
@@ -245,33 +273,3 @@ jobs:
           path: artifacts/FamilyOS-android-debug.apk
           if-no-files-found: error
           retention-days: 14
-
-      # Compilation alone cannot catch Android startup crashes. Install the exact
-      # APK produced above and verify that the MAUI process survives first launch.
-      - name: Install and launch MAUI app in Android emulator
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          target: google_apis
-          arch: x86_64
-          profile: pixel_6
-          disable-animations: true
-          script: |
-            set -euo pipefail
-            adb install -r artifacts/FamilyOS-android-debug.apk
-            adb logcat -c
-            adb shell monkey -p com.familyos.app 1
-            sleep 12
-
-            if ! adb shell pidof com.familyos.app >/dev/null; then
-              echo "::error::FamilyOS process exited after launch."
-              adb logcat -d -t 3000
-              exit 1
-            fi
-
-            if adb logcat -d -t 3000 | grep -E "FATAL EXCEPTION|Fatal signal [0-9]+|Process: com\\.familyos\\.app"; then
-              echo "::error::Android reported a fatal FamilyOS startup error."
-              exit 1
-            fi
-
-            echo "FamilyOS remained running after Android emulator launch."

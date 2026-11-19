@@ -1,0 +1,157 @@
+name: MAUI Android Release
+
+# Builds a versioned Release APK with FamilyOS brand assets and publishes a GitHub Release.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "SemVer display version (e.g. 0.1.0). Empty = Directory.Build.props VersionPrefix."
+        required: false
+        default: ""
+      prerelease:
+        description: "Mark GitHub Release as pre-release"
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: maui-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build & publish MAUI APK release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "11.0.x"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-35 build-tools;35.0.0
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${{ inputs.version }}" ]]; then
+            DISPLAY="${{ inputs.version }}"
+          else
+            DISPLAY=$(grep -oP '(?<=<VersionPrefix>)[^<]+' Directory.Build.props || echo "0.1.0")
+          fi
+          # Android versionCode must be integer; use run number.
+          CODE="${{ github.run_number }}"
+          SHORT=$(git rev-parse --short HEAD)
+          TAG="maui-v${DISPLAY}-build${CODE}"
+          echo "display=$DISPLAY" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "info=${DISPLAY}+${SHORT}" >> "$GITHUB_OUTPUT"
+          echo "Release version $DISPLAY (versionCode $CODE) tag $TAG"
+
+      - name: Stage MAUI brand assets
+        run: |
+          chmod +x scripts/stage-maui-brand-assets.sh
+          ./scripts/stage-maui-brand-assets.sh
+
+      - name: Install MAUI Android workload
+        run: dotnet workload install maui-android --ignore-failed-sources
+
+      - name: Restore
+        run: dotnet restore src/FamilyOS.Maui/FamilyOS.Maui.csproj -p:TargetFramework=net11.0-android
+
+      - name: Publish Release APK
+        run: >
+          dotnet publish src/FamilyOS.Maui/FamilyOS.Maui.csproj
+          --configuration Release
+          --framework net11.0-android
+          -p:AndroidPackageFormat=apk
+          -p:ApplicationDisplayVersion=${{ steps.ver.outputs.display }}
+          -p:ApplicationVersion=${{ steps.ver.outputs.code }}
+          -p:Version=${{ steps.ver.outputs.display }}
+          -p:InformationalVersion=${{ steps.ver.outputs.info }}
+
+      - name: Stage release APK
+        id: apk
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=$(find src/FamilyOS.Maui/bin/Release/net11.0-android -type f -name '*Signed.apk' -print -quit)
+          if [[ -z "$APK" ]]; then
+            APK=$(find src/FamilyOS.Maui/bin/Release/net11.0-android -type f -name '*.apk' -print -quit)
+          fi
+          if [[ -z "$APK" ]]; then
+            echo "::error::No APK produced"
+            find src/FamilyOS.Maui/bin/Release/net11.0-android -maxdepth 6 -type f -print || true
+            exit 1
+          fi
+          mkdir -p artifacts
+          OUT="artifacts/FamilyOS-maui-v${{ steps.ver.outputs.display }}-build${{ steps.ver.outputs.code }}.apk"
+          cp "$APK" "$OUT"
+          echo "path=$OUT" >> "$GITHUB_OUTPUT"
+          ls -lh "$OUT"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FamilyOS-MAUI-Android-APK
+          path: ${{ steps.apk.outputs.path }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.ver.outputs.tag }}"
+          DISPLAY="${{ steps.ver.outputs.display }}"
+          CODE="${{ steps.ver.outputs.code }}"
+          APK="${{ steps.apk.outputs.path }}"
+          NOTES=$(cat <<EOF
+          ## FamilyOS MAUI Android ${DISPLAY}
+
+          - **versionName:** ${DISPLAY}
+          - **versionCode:** ${CODE}
+          - **TFM:** net11.0-android
+          - **Commit:** ${GITHUB_SHA}
+          - **Brand:** mobile/assets/brand (icon-app-1024 + splash)
+
+          Install the attached APK (debug-signed or CI keystore as configured).
+          EOF
+          )
+          PRE=""
+          if [[ "${{ inputs.prerelease }}" == "true" ]]; then
+            PRE="--prerelease"
+          fi
+          gh release create "$TAG" "$APK" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "FamilyOS MAUI v${DISPLAY} (build ${CODE})" \
+            --notes "$NOTES" \
+            $PRE
+
+      - name: Summary
+        run: |
+          {
+            echo "### MAUI Android release"
+            echo "- Tag: \`${{ steps.ver.outputs.tag }}\`"
+            echo "- APK: FamilyOS-maui-v${{ steps.ver.outputs.display }}-build${{ steps.ver.outputs.code }}.apk"
+            echo "- Releases: https://github.com/${{ github.repository }}/releases"
+          } >> "$GITHUB_STEP_SUMMARY"
