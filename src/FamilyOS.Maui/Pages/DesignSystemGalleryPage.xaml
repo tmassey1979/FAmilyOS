@@ -65,6 +65,19 @@
                 <controls:FoErrorView Message="We couldn’t load Pulse." />
             </controls:FoCard>
 
+            <controls:FoSectionTitle Text="Chips + avatar" />
+            <HorizontalStackLayout Spacing="8">
+                <controls:FoChip Text="All" Tone="Neutral" IsSelected="True" />
+                <controls:FoChip Text="Tasks" Tone="Info" />
+                <controls:FoChip Text="Done" Tone="Success" />
+                <controls:FoChip Text="Blocked" Tone="Danger" />
+            </HorizontalStackLayout>
+            <HorizontalStackLayout Spacing="12">
+                <controls:FoAvatar Initials="TM" />
+                <controls:FoAvatar Initials="MA" Size="48" />
+                <controls:FoAvatar Initials="K" Size="32" />
+            </HorizontalStackLayout>
+
             <controls:FoSectionTitle Text="Typography" />
             <Label Text="Display" Style="{StaticResource TextDisplay}" />
             <Label Text="Title" Style="{StaticResource TextTitle}" />
