@@ -7,7 +7,7 @@
 
     <TabBar>
         <Tab Title="Home" Route="home">
-            <ShellContent Title="Pulse" ContentTemplate="{DataTemplate pages:HomePage}" />
+            <ShellContent x:Name="HomeShellContent" Title="Pulse" ContentTemplate="{DataTemplate pages:HomePage}" />
         </Tab>
         <Tab Title="Tasks" Route="tasks">
             <ShellContent Title="Tasks" ContentTemplate="{DataTemplate pages:TasksPage}" />
