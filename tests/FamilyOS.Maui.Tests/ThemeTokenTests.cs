@@ -99,7 +99,8 @@ public class ThemeTokenTests
         [
             "FoButton", "FoCard", "FoBadge", "FoSectionTitle", "FoEmptyState",
             "FoStatusBanner", "FoListRow", "FoTextField", "FoLoadingView", "FoErrorView",
-            "FoChip", "FoAvatar"
+            "FoChip", "FoAvatar",
+            "FoAppBar", "FoDialog", "FoSheet"
         ];
         foreach (var name in controls)
         {
