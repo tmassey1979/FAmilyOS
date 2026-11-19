@@ -2,6 +2,7 @@ import React from 'react';
 import {
   ActivityIndicator,
   Pressable,
+  StyleProp,
   StyleSheet,
   Text,
   View,
@@ -54,7 +55,7 @@ export function Button({ title, onPress, variant = 'primary', disabled, loading 
   );
 }
 
-export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
+export function Card({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
