@@ -225,11 +225,11 @@ jobs:
           APK=$(find release-assets -maxdepth 1 -type f -name '*.apk' -print -quit)
           test -n "$APK"
           TAG="v${VERSION}-build${BUILD_NUMBER}"
-          gh release create "$TAG" "$APK" release-assets/SHA256SUMS.txt \\
-            --repo "${GITHUB_REPOSITORY}" \\
-            --target "${GITHUB_SHA}" \\
-            --title "FamilyOS v${VERSION} (build ${BUILD_NUMBER})" \\
-            --notes "FamilyOS MAUI Android release. versionName: ${VERSION}. versionCode: ${VERSION_CODE}. Source commit: ${GITHUB_SHA}. API and Keycloak images were deployed and health-checked by this coordinated release." \\
+          gh release create "$TAG" "$APK" release-assets/SHA256SUMS.txt \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "FamilyOS v${VERSION} (build ${BUILD_NUMBER})" \
+            --notes "FamilyOS MAUI Android release. versionName: ${VERSION}. versionCode: ${VERSION_CODE}. Source commit: ${GITHUB_SHA}. API and Keycloak images were deployed and health-checked by this coordinated release." \
             --latest
 
       - name: Release summary
