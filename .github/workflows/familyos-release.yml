@@ -211,7 +211,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: familyos-android-apk-${{ github.run_id }}
+          name: FamilyOS-MAUI-Android-v${{ needs.build-android.outputs.version }}-build${{ needs.build-android.outputs.version_code }}
           path: release-assets
 
       - name: Publish coordinated GitHub Release
@@ -224,7 +224,7 @@ jobs:
           set -euo pipefail
           APK=$(find release-assets -maxdepth 1 -type f -name '*.apk' -print -quit)
           test -n "$APK"
-          TAG="v${VERSION}"
+          TAG="v${VERSION}-build${BUILD_NUMBER}"
           gh release create "$TAG" "$APK" \
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
