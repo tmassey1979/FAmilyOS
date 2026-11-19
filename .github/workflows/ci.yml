@@ -202,6 +202,9 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The legacy `tools` SDK package was removed from current Android SDK repos.
+          packages: platform-tools platforms;android-35 build-tools;35.0.0
 
       - name: Install MAUI Android workload
         run: dotnet workload install maui-android --ignore-failed-sources
