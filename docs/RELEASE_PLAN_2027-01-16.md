@@ -27,7 +27,8 @@ Location tracking, SOS, finance/banking, smart home, health, school-provider int
 | [#12](https://github.com/tmassey1979/FamilyOS/issues/12) | API tests, coverage and CI release gates | P0 |
 | [#13](https://github.com/tmassey1979/FamilyOS/issues/13) | Production security, privacy, backups and observability | P0 |
 | [#14](https://github.com/tmassey1979/FamilyOS/issues/14) | Accessibility, settings and Android release UX | P1 |
-| [#15](https://github.com/tmassey1979/FamilyOS/issues/15) | Feature flags, entitlements and optional boundaries | P2 |
+| [#15](https://github.com/tmassey1979/FamilyOS/issues/15) | Feature flags, entitlements and optional module boundaries | P2 |
+| [#17](https://github.com/tmassey1979/FamilyOS/issues/17) | Google Play subscriptions, trial and commercial entitlement lifecycle | P2 |
 
 ## Calendar
 
@@ -82,6 +83,7 @@ Location tracking, SOS, finance/banking, smart home, health, school-provider int
 - Verify app update/install path and store metadata/assets.
 - Confirm monitoring, support/incident response, backup and rollback readiness.
 - Make explicit go/no-go decision; no scope expansion.
+- Complete Google Play billing only if it does not displace P0/P1 release gates; otherwise defer paid activation.
 
 **January 16:** production release decision and rollout only if all mandatory gates are green.
 
@@ -95,6 +97,7 @@ Location tracking, SOS, finance/banking, smart home, health, school-provider int
 - Security: no production dev bypass/secrets; least privilege; sensitive modules opt-in and off by default.
 - Operations: health/readiness, logs/metrics/alerts, encrypted backups, restore and rollback rehearsed.
 - Android: install/upgrade, navigation, accessibility, notification permission, deep links and critical journeys tested on physical devices.
+- Commercial: do not sell or advertise paid plans/trials until Google Play purchase verification, entitlement lifecycle, cancellation/refund behavior and store policy review are complete.
 
 ## Scope-control rules
 
