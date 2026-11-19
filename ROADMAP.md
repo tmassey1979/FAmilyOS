@@ -1,96 +1,72 @@
 # FamilyOS — Product delivery roadmap
 
-Canonical tracking hub: [Issue #123 — FamilyOS roadmap and feature coverage](https://github.com/tmassey1979/FamilyOS/issues/123)
+**Production target:** Android release candidate and production readiness by **2027-01-16**.  
+**Delivery window:** 58 days beginning 2026-11-19.  
+**Canonical tracker:** [Issue #1 — FamilyOS Android production release](https://github.com/tmassey1979/FAmilyOS/issues/1).  
+**Detailed plan:** [docs/RELEASE_PLAN_2027-01-16.md](docs/RELEASE_PLAN_2027-01-16.md).
 
-This roadmap is ordered by dependencies and release risk. Detailed requirements and acceptance criteria belong in linked issues. A feature is complete only after acceptance criteria, tests, CI and required Android/device validation pass.
+This roadmap covers core and add-on delivery stories #2–#15 and #17–#27. The November 14 source audit is a starting baseline only; implementation status must be re-verified against current main and runtime evidence.
 
-## 60-day delivery target — January 14, 2027
-- Target a usable, release-ready Android core by January 14, 2027; this is a delivery goal, not permission to bypass quality or safety gates.
-- Minimum release candidate: Phase 0 exit gates plus the Phase 1 household coordination journeys, with the critical Phase 2 daily-operations paths selected and verified end to end.
-- Treat Phases 3–4 as independently optional modules; defer integrations or specialist modules that cannot meet privacy, provider, testing and device-validation requirements by the target date.
-- A release claim requires passing CI, tested authorization/offline behavior, accessibility checks, and physical Android validation of install/upgrade, authentication, permissions and critical workflows.
-- Reassess scope daily from actual issue/PR/CI evidence. If schedule pressure rises, reduce optional scope rather than weaken release gates.
+## Release strategy
 
-## Principles
-- Android-first; core household coordination remains useful without optional modules.
-- Major modules are independently enableable; add-on status does not imply paid packaging.
-- Entitlements, authorization and explicit consent are separate controls. Feature flags never grant access.
-- Server-side authorization is authoritative; offline replay must reconcile against current policy.
-- Sensitive capabilities require granular access, consent, retention and audit rules.
-- Prefer tested vertical slices and shared domain concepts.
+- Android-first production release of the largest safe, coherent FamilyOS platform.
+- Ship complete vertical slices: API + domain + persistence + authorization + mobile UI + tests.
+- Bring practical add-ons into the first release where a safe, bounded MVP fits: pet care, school coordination, caregiver access, home maintenance, multi-household foundations and universal search.
+- Include safe foundations/prototypes for AI, smart home and wearables; enable external providers only after security, privacy and provider validation.
+- Reduce optional scope before weakening security, privacy, offline correctness or release acceptance.
 
-## Phase 0 — Architecture and release gates (P0)
-- [ ] [#111](https://github.com/tmassey1979/FamilyOS/issues/111) Feature flags, household entitlements and privacy controls.
-- [ ] [#112](https://github.com/tmassey1979/FamilyOS/issues/112) Base vs optional module matrix.
-- [ ] [#74](https://github.com/tmassey1979/FamilyOS/issues/74) Android auth/onboarding physical-device acceptance.
-- [ ] [#78](https://github.com/tmassey1979/FamilyOS/issues/78) Offline replay and API integration tests.
-- [ ] [#81](https://github.com/tmassey1979/FamilyOS/issues/81) Durable domain events.
-- [ ] [#14](https://github.com/tmassey1979/FamilyOS/issues/14) Domain coverage target and enforcement.
-- [ ] [#82](https://github.com/tmassey1979/FamilyOS/issues/82) Feature audit/backlog reconciliation.
-- [ ] [#121](https://github.com/tmassey1979/FamilyOS/issues/121) Data export, deletion and retention.
-**Exit:** catalog, authorization, consent, offline and CI gates are documented and tested.
+## P0 — Release gates (must pass)
 
-## Phase 1 — Household foundation and core coordination (P1)
-- [ ] [#119](https://github.com/tmassey1979/FamilyOS/issues/119) Member profiles and household directory.
-- [ ] [#1](https://github.com/tmassey1979/FamilyOS/issues/1), [#17](https://github.com/tmassey1979/FamilyOS/issues/17) Authentication, household context, onboarding/invites.
-- [ ] [#2](https://github.com/tmassey1979/FamilyOS/issues/2), [#13](https://github.com/tmassey1979/FamilyOS/issues/13), [#77](https://github.com/tmassey1979/FamilyOS/issues/77) Tasks, assignments, recurrence and planning.
-- [ ] [#75](https://github.com/tmassey1979/FamilyOS/issues/75), [#76](https://github.com/tmassey1979/FamilyOS/issues/76) Schema-driven requests and execution-plan review/commit.
-- [ ] [#79](https://github.com/tmassey1979/FamilyOS/issues/79) Calendar editing, attendees and task-linked events.
-- [ ] [#120](https://github.com/tmassey1979/FamilyOS/issues/120) Universal search and cross-module linking.
-**Exit:** members can onboard, coordinate tasks/requests/events and navigate linked records safely.
+- [ ] [#2 Authentication, onboarding and member access](https://github.com/tmassey1979/FAmilyOS/issues/2)
+- [ ] [#3 Authorization, tenant isolation and privacy](https://github.com/tmassey1979/FAmilyOS/issues/3)
+- [ ] [#10 Offline synchronization and conflict recovery](https://github.com/tmassey1979/FAmilyOS/issues/10)
+- [ ] [#12 API integration, domain coverage and CI](https://github.com/tmassey1979/FAmilyOS/issues/12)
+- [ ] [#13 Production security, retention, backups and observability](https://github.com/tmassey1979/FAmilyOS/issues/13)
 
-## Phase 2 — Daily operations and communication (P1/P2)
-- [ ] [#98](https://github.com/tmassey1979/FamilyOS/issues/98) Daily briefing.
-- [ ] [#99](https://github.com/tmassey1979/FamilyOS/issues/99) Activity timeline.
-- [ ] [#80](https://github.com/tmassey1979/FamilyOS/issues/80), [#9](https://github.com/tmassey1979/FamilyOS/issues/9), [#27](https://github.com/tmassey1979/FamilyOS/issues/27), [#46](https://github.com/tmassey1979/FamilyOS/issues/46) Pulse, notifications, preferences and quiet hours.
-- [ ] [#117](https://github.com/tmassey1979/FamilyOS/issues/117) Messaging, announcements and shared notes.
-- [ ] [#103](https://github.com/tmassey1979/FamilyOS/issues/103) Chore rotations and routines.
-- [ ] [#116](https://github.com/tmassey1979/FamilyOS/issues/116) Goals and nonfinancial rewards.
-- [ ] [#122](https://github.com/tmassey1979/FamilyOS/issues/122) Accessibility and localization.
-**Exit:** members can understand priorities, communicate and coordinate recurring work accessibly.
+## P1 — Core journeys and first-release add-on MVPs
 
-## Phase 3 — Practical household modules (P2)
-- Shopping/procurement: #5, #10, #23, #24, #34, #44, #64.
-- Meals/recipes: #12, #58 (base/optional decision in #112).
-- Transportation: [#104](https://github.com/tmassey1979/FamilyOS/issues/104).
-- Home/property: [#113](https://github.com/tmassey1979/FamilyOS/issues/113).
-- Pets: [#114](https://github.com/tmassey1979/FamilyOS/issues/114).
-- Travel/outings: [#118](https://github.com/tmassey1979/FamilyOS/issues/118).
-**Exit:** optional modules integrate with tasks, calendar, notifications and documents without bypassing permissions.
+- [ ] [#4 Household profiles and membership](https://github.com/tmassey1979/FAmilyOS/issues/4)
+- [ ] [#5 Tasks, recurrence and routines](https://github.com/tmassey1979/FAmilyOS/issues/5)
+- [ ] [#6 Requests, approvals and execution plans](https://github.com/tmassey1979/FAmilyOS/issues/6)
+- [ ] [#7 Calendar and linked workflows](https://github.com/tmassey1979/FAmilyOS/issues/7)
+- [ ] [#8 Pulse and household activity](https://github.com/tmassey1979/FAmilyOS/issues/8)
+- [ ] [#9 Notifications, push and realtime](https://github.com/tmassey1979/FAmilyOS/issues/9)
+- [ ] [#11 Shopping and meals](https://github.com/tmassey1979/FAmilyOS/issues/11)
+- [ ] [#14 Accessibility, settings and Android UX](https://github.com/tmassey1979/FAmilyOS/issues/14)
+- [ ] [#20 Pet profiles, care routines and reminders](https://github.com/tmassey1979/FAmilyOS/issues/20)
+- [ ] [#22 School schedules, assignments and guardian workflows](https://github.com/tmassey1979/FAmilyOS/issues/22)
+- [ ] [#23 Scoped caregiver access and care handoffs](https://github.com/tmassey1979/FAmilyOS/issues/23)
+- [ ] [#26 Home assets and maintenance schedules](https://github.com/tmassey1979/FAmilyOS/issues/26)
+- [ ] [#27 Multi-household context and permission-filtered universal search](https://github.com/tmassey1979/FAmilyOS/issues/27)
 
-## Phase 4 — Sensitive and external integrations (opt-in; P2/P3)
-- GPS/maps/geofences: #96, #100, #101.
-- Check-ins/SOS: [#102](https://github.com/tmassey1979/FamilyOS/issues/102).
-- Documents: [#108](https://github.com/tmassey1979/FamilyOS/issues/108).
-- Finance: [#109](https://github.com/tmassey1979/FamilyOS/issues/109).
-- Health: [#115](https://github.com/tmassey1979/FamilyOS/issues/115).
-- Smart home/automation: [#106](https://github.com/tmassey1979/FamilyOS/issues/106).
-- School/activity integrations: [#107](https://github.com/tmassey1979/FamilyOS/issues/107).
-- AI assistant: [#105](https://github.com/tmassey1979/FamilyOS/issues/105).
-- Memories/milestones: [#110](https://github.com/tmassey1979/FamilyOS/issues/110).
-**Exit:** explicit consent, scoped credentials, disconnect/revocation, provider review and privacy tests; sensitive modules are never on by default.
+## P2 — Paid modules, integrations and advanced add-ons
 
-## Phase 5 — Release readiness (continuous)
-- Keep #82 as verified feature inventory.
-- Every feature issue documents behavior, acceptance criteria, dependencies, roles/consent, offline behavior, export/retention and tests.
-- CI runs Android build, unit/integration tests, static analysis and accessibility checks.
-- Validate install/upgrade, auth, permissions, offline recovery and critical flows on physical Android devices.
+- [ ] [#15 Feature flags, entitlements and module boundaries](https://github.com/tmassey1979/FAmilyOS/issues/15)
+- [ ] [#17 Google Play subscriptions and trial](https://github.com/tmassey1979/FAmilyOS/issues/17)
+- [ ] [#18 Virtual-envelope finance and allowances](https://github.com/tmassey1979/FAmilyOS/issues/18)
+- [ ] [#19 Consent-based location, geofences and household safety alerts](https://github.com/tmassey1979/FAmilyOS/issues/19)
+- [ ] [#21 Smart-home provider adapters and low-risk device integration](https://github.com/tmassey1979/FAmilyOS/issues/21)
+- [ ] [#24 Permission-aware AI summaries and draft suggestions](https://github.com/tmassey1979/FAmilyOS/issues/24)
+- [ ] [#25 Opt-in wearables and device signals](https://github.com/tmassey1979/FAmilyOS/issues/25)
 
-## Coverage index
-- Household identity/profiles: #1, #17, #119
-- Tasks/chores/routines: #2, #13, #20, #43, #47, #52, #77, #103
-- Calendar: #7, #49, #79
-- Requests/approvals/execution: #3, #4, #18, #21, #22, #28, #36, #39, #40, #41, #42, #48, #62, #75, #76
-- Dashboard/activity: #6, #29, #30, #35, #80, #98, #99
-- Notifications/realtime: #9, #26, #27, #32, #46, #50, #80, #81
-- Shopping/meals/transport: #5, #10, #12, #23, #24, #34, #44, #58, #64, #104
-- Location/safety/maps: #96, #100, #101, #102
-- AI/automation: #105, #106
-- Documents/privacy: #108, #121
-- Finance: #109; school: #107; memories: #110
-- Home: #113; pets: #114; health: #115; goals: #116; messaging: #117; travel: #118
-- Search: #120; accessibility: #122
-- Quality/offline/release: #14, #38, #61, #66, #74, #78, #82
+P2 modules must remain disabled until their own consent, security, entitlement and runtime acceptance criteria pass. Finance issue #18 is virtual budgeting software, not bank connectivity or stored-value accounts. Location issue #19 requires revocable consent and retention controls; SOS is a household notification, not emergency dispatch. Smart-home control must fail safely and high-risk device actions remain excluded. AI may draft suggestions but cannot silently commit consequential actions. Wearable data is opt-in and minimized.
+
+## 58-day delivery cadence
+
+| Window | Focus | Exit evidence |
+|---|---|---|
+| Days 1–7 · Nov 19–25 | Auth, authorization, CI, audit reconciliation, multi-household data boundaries | Auth proof, role matrix, tenant isolation tests |
+| Days 8–21 · Nov 26–Dec 9 | Household, tasks, requests, pet-care MVP and school task/calendar slice | Complete family workflows and role-safe add-on MVPs |
+| Days 22–35 · Dec 10–23 | Calendar, Pulse, notifications, chat, offline, caregiver MVP | Handoff flow, deep links and offline replay proof |
+| Days 36–45 · Dec 24–Jan 2 | Shopping, meals, home-maintenance MVP, universal search and settings | Linked cross-module workflows and search authorization tests |
+| Days 46–53 · Jan 3–10 | Location/finance and AI/smart-home/wearable gates where feasible; security and regression | Independent privacy/security evidence; otherwise disabled |
+| Days 54–58 · Jan 11–15 | Release candidate, production rehearsal, rollback/restore and store readiness | Signed RC and go/no-go evidence |
+| **Jan 16** | **Production release decision** | **All P0 gates green; shipped modules independently accepted** |
+
+## Definition of done
+
+A story is complete only when acceptance criteria pass in the running app/API, tests pass in CI, authorization and offline behavior are verified, and required Android/device acceptance is recorded. Provider-dependent features may be represented by disabled adapters or documented follow-up work, but must not be advertised as active functionality.
 
 ## Maintenance
-Update this file and [issue #123](https://github.com/tmassey1979/FamilyOS/issues/123) when priorities/dependencies change. Implementation status belongs in individual issues, not this document.
+
+Update [issue #1](https://github.com/tmassey1979/FAmilyOS/issues/1) when scope changes. Keep implementation evidence in linked issues.

@@ -1,109 +1,55 @@
-# Family OS — Feature → Story Index
+# FamilyOS — Feature → Release Story Index
 
-Every product feature maps to a GitHub **story** (vertical slice: backend + frontend where applicable).
-Repo: https://github.com/tmassey1979/FamilyOS
+**Release target:** 2027-01-16  
+**Canonical epic:** [#1 FamilyOS Android production release](https://github.com/tmassey1979/FAmilyOS/issues/1)
 
-## Product scenarios (definition of done)
+| Product area | Release story |
+|---|---|
+| Production authentication, PKCE and onboarding | [#2](https://github.com/tmassey1979/FAmilyOS/issues/2) |
+| Authorization, privacy and tenant isolation | [#3](https://github.com/tmassey1979/FAmilyOS/issues/3) |
+| Household profiles, relationships and member lifecycle | [#4](https://github.com/tmassey1979/FAmilyOS/issues/4) |
+| Tasks, recurrence, routines and time tracking | [#5](https://github.com/tmassey1979/FAmilyOS/issues/5) |
+| Dynamic requests, approvals and execution plans | [#6](https://github.com/tmassey1979/FAmilyOS/issues/6) |
+| Shared calendar and linked workflows | [#7](https://github.com/tmassey1979/FAmilyOS/issues/7) |
+| Pulse, blockers, outcomes and activity | [#8](https://github.com/tmassey1979/FAmilyOS/issues/8) |
+| Notifications, push, quiet hours and realtime | [#9](https://github.com/tmassey1979/FAmilyOS/issues/9) |
+| Offline cache, mutation queue and conflict recovery | [#10](https://github.com/tmassey1979/FAmilyOS/issues/10) |
+| Shopping, procurement, meals and recipes | [#11](https://github.com/tmassey1979/FAmilyOS/issues/11) |
+| API integration tests and CI release gates | [#12](https://github.com/tmassey1979/FAmilyOS/issues/12) |
+| Production security, data lifecycle and operations | [#13](https://github.com/tmassey1979/FAmilyOS/issues/13) |
+| Settings, accessibility and Android UX | [#14](https://github.com/tmassey1979/FAmilyOS/issues/14) |
+| Feature flags, entitlements and module boundaries | [#15](https://github.com/tmassey1979/FAmilyOS/issues/15) |
+| Google Play subscriptions and trial | [#17](https://github.com/tmassey1979/FAmilyOS/issues/17) |
+| Virtual finance, envelopes and allowances | [#18](https://github.com/tmassey1979/FAmilyOS/issues/18) |
+| Consent-based location, geofences and household alerts | [#19](https://github.com/tmassey1979/FAmilyOS/issues/19) |
+| Pet profiles, care routines and reminders | [#20](https://github.com/tmassey1979/FAmilyOS/issues/20) |
+| Smart-home adapter architecture and safe device integration | [#21](https://github.com/tmassey1979/FAmilyOS/issues/21) |
+| School schedules, assignments and guardian coordination | [#22](https://github.com/tmassey1979/FAmilyOS/issues/22) |
+| Scoped caregiver access, care plans and handoffs | [#23](https://github.com/tmassey1979/FAmilyOS/issues/23) |
+| Permission-aware AI summaries and draft actions | [#24](https://github.com/tmassey1979/FAmilyOS/issues/24) |
+| Opt-in wearable/device signals | [#25](https://github.com/tmassey1979/FAmilyOS/issues/25) |
+| Home assets, maintenance and service requests | [#26](https://github.com/tmassey1979/FAmilyOS/issues/26) |
+| Multi-household context, universal search and cross-module relationships | [#27](https://github.com/tmassey1979/FAmilyOS/issues/27) |
 
-| Scenario | Story |
-|----------|-------|
-| 1 Family setup | #60 |
-| 2 Task lifecycle | #61 |
-| 3 Decline | #62 |
-| 4 Ride request | #26 |
-| 5 Purchase | #59 |
-| 6 Meal plan | #63 |
-| 7 Family Pulse by role | #64 |
+## First-release add-on targets
 
-## PLAN → REQUEST → DECIDE → EXECUTE → MEASURE → LEARN
+The January release should aim to include usable MVPs for pet care (#20), school coordination (#22), scoped caregiver access (#23), home maintenance (#26), and multi-household/search foundations (#27), provided the P0 release gates remain green.
 
-### Foundation & identity
-| Feature | Story |
-|---------|-------|
-| Keycloak OIDC + PKCE login | #6 |
-| Household onboarding / invite | #22 |
-| Members & roles UI | #16 |
-| Change role (Owner) | #58 |
-| Deactivate member | #50 |
-| Family-scoped permissions | #36 |
-| Assignment ≠ acceptance | #68 |
-| Demo Henderson seed | #38 |
-| Docker Compose stack | #65 |
-| EF Core migrations | #66 |
+Location (#19) and virtual finance (#18) are planned as optional paid modules with separate acceptance gates. Smart home (#21), AI (#24) and wearables (#25) should have safe architecture and a narrowly scoped integration/suggestion MVP only if provider, consent and security reviews pass. Otherwise, ship the module boundary disabled and continue post-release.
 
-### Tasks
-| Feature | Story |
-|---------|-------|
-| Create / assign / accept / complete | #7 |
-| Reassign / defer / cancel | #24 |
-| Decline + reasons | #30 |
-| Recurring + policy | #18 |
-| Skip instance | #52 |
-| Priority / category / overdue | #48 |
-| Planned vs actual time | #25 |
-| Task history timeline | #40 |
+## Product acceptance journeys
 
-### Requests & decisions
-| Feature | Story |
-|---------|-------|
-| Dynamic questionnaire + queue | #8 |
-| Full type catalog | #33 |
-| School/Medical/Personal/Household/Other | #67 |
-| Draft save/edit/submit | #53 |
-| Ask / answer questions | #44 |
-| Cancel / withdraw | #45 |
-| Money request | #27 |
-| Grocery → procurement | #39 |
-| Approval policies | #23 |
-| Owner policy override | #47 |
-| Conditional approval | #46 |
-| Conditions / blockers | #13 |
-| Execution plan commit | #9 |
-| Request decision trail | #41 |
+1. A new family registers, creates a household and invites members.
+2. Roles and household boundaries prevent unauthorized reads and writes.
+3. Members assign and complete recurring tasks.
+4. Members submit and approve schema-driven requests and explicitly commit reviewed execution plans.
+5. Calendar events link to tasks, school activities, pet care and home maintenance.
+6. Pulse shows accurate next actions, blockers and upcoming commitments.
+7. Notifications and chat remain permission-safe and reliable through reconnect/offline conditions.
+8. Shopping and meals connect recipes, requests, carts and purchase history.
+9. Caregivers receive only time-bounded, explicitly scoped access.
+10. Multi-household switching, offline caches and universal search never leak data.
+11. Optional modules remain disabled without consent/entitlement and preserve data when disabled.
+12. Production operations support secure deployment, monitoring, backups and rollback.
 
-### Calendar, meals, procurement
-| Feature | Story |
-|---------|-------|
-| Calendar view + task-backed | #12 |
-| Event create/edit + attendees | #54 |
-| Recipes & meal plan | #17 |
-| Procurement queue → purchase | #10 |
-| Cart build / abandon | #69 |
-| Shopping trip by store | #28 |
-| Hold / defer / no-longer-needed | #49 |
-| Product catalog & prices | #29 |
-
-### Pulse, notify, learn
-| Feature | Story |
-|---------|-------|
-| Family Pulse home | #11 |
-| Waiting / blockers section | #35 |
-| In-app notifications + deep link | #14 #55 |
-| Push notifications | #32 |
-| Notification preferences / quiet hours | #51 |
-| SignalR realtime | #31 |
-| Domain events (MassTransit) | #56 |
-| Outcomes dashboard | #34 |
-| External time source hooks | #37 |
-
-### App shell & quality
-| Feature | Story |
-|---------|-------|
-| Settings hub | #42 |
-| Offline-tolerant mobile | #57 |
-| Production hardening | #43 |
-
-## Engineering tasks (not product stories)
-
-| Task | Issue |
-|------|-------|
-| CI / release auto-version | #15 |
-| Domain unit tests ≥90% | #19 |
-| Expo app shell | #20 |
-| Push full source to main | #21 |
-
-## Count
-
-- **Product stories:** #6–#14, #16–#18, #22–#69 (excl. tasks)
-- **Tasks:** #15, #19, #20, #21
-- **Phases #1–#5:** closed (superseded by slices)
+A story is complete only with passing acceptance criteria, CI evidence and runtime/device verification.
