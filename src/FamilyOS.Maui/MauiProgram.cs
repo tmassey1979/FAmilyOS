@@ -20,6 +20,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<HttpClient>();
         builder.Services.AddSingleton<IAuthSessionService, KeycloakAuthService>();
         builder.Services.AddSingleton<AppShell>();
+        builder.Services.AddTransient<HomePage>();
+        builder.Services.AddSingleton<PulseApiClient>();
         builder.Services.AddTransient<DesignSystemGalleryPage>();
         builder.Services.AddTransient<RequestsPage>();
         builder.Services.AddTransient<MealsPage>();
