@@ -215,6 +215,19 @@ jobs:
           chmod +x scripts/stage-maui-brand-assets.sh
           ./scripts/stage-maui-brand-assets.sh
 
+      - name: Resolve MAUI app version
+        id: maui-version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(grep -oP '(?<=<VersionPrefix>)[^<]+' Directory.Build.props | head -1)
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Directory.Build.props VersionPrefix must be SemVer X.Y.Z; got '$VERSION'"
+            exit 1
+          fi
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "code=$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+
       - name: Install MAUI Android workload
         run: dotnet workload install maui-android --ignore-failed-sources
 
@@ -251,6 +264,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: FamilyOS-Android-Debug-APK
-          path: artifacts/FamilyOS-android-debug.apk
+          path: artifacts/FamilyOS-MAUI-Android-v${{ steps.maui-version.outputs.value }}-build${{ steps.maui-version.outputs.code }}-debug.apk
           if-no-files-found: error
           retention-days: 14
