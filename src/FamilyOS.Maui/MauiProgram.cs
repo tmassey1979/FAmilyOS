@@ -27,6 +27,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<NotificationsApiClient>();
         builder.Services.AddSingleton<MealsApiClient>();
         builder.Services.AddSingleton<ChatApiClient>();
+        builder.Services.AddSingleton<OutcomesApiClient>();
         builder.Services.AddTransient<TasksPage>();
         builder.Services.AddSingleton<CalendarApiClient>();
         builder.Services.AddTransient<CalendarPage>();
