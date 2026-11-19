@@ -41,10 +41,6 @@ public abstract class FeaturePlaceholderPage : ContentPage
     }
 }
 
-public sealed class TasksPage() : FeaturePlaceholderPage(
-    "Tasks",
-    "Household tasks, assignments, routines, and progress.") { }
-
 public sealed class CalendarPage() : FeaturePlaceholderPage(
     "Calendar",
     "Family events and shared schedules.") { }
