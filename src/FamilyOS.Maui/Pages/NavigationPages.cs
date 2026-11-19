@@ -12,7 +12,7 @@ public abstract class FeaturePlaceholderPage : ContentPage
         Title = title;
 
         var heading = new Label { Text = title, FontAttributes = FontAttributes.Bold, FontSize = 28 };
-        heading.SetDynamicResource(StyleProperty, "TextTitle");
+        heading.SetDynamicResource(VisualElement.StyleProperty, "TextTitle");
 
         var explanation = new Label
         {
@@ -20,7 +20,7 @@ public abstract class FeaturePlaceholderPage : ContentPage
             FontSize = 16,
             LineBreakMode = LineBreakMode.WordWrap
         };
-        explanation.SetDynamicResource(StyleProperty, "TextBody");
+        explanation.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
 
         var status = new Label
         {
@@ -28,7 +28,7 @@ public abstract class FeaturePlaceholderPage : ContentPage
             FontSize = 13,
             LineBreakMode = LineBreakMode.WordWrap
         };
-        status.SetDynamicResource(StyleProperty, "TextCaption");
+        status.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
 
         var content = new VerticalStackLayout
         {
@@ -107,7 +107,7 @@ public sealed class MorePage() : FeaturePlaceholderPage(
     private static void AddDestination(VerticalStackLayout layout, string title, string route)
     {
         var button = new Button { Text = title, HorizontalOptions = LayoutOptions.Fill };
-        button.SetDynamicResource(StyleProperty, "FoSecondaryButtonStyle");
+        button.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         button.Clicked += async (_, _) => await Shell.Current.GoToAsync(route);
         layout.Children.Add(button);
     }
