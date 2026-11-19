@@ -16,6 +16,9 @@ All controls live under `src/FamilyOS.Maui/Controls/` and consume **semantic the
 | `FoTextField` | Form input | Label, helper, error |
 | `FoLoadingView` | In-progress | Message |
 | `FoErrorView` | Recoverable failure | Message + retry |
+| `FoAppBar` | Top navigation chrome | Title, subtitle, leading back, trailing slot |
+| `FoDialog` | Modal confirm / alert | Title, message, body slot, primary/secondary, scrim dismiss |
+| `FoSheet` | Bottom sheet | Title, subtitle, body slot, actions, scrim dismiss |
 
 ## Accessibility
 
