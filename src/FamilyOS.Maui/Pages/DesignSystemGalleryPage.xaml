@@ -78,6 +78,69 @@
                 <controls:FoAvatar Initials="K" Size="32" />
             </HorizontalStackLayout>
 
+            <controls:FoSectionTitle Text="App bar" />
+            <controls:FoAppBar Title="Household" Subtitle="Henderson family" ShowLeading="True" />
+            <controls:FoAppBar Title="Settings" />
+
+            <controls:FoSectionTitle Text="Dialog (inline preview)" />
+            <Border Stroke="{AppThemeBinding Light={StaticResource BorderSubtle}, Dark={StaticResource BorderSubtle}}"
+                    StrokeThickness="1"
+                    Padding="0"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource BgSurfaceAlt}, Dark={StaticResource BgSurfaceAlt}}">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="12" />
+                </Border.StrokeShape>
+                <VerticalStackLayout Padding="16" Spacing="12">
+                    <Label Text="Preview — host FoDialog full-screen when presenting"
+                           Style="{StaticResource TextCaption}" />
+                    <controls:FoCard>
+                        <VerticalStackLayout Spacing="12">
+                            <Label Text="Approve request?" Style="{StaticResource TextTitle}" />
+                            <Label Text="Mia asked for $25 for school supplies."
+                                   Style="{StaticResource TextBody}"
+                                   TextColor="{AppThemeBinding Light={StaticResource TextMuted}, Dark={StaticResource TextMuted}}" />
+                            <HorizontalStackLayout Spacing="8" HorizontalOptions="End">
+                                <controls:FoButton Title="Deny" Variant="Ghost" />
+                                <controls:FoButton Title="Approve" Variant="Primary" />
+                            </HorizontalStackLayout>
+                        </VerticalStackLayout>
+                    </controls:FoCard>
+                </VerticalStackLayout>
+            </Border>
+
+            <controls:FoSectionTitle Text="Sheet (inline preview)" />
+            <Border Stroke="{AppThemeBinding Light={StaticResource BorderSubtle}, Dark={StaticResource BorderSubtle}}"
+                    StrokeThickness="1"
+                    Padding="0"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource BgSurfaceAlt}, Dark={StaticResource BgSurfaceAlt}}">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="12" />
+                </Border.StrokeShape>
+                <VerticalStackLayout Padding="16" Spacing="12">
+                    <Label Text="Preview — host FoSheet full-screen when presenting"
+                           Style="{StaticResource TextCaption}" />
+                    <Border Padding="20,16"
+                            BackgroundColor="{AppThemeBinding Light={StaticResource BgSurface}, Dark={StaticResource BgSurface}}"
+                            StrokeThickness="0">
+                        <Border.StrokeShape>
+                            <RoundRectangle CornerRadius="16,16,0,0" />
+                        </Border.StrokeShape>
+                        <VerticalStackLayout Spacing="12">
+                            <BoxView WidthRequest="40" HeightRequest="4" CornerRadius="2"
+                                     HorizontalOptions="Center"
+                                     Color="{AppThemeBinding Light={StaticResource BorderSubtle}, Dark={StaticResource BorderSubtle}}" />
+                            <Label Text="New task" Style="{StaticResource TextTitle}" />
+                            <Label Text="Quick add from Pulse" Style="{StaticResource TextCaption}" />
+                            <controls:FoTextField Label="Title" Placeholder="Take out recycling" />
+                            <HorizontalStackLayout Spacing="8" HorizontalOptions="End">
+                                <controls:FoButton Title="Cancel" Variant="Secondary" />
+                                <controls:FoButton Title="Create" Variant="Primary" />
+                            </HorizontalStackLayout>
+                        </VerticalStackLayout>
+                    </Border>
+                </VerticalStackLayout>
+            </Border>
+
             <controls:FoSectionTitle Text="Typography" />
             <Label Text="Display" Style="{StaticResource TextDisplay}" />
             <Label Text="Title" Style="{StaticResource TextTitle}" />
