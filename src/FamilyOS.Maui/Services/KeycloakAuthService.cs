@@ -103,9 +103,9 @@ public sealed class KeycloakAuthService : IAuthSessionService
 
     public async Task SignOutAsync()
     {
-        await SecureStorage.Default.RemoveAsync(AccessTokenKey);
-        await SecureStorage.Default.RemoveAsync(RefreshTokenKey);
-        await SecureStorage.Default.RemoveAsync(ExpiresAtKey);
+        SecureStorage.Default.Remove(AccessTokenKey);
+        SecureStorage.Default.Remove(RefreshTokenKey);
+        SecureStorage.Default.Remove(ExpiresAtKey);
     }
 
     private async Task<string?> RefreshAccessTokenAsync(CancellationToken cancellationToken)
