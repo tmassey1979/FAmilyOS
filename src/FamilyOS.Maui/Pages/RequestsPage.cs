@@ -1,4 +1,5 @@
 using FamilyOS.Maui.Services;
+using Microsoft.Maui.Layouts;
 
 namespace FamilyOS.Maui.Pages;
 
@@ -131,7 +132,7 @@ public sealed class RequestsPage : ContentPage
             }
 
             var labels = types.Select(x => x.Name).ToArray();
-            var selected = await DisplayActionSheet("Choose a request type", "Cancel", null, labels);
+            var selected = await DisplayActionSheetAsync("Choose a request type", "Cancel", null, labels);
             var type = types.FirstOrDefault(x => string.Equals(x.Name, selected, StringComparison.Ordinal));
             if (type is null) return;
 
