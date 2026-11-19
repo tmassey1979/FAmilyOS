@@ -7,108 +7,209 @@ namespace FamilyOS.Maui.Pages;
 /// </summary>
 public abstract class FeaturePlaceholderPage : ContentPage
 {
-    protected FeaturePlaceholderPage(string title, string description)
+    protected FeaturePlaceholderPage(string title, string description, string? icon = null)
     {
         Title = title;
 
-        var heading = new Label { Text = title, FontAttributes = FontAttributes.Bold, FontSize = 28 };
-        heading.SetDynamicResource(VisualElement.StyleProperty, "TextTitle");
+        var heading = new Label
+        {
+            Text = title,
+            Style = GetStyle("TextDisplay")
+        };
 
         var explanation = new Label
         {
             Text = description,
-            FontSize = 16,
-            LineBreakMode = LineBreakMode.WordWrap
+            LineBreakMode = LineBreakMode.WordWrap,
+            Style = GetStyle("TextBody")
         };
-        explanation.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
 
         var status = new Label
         {
-            Text = "This destination is wired into navigation. Its real API-backed screen is part of the feature migration backlog.",
-            FontSize = 13,
-            LineBreakMode = LineBreakMode.WordWrap
+            Text = "Wired for navigation. Feature UI lands with its migration issue.",
+            LineBreakMode = LineBreakMode.WordWrap,
+            Style = GetStyle("TextCaption")
         };
-        status.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
 
-        var content = new VerticalStackLayout
+        View header;
+        if (!string.IsNullOrWhiteSpace(icon))
         {
-            Padding = new Thickness(24),
-            Spacing = 16,
-            Children = { heading, explanation, status }
+            header = new HorizontalStackLayout
+            {
+                Spacing = 12,
+                VerticalOptions = LayoutOptions.Center,
+                Children =
+                {
+                    new Image
+                    {
+                        Source = icon,
+                        WidthRequest = 28,
+                        HeightRequest = 28,
+                        VerticalOptions = LayoutOptions.Center
+                    },
+                    heading
+                }
+            };
+        }
+        else
+        {
+            header = heading;
+        }
+
+        var card = new Border
+        {
+            Style = GetStyle("FoCardFrameStyle"),
+            Content = new VerticalStackLayout
+            {
+                Spacing = 12,
+                Children = { header, explanation, status }
+            }
         };
 
-        Content = new ScrollView { Content = content };
+        Content = new ScrollView
+        {
+            Content = new VerticalStackLayout
+            {
+                Padding = new Thickness(20, 24),
+                Spacing = 16,
+                Children = { card }
+            }
+        };
+    }
+
+    protected static Style? GetStyle(string key)
+    {
+        if (Application.Current?.Resources.TryGetValue(key, out var value) == true && value is Style style)
+            return style;
+        return null;
     }
 }
 
 public sealed class HomePage() : FeaturePlaceholderPage(
     "Family Pulse",
-    "A clear view of what needs attention, what is coming up, and the next useful action.") { }
+    "What needs attention, what is coming up, and the next useful action.",
+    "menu_home.png") { }
 
 public sealed class TasksPage() : FeaturePlaceholderPage(
     "Tasks",
-    "Household tasks, assignments, routines, and progress.") { }
+    "Household tasks, assignments, routines, and progress.",
+    "menu_tasks.png") { }
 
 public sealed class CalendarPage() : FeaturePlaceholderPage(
     "Calendar",
-    "Family events and shared schedules.") { }
+    "Family events and shared schedules.",
+    "menu_calendar.png") { }
 
 public sealed class FamilyPage() : FeaturePlaceholderPage(
     "Family",
-    "Household members, roles, and shared coordination.") { }
+    "Household members, roles, and shared coordination.",
+    "menu_family.png") { }
 
 public sealed class RequestsPage() : FeaturePlaceholderPage(
     "Requests",
-    "Submit, review, and track household requests.") { }
+    "Submit, review, and track household requests.",
+    "menu_requests.png") { }
 
 public sealed class MealsPage() : FeaturePlaceholderPage(
     "Meals",
-    "Weekly meal planning and recipes.") { }
+    "Weekly meal planning and recipes.",
+    "menu_meals.png") { }
 
 public sealed class ChatPage() : FeaturePlaceholderPage(
     "Chat",
-    "Household conversations.") { }
+    "Household conversations.",
+    "menu_chat.png") { }
 
 public sealed class SettingsPage() : FeaturePlaceholderPage(
     "Settings",
-    "Account, household, security, and app preferences.") { }
+    "Account, household, security, and app preferences.",
+    "menu_settings.png") { }
 
 public sealed class OutcomesPage() : FeaturePlaceholderPage(
     "Outcomes",
-    "A view of household activity and progress.") { }
+    "A view of household activity and progress.",
+    "menu_outcomes.png") { }
 
 public sealed class NotificationsPage() : FeaturePlaceholderPage(
     "Notifications",
-    "Updates and actions that need your attention.") { }
+    "Updates and actions that need your attention.",
+    "menu_notifications.png") { }
 
 public sealed class MorePage() : FeaturePlaceholderPage(
     "More",
-    "Additional FamilyOS destinations.")
+    "Additional FamilyOS destinations.",
+    "menu_more.png")
 {
     protected override void OnAppearing()
     {
         base.OnAppearing();
 
-        if (Content is not ScrollView scroll || scroll.Content is not VerticalStackLayout layout)
+        if (Content is not ScrollView scroll || scroll.Content is not VerticalStackLayout root)
             return;
 
-        if (layout.Children.Count > 3)
+        // Avoid duplicating rows on re-appear.
+        if (root.Children.Count > 1)
             return;
 
-        AddDestination(layout, "Requests", nameof(RequestsPage));
-        AddDestination(layout, "Meals", nameof(MealsPage));
-        AddDestination(layout, "Chat", nameof(ChatPage));
-        AddDestination(layout, "Outcomes", nameof(OutcomesPage));
-        AddDestination(layout, "Notifications", nameof(NotificationsPage));
-        AddDestination(layout, "Settings", nameof(SettingsPage));
-        AddDestination(layout, "Design system gallery", nameof(DesignSystemGalleryPage));
+        var list = new VerticalStackLayout { Spacing = 10 };
+        AddDestination(list, "Requests", nameof(RequestsPage), "menu_requests.png");
+        AddDestination(list, "Meals", nameof(MealsPage), "menu_meals.png");
+        AddDestination(list, "Chat", nameof(ChatPage), "menu_chat.png");
+        AddDestination(list, "Outcomes", nameof(OutcomesPage), "menu_outcomes.png");
+        AddDestination(list, "Notifications", nameof(NotificationsPage), "menu_notifications.png");
+        AddDestination(list, "Settings", nameof(SettingsPage), "menu_settings.png");
+        AddDestination(list, "Design system", nameof(DesignSystemGalleryPage), "menu_gallery.png");
+        root.Children.Add(list);
     }
 
-    private static void AddDestination(VerticalStackLayout layout, string title, string route)
+    private static void AddDestination(VerticalStackLayout layout, string title, string route, string icon)
     {
-        var button = new Button { Text = title, HorizontalOptions = LayoutOptions.Fill };
-        button.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
-        button.Clicked += async (_, _) => await Shell.Current.GoToAsync(route);
-        layout.Children.Add(button);
+        var row = new Grid
+        {
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(GridLength.Auto),
+                new ColumnDefinition(GridLength.Star),
+                new ColumnDefinition(GridLength.Auto)
+            },
+            ColumnSpacing = 14,
+            Padding = new Thickness(4, 2)
+        };
+
+        row.Add(new Image
+        {
+            Source = icon,
+            WidthRequest = 24,
+            HeightRequest = 24,
+            VerticalOptions = LayoutOptions.Center
+        }, 0);
+
+        row.Add(new Label
+        {
+            Text = title,
+            Style = GetStyle("TextBodyStrong"),
+            VerticalOptions = LayoutOptions.Center
+        }, 1);
+
+        row.Add(new Label
+        {
+            Text = "›",
+            Style = GetStyle("TextMutedArrow") ?? GetStyle("TextCaption"),
+            VerticalOptions = LayoutOptions.Center,
+            FontSize = 20
+        }, 2);
+
+        var border = new Border
+        {
+            Style = GetStyle("FoCardFrameStyle"),
+            Padding = new Thickness(14, 12),
+            Content = row
+        };
+
+        var tap = new TapGestureRecognizer();
+        tap.Tapped += async (_, _) => await Shell.Current.GoToAsync(route);
+        border.GestureRecognizers.Add(tap);
+
+        layout.Children.Add(border);
     }
 }
