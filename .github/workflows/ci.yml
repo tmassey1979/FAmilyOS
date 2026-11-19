@@ -64,16 +64,36 @@ jobs:
           echo "info=$RAW_VERSION+$SHORT" >> "$GITHUB_OUTPUT"
           echo "Using NuGet version $VERSION (informational version $RAW_VERSION+$SHORT)"
 
-      - name: Restore solution
-        run: dotnet restore FamilyOS.sln
+      - name: Restore backend + domain tests
+        run: |
+          set -euo pipefail
+          for proj in \
+            src/FamilyOS.Contracts/FamilyOS.Contracts.csproj \
+            src/FamilyOS.Domain/FamilyOS.Domain.csproj \
+            src/FamilyOS.Application/FamilyOS.Application.csproj \
+            src/FamilyOS.Infrastructure/FamilyOS.Infrastructure.csproj \
+            src/FamilyOS.Api/FamilyOS.Api.csproj \
+            tests/FamilyOS.Domain.Tests/FamilyOS.Domain.Tests.csproj
+          do
+            dotnet restore "$proj"
+          done
 
-      - name: Build solution
-        run: >
-          dotnet build FamilyOS.sln
-          --configuration Release
-          --no-restore
-          -p:Version=${{ steps.ver.outputs.version }}
-          -p:InformationalVersion=${{ steps.ver.outputs.info }}
+      - name: Build backend + domain tests
+        run: |
+          set -euo pipefail
+          VER="${{ steps.ver.outputs.version }}"
+          INFO="${{ steps.ver.outputs.info }}"
+          for proj in \
+            src/FamilyOS.Contracts/FamilyOS.Contracts.csproj \
+            src/FamilyOS.Domain/FamilyOS.Domain.csproj \
+            src/FamilyOS.Application/FamilyOS.Application.csproj \
+            src/FamilyOS.Infrastructure/FamilyOS.Infrastructure.csproj \
+            src/FamilyOS.Api/FamilyOS.Api.csproj \
+            tests/FamilyOS.Domain.Tests/FamilyOS.Domain.Tests.csproj
+          do
+            dotnet build "$proj" --configuration Release --no-restore \
+              -p:Version="$VER" -p:InformationalVersion="$INFO"
+          done
 
       - name: Test Domain
         run: >
@@ -132,6 +152,19 @@ jobs:
           name: domain-coverage
           path: coverage
           retention-days: 14
+
+  maui-design-system:
+    name: MAUI design-system tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Test design tokens & controls contract
+        run: >
+          dotnet test tests/FamilyOS.Maui.Tests/FamilyOS.Maui.Tests.csproj
+          --configuration Release
 
   mobile-typecheck:
     name: Mobile typecheck
