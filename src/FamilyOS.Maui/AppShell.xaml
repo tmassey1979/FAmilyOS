@@ -3,23 +3,46 @@
        xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
        xmlns:pages="clr-namespace:FamilyOS.Maui.Pages"
        x:Class="FamilyOS.Maui.AppShell"
-       FlyoutBehavior="Disabled">
+       FlyoutBehavior="Disabled"
+       Shell.NavBarIsVisible="True"
+       Shell.BackgroundColor="{StaticResource BgPage}"
+       Shell.ForegroundColor="{StaticResource TextPrimary}"
+       Shell.TitleColor="{StaticResource TextPrimary}"
+       Shell.TabBarBackgroundColor="{StaticResource BgSurface}"
+       Shell.TabBarForegroundColor="{StaticResource AccentPrimary}"
+       Shell.TabBarUnselectedColor="{StaticResource TextMuted}"
+       Shell.TabBarTitleColor="{StaticResource AccentPrimary}">
 
     <TabBar>
-        <Tab Title="Home" Route="home">
-            <ShellContent Title="Pulse" ContentTemplate="{DataTemplate pages:HomePage}" />
+        <Tab Title="Home"
+             Icon="menu_home.png"
+             Route="home">
+            <ShellContent Title="Pulse"
+                          ContentTemplate="{DataTemplate pages:HomePage}" />
         </Tab>
-        <Tab Title="Tasks" Route="tasks">
-            <ShellContent Title="Tasks" ContentTemplate="{DataTemplate pages:TasksPage}" />
+        <Tab Title="Tasks"
+             Icon="menu_tasks.png"
+             Route="tasks">
+            <ShellContent Title="Tasks"
+                          ContentTemplate="{DataTemplate pages:TasksPage}" />
         </Tab>
-        <Tab Title="Calendar" Route="calendar">
-            <ShellContent Title="Calendar" ContentTemplate="{DataTemplate pages:CalendarPage}" />
+        <Tab Title="Calendar"
+             Icon="menu_calendar.png"
+             Route="calendar">
+            <ShellContent Title="Calendar"
+                          ContentTemplate="{DataTemplate pages:CalendarPage}" />
         </Tab>
-        <Tab Title="Family" Route="family">
-            <ShellContent Title="Family" ContentTemplate="{DataTemplate pages:FamilyPage}" />
+        <Tab Title="Family"
+             Icon="menu_family.png"
+             Route="family">
+            <ShellContent Title="Family"
+                          ContentTemplate="{DataTemplate pages:FamilyPage}" />
         </Tab>
-        <Tab Title="More" Route="more">
-            <ShellContent Title="More" ContentTemplate="{DataTemplate pages:MorePage}" />
+        <Tab Title="More"
+             Icon="menu_more.png"
+             Route="more">
+            <ShellContent Title="More"
+                          ContentTemplate="{DataTemplate pages:MorePage}" />
         </Tab>
     </TabBar>
 </Shell>
