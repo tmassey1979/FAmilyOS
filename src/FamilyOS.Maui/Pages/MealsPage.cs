@@ -147,6 +147,26 @@ public sealed class MealsPage : ContentPage
 
     private async Task EditMealAsync(DateTime day, string slot, MealEntryDto? existing)
     {
+        if (existing is not null)
+        {
+            var action = await DisplayActionSheetAsync($"{day:dddd} · {slot}", "Cancel", "Remove meal", "Edit meal");
+            if (action == "Remove meal")
+            {
+                if (!await DisplayAlertAsync("Remove meal", $"Remove {existing.DishName}?", "Remove", "Keep")) return;
+                try
+                {
+                    await _api.RemoveEntryAsync(existing.Id);
+                    await LoadAsync();
+                }
+                catch (Exception ex)
+                {
+                    await DisplayAlertAsync("Meal not removed", ex is FamilyApiException ? ex.Message : "Could not remove this meal.", "OK");
+                }
+                return;
+            }
+            if (action != "Edit meal") return;
+        }
+
         var dish = await DisplayPromptAsync(existing is null ? "Add meal" : "Edit meal",
             $"{day:dddd} · {slot}", initialValue: existing?.DishName ?? "", maxLength: 160);
         if (string.IsNullOrWhiteSpace(dish)) return;
@@ -227,13 +247,16 @@ public sealed class MealsPage : ContentPage
 
     private async Task ApplyRecipeAsync(RecipeDto recipe)
     {
-        var day = _weekStart.AddDays(Math.Clamp((int)(MealMonday(DateTime.UtcNow) - _weekStart).TotalDays, 0, 6));
-        var choices = Slots;
-        var slot = await DisplayActionSheetAsync($"Add {recipe.Name} to…", "Cancel", null, choices);
+        var days = Enumerable.Range(0, 7).Select(i => _weekStart.AddDays(i)).ToArray();
+        var dayChoices = days.Select(d => d.ToString("dddd, MMM d")).ToArray();
+        var selectedDay = await DisplayActionSheetAsync($"Choose a day for {recipe.Name}", "Cancel", null, dayChoices);
+        var dayIndex = Array.IndexOf(dayChoices, selectedDay);
+        if (dayIndex < 0) return;
+        var slot = await DisplayActionSheetAsync("Choose a meal", "Cancel", null, Slots);
         if (string.IsNullOrWhiteSpace(slot) || slot == "Cancel") return;
         try
         {
-            await _api.ApplyRecipeAsync(recipe.Id, new ApplyRecipeDto(day, slot, _weekStart));
+            await _api.ApplyRecipeAsync(recipe.Id, new ApplyRecipeDto(days[dayIndex], slot, _weekStart));
             await LoadAsync();
         }
         catch (Exception ex)
