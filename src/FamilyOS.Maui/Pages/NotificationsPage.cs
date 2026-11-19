@@ -118,7 +118,7 @@ public sealed class NotificationsPage : ContentPage
         var border = new Border { Padding = 14, Content = stack };
         border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
         if (!item.IsRead)
-            border.Stroke = (Color)Application.Current!.Resources["AccentPrimary"];
+            border.Stroke = new SolidColorBrush((Color)Application.Current!.Resources["AccentPrimary"]);
         _items.Children.Add(border);
     }
 
