@@ -34,6 +34,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<OnboardingApiClient>();
         builder.Services.AddTransient<OnboardingPage>();
         builder.Services.AddSingleton<FamilyApiClient>();
+        builder.Services.AddSingleton<MeApiClient>();
         builder.Services.AddTransient<FamilyPage>();
         builder.Services.AddTransient<DesignSystemGalleryPage>();
         builder.Services.AddTransient<RequestsPage>();
