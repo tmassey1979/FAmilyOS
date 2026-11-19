@@ -101,11 +101,13 @@ public sealed class KeycloakAuthService : IAuthSessionService
         return await RefreshAccessTokenAsync(cancellationToken);
     }
 
-    public async Task SignOutAsync()
+    public Task SignOutAsync()
     {
-        await SecureStorage.Default.RemoveAsync(AccessTokenKey);
-        await SecureStorage.Default.RemoveAsync(RefreshTokenKey);
-        await SecureStorage.Default.RemoveAsync(ExpiresAtKey);
+        // ISecureStorage in .NET 11 exposes synchronous Remove(string), not RemoveAsync.
+        SecureStorage.Default.Remove(AccessTokenKey);
+        SecureStorage.Default.Remove(RefreshTokenKey);
+        SecureStorage.Default.Remove(ExpiresAtKey);
+        return Task.CompletedTask;
     }
 
     private async Task<string?> RefreshAccessTokenAsync(CancellationToken cancellationToken)
