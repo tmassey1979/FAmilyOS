@@ -1,5 +1,6 @@
 using FamilyOS.Maui.Services;
 using Microsoft.Maui.ApplicationModel;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FamilyOS.Maui.Pages;
 
@@ -7,15 +8,17 @@ namespace FamilyOS.Maui.Pages;
 public sealed class HomePage : ContentPage
 {
     private readonly PulseApiClient _pulseClient;
+    private readonly IServiceProvider _services;
     private readonly VerticalStackLayout _content;
     private readonly Label _status;
     private readonly Button _refresh;
     private PulseDto? _snapshot;
     private bool _loading;
 
-    public HomePage(PulseApiClient pulseClient)
+    public HomePage(PulseApiClient pulseClient, IServiceProvider services)
     {
         _pulseClient = pulseClient;
+        _services = services;
         Title = "Pulse";
 
         _status = new Label { Text = "Loading your family dashboard…", FontSize = 14 };
@@ -69,7 +72,7 @@ public sealed class HomePage : ContentPage
         catch (FamilyApiException ex)
         {
             _status.Text = ex.Message;
-            if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            if (ex.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
                 AddSignInHint();
         }
         catch (HttpRequestException)
@@ -228,14 +231,25 @@ public sealed class HomePage : ContentPage
 
     private void AddSignInHint()
     {
+        if (_content.Children.OfType<Button>().Any(b => b.Text == "Sign in / set up household"))
+            return;
+
         var hint = new Label
         {
-            Text = "Sign in from the account screen, then return here to refresh.",
+            Text = "Sign in or finish setting up your household to use FamilyOS.",
             FontSize = 13,
             LineBreakMode = LineBreakMode.WordWrap
         };
         hint.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+        var button = new Button { Text = "Sign in / set up household" };
+        button.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
+        button.Clicked += async (_, _) =>
+        {
+            var page = _services.GetRequiredService<OnboardingPage>();
+            await Shell.Current.Navigation.PushAsync(page);
+        };
         _content.Children.Add(hint);
+        _content.Children.Add(button);
     }
 
     private static async Task NavigateForAsync(string kind)
