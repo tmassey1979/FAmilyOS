@@ -17,7 +17,14 @@ public static class MauiProgram
             });
 
         builder.Services.AddSingleton<IThemeService, ThemeService>();
+        builder.Services.AddSingleton<AppShell>();
         builder.Services.AddTransient<DesignSystemGalleryPage>();
+        builder.Services.AddTransient<RequestsPage>();
+        builder.Services.AddTransient<MealsPage>();
+        builder.Services.AddTransient<ChatPage>();
+        builder.Services.AddTransient<SettingsPage>();
+        builder.Services.AddTransient<OutcomesPage>();
+        builder.Services.AddTransient<NotificationsPage>();
 
 #if DEBUG
         builder.Logging.AddDebug();
