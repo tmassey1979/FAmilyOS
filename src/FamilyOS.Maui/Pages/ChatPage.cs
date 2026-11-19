@@ -13,10 +13,12 @@ public sealed class ChatPage : ContentPage
     private readonly Button _refresh = new() { Text = "Refresh" };
     private readonly Button _older = new() { Text = "Load older messages" };
     private readonly ScrollView _scroll = new() { VerticalOptions = LayoutOptions.FillAndExpand };
+    private readonly HashSet<Guid> _knownMessageIds = new();
     private ChatChannelDto? _channel;
     private DateTime? _oldestMessage;
     private bool _loading;
     private bool _sending;
+    private CancellationTokenSource? _polling;
 
     public ChatPage(ChatApiClient api)
     {
@@ -66,6 +68,54 @@ public sealed class ChatPage : ContentPage
     {
         base.OnAppearing();
         if (_channel is null && !_loading) await LoadAsync();
+        StartPolling();
+    }
+
+    protected override void OnDisappearing()
+    {
+        StopPolling();
+        base.OnDisappearing();
+    }
+
+    private void StartPolling()
+    {
+        if (_polling is not null || _channel is null) return;
+        _polling = new CancellationTokenSource();
+        _ = PollAsync(_polling.Token);
+    }
+
+    private void StopPolling()
+    {
+        _polling?.Cancel();
+        _polling?.Dispose();
+        _polling = null;
+    }
+
+    private async Task PollAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (_channel is null || _loading || _sending) continue;
+                var latest = await _api.GetMessagesAsync(_channel.Id, 30, ct: cancellationToken);
+                var added = 0;
+                foreach (var message in latest)
+                {
+                    if (!_knownMessageIds.Add(message.Id)) continue;
+                    AddMessage(message);
+                    added++;
+                }
+                if (added > 0)
+                {
+                    _status.Text = $"{_channel.Name} · {added} new message(s)";
+                    await ScrollToLatestAsync();
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        catch (Exception) { /* Manual refresh remains available if polling fails. */ }
     }
 
     private async Task LoadAsync()
@@ -79,6 +129,7 @@ public sealed class ChatPage : ContentPage
             _channel ??= await _api.GetChannelAsync();
             var rows = await _api.GetMessagesAsync(_channel.Id, 50);
             _messages.Children.Clear();
+            _knownMessageIds.Clear();
             foreach (var item in rows) AddMessage(item);
             _oldestMessage = rows.Count == 0 ? null : rows[0].SentAtUtc;
             _older.IsEnabled = rows.Count == 50;
@@ -121,7 +172,9 @@ public sealed class ChatPage : ContentPage
                 _status.Text = "No older messages.";
                 return;
             }
-            foreach (var item in rows) _messages.Children.Insert(0, BuildMessage(item));
+            foreach (var item in rows)
+                if (_knownMessageIds.Add(item.Id))
+                    _messages.Children.Insert(0, BuildMessage(item));
             _oldestMessage = rows[0].SentAtUtc;
             _older.IsEnabled = rows.Count == 50;
             _status.Text = $"Loaded {rows.Count} older message(s).";
@@ -149,12 +202,10 @@ public sealed class ChatPage : ContentPage
             _channel ??= await _api.GetChannelAsync();
             var sent = await _api.SendAsync(body, _channel.Id);
             _composer.Text = string.Empty;
-            if (!_messages.Children.OfType<Border>().Any())
-                AddMessage(sent);
-            else
-                AddMessage(sent);
+            if (_knownMessageIds.Add(sent.Id)) AddMessage(sent);
             _status.Text = $"Sent · {sent.SentAtUtc.ToLocalTime():t}";
             await ScrollToLatestAsync();
+            StartPolling();
         }
         catch (Exception ex)
         {
@@ -173,7 +224,6 @@ public sealed class ChatPage : ContentPage
 
     private static Border BuildMessage(ChatMessageDto item)
     {
-        var mine = false;
         var title = new Label { Text = item.SenderName, FontSize = 12, FontAttributes = FontAttributes.Bold };
         title.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
         var body = new Label { Text = item.Body, FontSize = 15, LineBreakMode = LineBreakMode.WordWrap };

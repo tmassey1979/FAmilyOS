@@ -85,20 +85,10 @@ public abstract class FeaturePlaceholderPage : ContentPage
     }
 }
 
-public sealed class ChatPage() : FeaturePlaceholderPage(
-    "Chat",
-    "Household conversations.",
-    "menu_chat.png") { }
-
 public sealed class SettingsPage() : FeaturePlaceholderPage(
     "Settings",
     "Account, household, security, and app preferences.",
     "menu_settings.png") { }
-
-public sealed class OutcomesPage() : FeaturePlaceholderPage(
-    "Outcomes",
-    "A view of household activity and progress.",
-    "menu_outcomes.png") { }
 
 public sealed class MorePage() : FeaturePlaceholderPage(
     "More",
