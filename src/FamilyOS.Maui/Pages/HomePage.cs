@@ -1,6 +1,5 @@
 using FamilyOS.Maui.Services;
 using Microsoft.Maui.ApplicationModel;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace FamilyOS.Maui.Pages;
 
@@ -8,17 +7,15 @@ namespace FamilyOS.Maui.Pages;
 public sealed class HomePage : ContentPage
 {
     private readonly PulseApiClient _pulseClient;
-    private readonly IServiceProvider _services;
     private readonly VerticalStackLayout _content;
     private readonly Label _status;
     private readonly Button _refresh;
     private PulseDto? _snapshot;
     private bool _loading;
 
-    public HomePage(PulseApiClient pulseClient, IServiceProvider services)
+    public HomePage(PulseApiClient pulseClient)
     {
         _pulseClient = pulseClient;
-        _services = services;
         Title = "Pulse";
 
         _status = new Label { Text = "Loading your family dashboard…", FontSize = 14 };
@@ -245,8 +242,7 @@ public sealed class HomePage : ContentPage
         button.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
         button.Clicked += async (_, _) =>
         {
-            var page = _services.GetRequiredService<OnboardingPage>();
-            await Shell.Current.Navigation.PushAsync(page);
+            await Shell.Current.GoToAsync(nameof(OnboardingPage));
         };
         _content.Children.Add(hint);
         _content.Children.Add(button);
