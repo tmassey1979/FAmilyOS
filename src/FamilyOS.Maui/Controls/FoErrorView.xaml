@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:FamilyOS.Maui.Controls"
+             x:Class="FamilyOS.Maui.Controls.FoErrorView">
+    <VerticalStackLayout Padding="32" Spacing="12" HorizontalOptions="Center" VerticalOptions="Center">
+        <Label x:Name="MessageLabel" Style="{StaticResource TextHeading}" HorizontalTextAlignment="Center" />
+        <controls:FoButton x:Name="RetryButton" Title="Try again" Variant="Secondary" HorizontalOptions="Center" Clicked="OnRetry" />
+    </VerticalStackLayout>
+</ContentView>
