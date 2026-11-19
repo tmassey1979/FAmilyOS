@@ -1,0 +1,88 @@
+name: Android Emulator Smoke Test
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: android-smoke-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  android-smoke:
+    name: Build and launch MAUI APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "11.0.x"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-35 build-tools;35.0.0
+      - name: Stage MAUI brand assets
+        run: |
+          set -euo pipefail
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pillow
+          chmod +x scripts/stage-maui-brand-assets.sh
+          ./scripts/stage-maui-brand-assets.sh
+      - name: Install MAUI Android workload
+        run: dotnet workload install maui-android --ignore-failed-sources
+      - name: Restore MAUI Android project
+        run: dotnet restore src/FamilyOS.Maui/FamilyOS.Maui.csproj -p:TargetFramework=net11.0-android
+      - name: Build installable debug APK
+        run: >
+          dotnet publish src/FamilyOS.Maui/FamilyOS.Maui.csproj
+          --configuration Debug
+          --framework net11.0-android
+          -p:AndroidPackageFormat=apk
+          -p:ApplicationDisplayVersion=0.1.0
+          -p:ApplicationVersion=${{ github.run_number }}
+      - name: Install and launch MAUI app in Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            APK=$(find src/FamilyOS.Maui/bin/Debug/net11.0-android -type f -name '*Signed.apk' -print -quit)
+            if [[ -z "$APK" ]]; then
+              APK=$(find src/FamilyOS.Maui/bin/Debug/net11.0-android -type f -name '*.apk' -print -quit)
+            fi
+            test -n "$APK"
+            adb install -r "$APK"
+            adb logcat -c
+            adb shell monkey -p com.familyos.app 1
+            sleep 15
+            LOGS="$(adb logcat -d -t 4000)"
+            if ! adb shell pidof com.familyos.app >/dev/null; then
+              echo "::error::FamilyOS process exited after launch."
+              printf '%s\\n' "$LOGS"
+              exit 1
+            fi
+            if printf '%s\\n' "$LOGS" | grep -E "FATAL EXCEPTION|Fatal signal [0-9]+|Process: com\\\\.familyos\\\\.app"; then
+              echo "::error::Android reported a fatal FamilyOS startup error."
+              printf '%s\\n' "$LOGS"
+              exit 1
+            fi
+            echo "FamilyOS remained running after Android emulator launch."
+      - name: Upload APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FamilyOS-Android-Smoke-APK
+          path: src/FamilyOS.Maui/bin/Debug/net11.0-android/**/*.apk
+          if-no-files-found: warn
+          retention-days: 7
