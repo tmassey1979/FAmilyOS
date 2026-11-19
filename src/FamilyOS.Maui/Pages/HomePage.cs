@@ -26,20 +26,17 @@ public sealed class HomePage : ContentPage
         _refresh.Clicked += async (_, _) => await LoadAsync();
 
         _content = new VerticalStackLayout { Padding = new Thickness(20, 12), Spacing = 16 };
-        _content.Children.Add(_status);
 
         var header = new Grid
         {
-            ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
-            Children =
-            {
-                new Label { Text = "Family Pulse", FontSize = 26, FontAttributes = FontAttributes.Bold,
-                    VerticalOptions = LayoutOptions.Center }.WithStyle("TextDisplay"),
-                _refresh
-            }
+            ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
         };
+        var heading = new Label { Text = "Family Pulse", FontSize = 26, FontAttributes = FontAttributes.Bold,
+            VerticalOptions = LayoutOptions.Center }.WithStyle("TextDisplay");
+        header.Add(heading, 0, 0);
+        header.Add(_refresh, 1, 0);
 
-        var layout = new VerticalStackLayout { Spacing = 8, Children = { header, _content } };
+        var layout = new VerticalStackLayout { Spacing = 8, Children = { header, _status, _content } };
         Content = new RefreshView
         {
             Content = new ScrollView { Content = layout },
