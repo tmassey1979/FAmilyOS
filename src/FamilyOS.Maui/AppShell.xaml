@@ -10,7 +10,7 @@
             <ShellContent x:Name="HomeShellContent" Title="Pulse" ContentTemplate="{DataTemplate pages:HomePage}" />
         </Tab>
         <Tab Title="Tasks" Route="tasks">
-            <ShellContent Title="Tasks" ContentTemplate="{DataTemplate pages:TasksPage}" />
+            <ShellContent x:Name="TasksShellContent" Title="Tasks" ContentTemplate="{DataTemplate pages:TasksPage}" />
         </Tab>
         <Tab Title="Calendar" Route="calendar">
             <ShellContent Title="Calendar" ContentTemplate="{DataTemplate pages:CalendarPage}" />
