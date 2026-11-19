@@ -179,7 +179,7 @@ public sealed class CalendarPage : ContentPage
         var title = await DisplayPromptAsync("New event", "Event title");
         if (string.IsNullOrWhiteSpace(title)) return;
         var startInput = await DisplayPromptAsync("Start time", "Use local time: YYYY-MM-DD HH:MM", "Continue", "Cancel",
-            "2026-11-19 18:00", 16, Keyboard.Text);
+            _rangeStart.AddHours(18).ToString("yyyy-MM-dd HH:mm"), 16, Keyboard.Text);
         if (string.IsNullOrWhiteSpace(startInput)) return;
         if (!DateTime.TryParseExact(startInput.Trim(), "yyyy-MM-dd HH:mm",
                 System.Globalization.CultureInfo.InvariantCulture,
