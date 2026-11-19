@@ -43,43 +43,43 @@ public abstract class FeaturePlaceholderPage : ContentPage
 
 public sealed class HomePage() : FeaturePlaceholderPage(
     "Family Pulse",
-    "A clear view of what needs attention, what is coming up, and the next useful action.");
+    "A clear view of what needs attention, what is coming up, and the next useful action.") { }
 
 public sealed class TasksPage() : FeaturePlaceholderPage(
     "Tasks",
-    "Household tasks, assignments, routines, and progress.");
+    "Household tasks, assignments, routines, and progress.") { }
 
 public sealed class CalendarPage() : FeaturePlaceholderPage(
     "Calendar",
-    "Family events and shared schedules.");
+    "Family events and shared schedules.") { }
 
 public sealed class FamilyPage() : FeaturePlaceholderPage(
     "Family",
-    "Household members, roles, and shared coordination.");
+    "Household members, roles, and shared coordination.") { }
 
 public sealed class RequestsPage() : FeaturePlaceholderPage(
     "Requests",
-    "Submit, review, and track household requests.");
+    "Submit, review, and track household requests.") { }
 
 public sealed class MealsPage() : FeaturePlaceholderPage(
     "Meals",
-    "Weekly meal planning and recipes.");
+    "Weekly meal planning and recipes.") { }
 
 public sealed class ChatPage() : FeaturePlaceholderPage(
     "Chat",
-    "Household conversations.");
+    "Household conversations.") { }
 
 public sealed class SettingsPage() : FeaturePlaceholderPage(
     "Settings",
-    "Account, household, security, and app preferences.");
+    "Account, household, security, and app preferences.") { }
 
 public sealed class OutcomesPage() : FeaturePlaceholderPage(
     "Outcomes",
-    "A view of household activity and progress.");
+    "A view of household activity and progress.") { }
 
 public sealed class NotificationsPage() : FeaturePlaceholderPage(
     "Notifications",
-    "Updates and actions that need your attention.");
+    "Updates and actions that need your attention.") { }
 
 public sealed class MorePage() : FeaturePlaceholderPage(
     "More",
