@@ -37,28 +37,8 @@ jobs:
           dotnet build FamilyOS.sln -c Release --no-restore
           dotnet test FamilyOS.sln -c Release --no-build --verbosity minimal
 
-  validate-mobile-pr:
-    name: Validate mobile app on pull requests
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: mobile
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: mobile/package-lock.json
-      - name: Install dependencies
-        run: npm ci
-      - name: Typecheck and validate Expo
-        run: |
-          npm run typecheck
-          npx expo install --check
-          npx expo-doctor
-          npx expo export --platform android
+  # MAUI is the shipping Android client. The regular CI workflow typechecks
+  # the legacy Expo reference app and builds the MAUI Android package.
 
   build-server-images:
     needs: [validate-api]
@@ -73,7 +53,8 @@ jobs:
       - name: Read app version
         id: version
         run: |
-          VERSION=$(python3 -c "import json; print(json.load(open('mobile/app.json'))['expo']['version'])")
+          VERSION=$(grep -oP '(?<=<VersionPrefix>)[^<]+' Directory.Build.props | head -1)
+          test -n "$VERSION"
           echo "value=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GHCR
@@ -114,83 +95,106 @@ jobs:
 
   build-android:
     needs: [validate-api]
-    name: Build Android APK via EAS
+    name: Build versioned MAUI Android APK
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     outputs:
       version: ${{ steps.version.outputs.value }}
-      eas_build_id: ${{ steps.eas.outputs.build_id }}
+      version_code: ${{ steps.version.outputs.code }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Read app version
-        id: version
-        run: |
-          VERSION=$(python3 -c "import json; print(json.load(open('mobile/app.json'))['expo']['version'])")
-          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: mobile/package-lock.json
+          fetch-depth: 0
+
+      - name: Resolve app version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION=$(grep -oP '(?<=<VersionPrefix>)[^<]+' Directory.Build.props | head -1)
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Directory.Build.props VersionPrefix must be SemVer X.Y.Z; got '$VERSION'"
+            exit 1
+          fi
+          CODE="$GITHUB_RUN_NUMBER"
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "Building FamilyOS MAUI v$VERSION (Android versionCode $CODE)"
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "11.0.x"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Expand / seed brand assets
-        run: |
-          python3 scripts/expand-assets.py || true
-          python3 scripts/seed-brand-assets.py || true
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-35 build-tools;35.0.0
 
-      - name: Install mobile deps
-        working-directory: mobile
-        run: npm ci
-
-      - name: EAS build Android APK
-        id: eas
-        working-directory: mobile
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      - name: Stage MAUI brand assets
         run: |
           set -euo pipefail
-          if [ -z "${EXPO_TOKEN:-}" ]; then
-            echo "::error::EXPO_TOKEN secret is required for EAS builds"
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pillow
+          chmod +x scripts/stage-maui-brand-assets.sh
+          ./scripts/stage-maui-brand-assets.sh
+
+      - name: Install MAUI Android workload
+        run: dotnet workload install maui-android --ignore-failed-sources
+
+      - name: Restore MAUI Android project
+        run: dotnet restore src/FamilyOS.Maui/FamilyOS.Maui.csproj -p:TargetFramework=net11.0-android
+
+      - name: Publish versioned MAUI Release APK
+        run: >
+          dotnet publish src/FamilyOS.Maui/FamilyOS.Maui.csproj
+          --configuration Release
+          --framework net11.0-android
+          -p:AndroidPackageFormat=apk
+          -p:ApplicationDisplayVersion=${{ steps.version.outputs.value }}
+          -p:ApplicationVersion=${{ steps.version.outputs.code }}
+          -p:Version=${{ steps.version.outputs.value }}
+          -p:InformationalVersion=${{ steps.version.outputs.value }}+${GITHUB_SHA::7}
+
+      - name: Stage versioned APK
+        id: apk
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=$(find src/FamilyOS.Maui/bin/Release/net11.0-android -type f -name '*Signed.apk' -print -quit)
+          if [[ -z "$APK" ]]; then
+            APK=$(find src/FamilyOS.Maui/bin/Release/net11.0-android -type f -name '*.apk' -print -quit)
+          fi
+          if [[ -z "$APK" ]]; then
+            echo "::error::MAUI build did not produce an APK."
+            find src/FamilyOS.Maui/bin/Release/net11.0-android -maxdepth 6 -type f -print || true
             exit 1
           fi
-          npx --yes eas-cli@latest whoami
-          BUILD_JSON=$(npx --yes eas-cli@latest build --platform android --profile production-apk --non-interactive --json --wait)
-          echo "$BUILD_JSON" > /tmp/eas-build.json
-          BUILD_ID=$(python3 -c "import json; d=json.load(open('/tmp/eas-build.json')); print(d[0]['id'] if isinstance(d, list) else d['id'])")
-          echo "build_id=$BUILD_ID" >> "$GITHUB_OUTPUT"
-          ARTIFACT_URL=$(python3 -c "import json; d=json.load(open('/tmp/eas-build.json')); x=d[0] if isinstance(d, list) else d; print(x.get('artifacts',{}).get('buildUrl') or x.get('artifacts',{}).get('applicationArchiveUrl') or '')")
-          echo "artifact_url=$ARTIFACT_URL" >> "$GITHUB_OUTPUT"
-          echo "EAS build $BUILD_ID done"
+          mkdir -p artifacts
+          OUT="artifacts/FamilyOS-MAUI-Android-v${{ steps.version.outputs.value }}-build${{ steps.version.outputs.code }}.apk"
+          cp "$APK" "$OUT"
+          echo "path=$OUT" >> "$GITHUB_OUTPUT"
+          sha256sum "$OUT" | tee artifacts/SHA256SUMS.txt
+          ls -lh "$OUT"
 
-      - name: Download APK artifact
-        working-directory: mobile
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          ARTIFACT_URL: ${{ steps.eas.outputs.artifact_url }}
-        run: |
-          set -euo pipefail
-          OUT="FamilyOS-android-v${{ steps.version.outputs.value }}-build${{ github.run_number }}.apk"
-          if [ -n "${ARTIFACT_URL:-}" ]; then
-            curl -L -o "$OUT" "$ARTIFACT_URL"
-          else
-            npx --yes eas-cli@latest build:download --id "${{ steps.eas.outputs.build_id }}" --platform android --output "$OUT" || true
-          fi
-          test -f "$OUT"
-          echo "APK size: $(wc -c < "$OUT")"
-
-      - name: Upload verified APK for final release
+      - name: Upload versioned APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: familyos-android-apk-${{ github.run_id }}
-          path: mobile/FamilyOS-android-v${{ steps.version.outputs.value }}-build${{ github.run_number }}.apk
+          name: FamilyOS-MAUI-Android-v${{ steps.version.outputs.value }}-build${{ steps.version.outputs.code }}
+          path: |
+            ${{ steps.apk.outputs.path }}
+            artifacts/SHA256SUMS.txt
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 30
 
   deploy-server:
     name: Deploy and verify AWS server
@@ -200,31 +204,32 @@ jobs:
     secrets: inherit
 
   publish-coordinated-release:
-    name: Publish release after server deployment
+    name: Publish release with installable MAUI APK
     needs: [build-server-images, build-android, deploy-server]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: familyos-android-apk-${{ github.run_id }}
+          name: FamilyOS-MAUI-Android-v${{ needs.build-android.outputs.version }}-build${{ needs.build-android.outputs.version_code }}
           path: release-assets
 
       - name: Publish coordinated GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.build-android.outputs.version }}
+          VERSION_CODE: ${{ needs.build-android.outputs.version_code }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
           APK=$(find release-assets -maxdepth 1 -type f -name '*.apk' -print -quit)
           test -n "$APK"
-          TAG="familyos-android-v${VERSION}-build${BUILD_NUMBER}"
-          gh release create "$TAG" "$APK" \
+          TAG="v${VERSION}-build${BUILD_NUMBER}"
+          gh release create "$TAG" "$APK" release-assets/SHA256SUMS.txt \
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "FamilyOS v${VERSION} (build ${BUILD_NUMBER})" \
-            --notes "Coordinated FamilyOS release. The Android APK was built and verified, and the matching API and Keycloak images were deployed to AWS with successful health checks. Source commit: ${GITHUB_SHA}." \
+            --notes "FamilyOS MAUI Android release. versionName: ${VERSION}. versionCode: ${VERSION_CODE}. Source commit: ${GITHUB_SHA}. API and Keycloak images were deployed and health-checked by this coordinated release." \
             --latest
 
       - name: Release summary
@@ -232,8 +237,8 @@ jobs:
           {
             echo "## FamilyOS coordinated release"
             echo "- App version: ${{ needs.build-android.outputs.version }}"
+            echo "- Android versionCode: ${{ needs.build-android.outputs.version_code }}"
             echo "- Commit: ${GITHUB_SHA}"
-            echo "- EAS build: https://expo.dev/accounts/tmassey1979/projects/familyos/builds/${{ needs.build-android.outputs.eas_build_id }}"
-            echo "- Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/familyos-android-v${{ needs.build-android.outputs.version }}-build${{ github.run_number }}"
-            echo "- Server deployment and health checks completed before publishing this release."
+            echo "- APK release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${{ needs.build-android.outputs.version }}-build${{ github.run_number }}"
+            echo "- The APK is attached to the GitHub Release."
           } >> "$GITHUB_STEP_SUMMARY"
