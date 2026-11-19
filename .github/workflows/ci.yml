@@ -193,39 +193,43 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: "11.0.x"
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          # The legacy `tools` SDK package was removed from current Android SDK repos.
+          # Legacy `tools` package removed from current Android SDK repos.
           packages: platform-tools platforms;android-35 build-tools;35.0.0
 
       - name: Install MAUI Android workload
         run: dotnet workload install maui-android --ignore-failed-sources
 
       - name: Restore MAUI Android project
-        run: dotnet restore src/FamilyOS.Maui/FamilyOS.Maui.csproj -p:TargetFramework=net8.0-android
+        run: dotnet restore src/FamilyOS.Maui/FamilyOS.Maui.csproj -p:TargetFramework=net11.0-android
 
       - name: Build installable debug APK
-        run: dotnet publish src/FamilyOS.Maui/FamilyOS.Maui.csproj --configuration Debug --framework net8.0-android -p:AndroidPackageFormat=apk
+        run: >
+          dotnet publish src/FamilyOS.Maui/FamilyOS.Maui.csproj
+          --configuration Debug
+          --framework net11.0-android
+          -p:AndroidPackageFormat=apk
 
       - name: Stage APK
         shell: bash
         run: |
           set -euo pipefail
-          APK=$(find src/FamilyOS.Maui/bin/Debug/net8.0-android -type f -name '*Signed.apk' -print -quit)
+          APK=$(find src/FamilyOS.Maui/bin/Debug/net11.0-android -type f -name '*Signed.apk' -print -quit)
           if [[ -z "$APK" ]]; then
-            APK=$(find src/FamilyOS.Maui/bin/Debug/net8.0-android -type f -name '*.apk' -print -quit)
+            APK=$(find src/FamilyOS.Maui/bin/Debug/net11.0-android -type f -name '*.apk' -print -quit)
           fi
           if [[ -z "$APK" ]]; then
             echo "::error::MAUI Android build completed without producing an APK."
-            find src/FamilyOS.Maui/bin/Debug/net8.0-android -maxdepth 5 -type f -print || true
+            find src/FamilyOS.Maui/bin/Debug/net11.0-android -maxdepth 5 -type f -print || true
             exit 1
           fi
           mkdir -p artifacts
