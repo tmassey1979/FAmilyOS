@@ -90,11 +90,6 @@ public sealed class SettingsPage() : FeaturePlaceholderPage(
     "Account, household, security, and app preferences.",
     "menu_settings.png") { }
 
-public sealed class OutcomesPage() : FeaturePlaceholderPage(
-    "Outcomes",
-    "A view of household activity and progress.",
-    "menu_outcomes.png") { }
-
 public sealed class MorePage() : FeaturePlaceholderPage(
     "More",
     "Additional FamilyOS destinations.",
