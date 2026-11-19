@@ -1,3 +1,5 @@
+using FamilyOS.Maui.Services;
+
 namespace FamilyOS.Maui;
 
 public partial class App : Application
