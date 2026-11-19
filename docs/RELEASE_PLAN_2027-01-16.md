@@ -8,7 +8,7 @@
 
 Ship the largest safe and coherent Android production release of FamilyOS by January 16, 2027. The core release includes household coordination, tasks, requests/approvals, calendar, Pulse, shopping, meals, messaging, notifications, settings and reliable offline behavior.
 
-Location tracking, SOS, finance/banking, smart home, health, school-provider integrations and advanced provider-dependent AI are explicitly out of the critical path. They may ship only if their independent privacy, consent, security, provider and device validation is complete. Never enable them by default.
+Location tracking, SOS, finance/banking, smart home, health, school-provider integrations and advanced provider-dependent AI are explicitly out of the critical path. Finance and location have separately scoped P2 stories and may ship only if their independent privacy, consent, security, provider and device validation is complete. Never enable them by default.
 
 ## Work packages
 
@@ -29,6 +29,8 @@ Location tracking, SOS, finance/banking, smart home, health, school-provider int
 | [#14](https://github.com/tmassey1979/FamilyOS/issues/14) | Accessibility, settings and Android release UX | P1 |
 | [#15](https://github.com/tmassey1979/FamilyOS/issues/15) | Feature flags, entitlements and optional module boundaries | P2 |
 | [#17](https://github.com/tmassey1979/FamilyOS/issues/17) | Google Play subscriptions, trial and commercial entitlement lifecycle | P2 |
+| [#18](https://github.com/tmassey1979/FamilyOS/issues/18) | Finance software: virtual envelopes, allowances and reports | P2 |
+| [#19](https://github.com/tmassey1979/FamilyOS/issues/19) | Consent-based location, geofences, check-ins and household alerts | P2 |
 
 ## Calendar
 
@@ -83,7 +85,7 @@ Location tracking, SOS, finance/banking, smart home, health, school-provider int
 - Verify app update/install path and store metadata/assets.
 - Confirm monitoring, support/incident response, backup and rollback readiness.
 - Make explicit go/no-go decision; no scope expansion.
-- Complete Google Play billing only if it does not displace P0/P1 release gates; otherwise defer paid activation.
+- Complete Google Play billing and optional modules only if they do not displace P0/P1 release gates; otherwise defer activation.
 
 **January 16:** production release decision and rollout only if all mandatory gates are green.
 
