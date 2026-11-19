@@ -59,6 +59,7 @@ public sealed class KeycloakAuthService : IAuthSessionService
             cancellationToken);
 
         if (!authResult.Properties.TryGetValue("state", out var returnedState)
+            || returnedState.Length != state.Length
             || !CryptographicOperations.FixedTimeEquals(
                 System.Text.Encoding.UTF8.GetBytes(state),
                 System.Text.Encoding.UTF8.GetBytes(returnedState)))
