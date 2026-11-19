@@ -1,109 +1,42 @@
-# Family OS — Feature → Story Index
+# FamilyOS — Feature → Release Story Index
 
-Every product feature maps to a GitHub **story** (vertical slice: backend + frontend where applicable).
-Repo: https://github.com/tmassey1979/FamilyOS
+**Release target:** 2027-01-16  
+**Canonical epic:** [#1 FamilyOS Android production release](https://github.com/tmassey1979/FamilyOS/issues/1)
 
-## Product scenarios (definition of done)
+This index replaces the previous story-number mapping, which referenced issue IDs that are not present in the current repository issue tracker. The new issues are production-oriented vertical slices; each includes acceptance criteria and dependencies.
 
-| Scenario | Story |
-|----------|-------|
-| 1 Family setup | #60 |
-| 2 Task lifecycle | #61 |
-| 3 Decline | #62 |
-| 4 Ride request | #26 |
-| 5 Purchase | #59 |
-| 6 Meal plan | #63 |
-| 7 Family Pulse by role | #64 |
+| Product area | Release story |
+|---|---|
+| Production authentication, PKCE, household onboarding, invitations and member access | [#2](https://github.com/tmassey1979/FamilyOS/issues/2) |
+| Roles, household isolation, privacy and server-side authorization | [#3](https://github.com/tmassey1979/FamilyOS/issues/3) |
+| Household profiles, relationships, member lifecycle and ownership | [#4](https://github.com/tmassey1979/FamilyOS/issues/4) |
+| Tasks, recurrence, routines, assignment/acceptance and time tracking | [#5](https://github.com/tmassey1979/FamilyOS/issues/5) |
+| Dynamic requests, approvals, conditions, decision history and execution plans | [#6](https://github.com/tmassey1979/FamilyOS/issues/6) |
+| Shared calendar, editing, attendees, linked tasks/requests and Google sync | [#7](https://github.com/tmassey1979/FamilyOS/issues/7) |
+| Pulse, blockers, outcomes and household activity | [#8](https://github.com/tmassey1979/FamilyOS/issues/8) |
+| In-app/push notifications, quiet hours, deep links and realtime | [#9](https://github.com/tmassey1979/FamilyOS/issues/9) |
+| Offline cache, mutation queue, replay, idempotency and conflicts | [#10](https://github.com/tmassey1979/FamilyOS/issues/10) |
+| Shopping queue, carts, purchases, meal planning and recipes | [#11](https://github.com/tmassey1979/FamilyOS/issues/11) |
+| API integration tests, domain coverage, mobile checks and CI gates | [#12](https://github.com/tmassey1979/FamilyOS/issues/12) |
+| Production security, data lifecycle, backups, observability and recovery | [#13](https://github.com/tmassey1979/FamilyOS/issues/13) |
+| Settings, onboarding guidance, accessibility and Android release UX | [#14](https://github.com/tmassey1979/FamilyOS/issues/14) |
+| Module flags, entitlements, consent and optional-module boundaries | [#15](https://github.com/tmassey1979/FamilyOS/issues/15) |
 
-## PLAN → REQUEST → DECIDE → EXECUTE → MEASURE → LEARN
+## Product scenarios / release acceptance
 
-### Foundation & identity
-| Feature | Story |
-|---------|-------|
-| Keycloak OIDC + PKCE login | #6 |
-| Household onboarding / invite | #22 |
-| Members & roles UI | #16 |
-| Change role (Owner) | #58 |
-| Deactivate member | #50 |
-| Family-scoped permissions | #36 |
-| Assignment ≠ acceptance | #68 |
-| Demo Henderson seed | #38 |
-| Docker Compose stack | #65 |
-| EF Core migrations | #66 |
+1. A new family can install, register, create a household, invite members and sign in again.
+2. Each role can perform permitted actions and cannot access another household's records.
+3. Members can assign, accept, decline, complete, defer and schedule recurring responsibilities.
+4. Members can create schema-driven requests; approvers can decide, set conditions and commit reviewed execution plans.
+5. Members can create/edit/cancel shared events and navigate linked tasks/requests.
+6. Pulse surfaces accurate next actions, blockers and upcoming commitments for the signed-in role.
+7. Members can communicate and receive permission-safe notifications with working deep links.
+8. Shopping and meal workflows connect recipes, requests, carts and purchase history.
+9. Core workflows recover safely after offline use, app restart, token expiry and connectivity restoration.
+10. Production operations support secure deployment, observability, backup/restore and rollback.
 
-### Tasks
-| Feature | Story |
-|---------|-------|
-| Create / assign / accept / complete | #7 |
-| Reassign / defer / cancel | #24 |
-| Decline + reasons | #30 |
-| Recurring + policy | #18 |
-| Skip instance | #52 |
-| Priority / category / overdue | #48 |
-| Planned vs actual time | #25 |
-| Task history timeline | #40 |
+## Completion rule
 
-### Requests & decisions
-| Feature | Story |
-|---------|-------|
-| Dynamic questionnaire + queue | #8 |
-| Full type catalog | #33 |
-| School/Medical/Personal/Household/Other | #67 |
-| Draft save/edit/submit | #53 |
-| Ask / answer questions | #44 |
-| Cancel / withdraw | #45 |
-| Money request | #27 |
-| Grocery → procurement | #39 |
-| Approval policies | #23 |
-| Owner policy override | #47 |
-| Conditional approval | #46 |
-| Conditions / blockers | #13 |
-| Execution plan commit | #9 |
-| Request decision trail | #41 |
+A release story is not complete because code exists. It must satisfy its issue acceptance criteria in the current branch, pass CI, and have runtime/device evidence where specified. Optional modules must remain independently disabled unless their own safety and release gates pass.
 
-### Calendar, meals, procurement
-| Feature | Story |
-|---------|-------|
-| Calendar view + task-backed | #12 |
-| Event create/edit + attendees | #54 |
-| Recipes & meal plan | #17 |
-| Procurement queue → purchase | #10 |
-| Cart build / abandon | #69 |
-| Shopping trip by store | #28 |
-| Hold / defer / no-longer-needed | #49 |
-| Product catalog & prices | #29 |
-
-### Pulse, notify, learn
-| Feature | Story |
-|---------|-------|
-| Family Pulse home | #11 |
-| Waiting / blockers section | #35 |
-| In-app notifications + deep link | #14 #55 |
-| Push notifications | #32 |
-| Notification preferences / quiet hours | #51 |
-| SignalR realtime | #31 |
-| Domain events (MassTransit) | #56 |
-| Outcomes dashboard | #34 |
-| External time source hooks | #37 |
-
-### App shell & quality
-| Feature | Story |
-|---------|-------|
-| Settings hub | #42 |
-| Offline-tolerant mobile | #57 |
-| Production hardening | #43 |
-
-## Engineering tasks (not product stories)
-
-| Task | Issue |
-|------|-------|
-| CI / release auto-version | #15 |
-| Domain unit tests ≥90% | #19 |
-| Expo app shell | #20 |
-| Push full source to main | #21 |
-
-## Count
-
-- **Product stories:** #6–#14, #16–#18, #22–#69 (excl. tasks)
-- **Tasks:** #15, #19, #20, #21
-- **Phases #1–#5:** closed (superseded by slices)
+See [ROADMAP.md](ROADMAP.md) and [docs/RELEASE_PLAN_2027-01-16.md](docs/RELEASE_PLAN_2027-01-16.md).
