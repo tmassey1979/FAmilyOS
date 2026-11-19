@@ -2,15 +2,15 @@
 
 **Production target:** Android release candidate and production readiness by **2027-01-16**.  
 **Delivery window:** 58 days beginning 2026-11-19.  
-**Canonical tracker:** [Issue #1 — FamilyOS Android production release](https://github.com/tmassey1979/FamilyOS/issues/1).  
+**Canonical tracker:** [Issue #1 — FamilyOS Android production release](https://github.com/tmassey1979/FAmilyOS/issues/1).  
 **Detailed plan:** [docs/RELEASE_PLAN_2027-01-16.md](docs/RELEASE_PLAN_2027-01-16.md).
 
-This roadmap supersedes the stale issue-number references in the previous roadmap. Delivery work is tracked in issues #2–#15 and #17. The November 14 source audit is a starting baseline only; implementation status must be re-verified against current main and runtime evidence.
+This roadmap supersedes stale issue-number references in the previous roadmap. Delivery work is tracked in issues #2–#15 and #17–#19. The November 14 source audit is a starting baseline only; implementation status must be re-verified against current main and runtime evidence.
 
 ## Release strategy
 
 - Android-first production release of the largest safe, complete portion of the FamilyOS core.
-- Ship complete vertical slices, not disconnected screens: API + domain + persistence + authorization + mobile UI + tests.
+- Ship complete vertical slices: API + domain + persistence + authorization + mobile UI + tests.
 - Keep core household coordination useful without paid/optional modules.
 - Reduce optional scope before weakening security, privacy, offline correctness or release acceptance.
 - Treat source presence as **not** proof of production readiness.
@@ -36,14 +36,16 @@ This roadmap supersedes the stale issue-number references in the previous roadma
 - [ ] [#11 Shopping, procurement and meals end-to-end polish](https://github.com/tmassey1979/FamilyOS/issues/11)
 - [ ] [#14 Android accessibility, settings and release UX](https://github.com/tmassey1979/FamilyOS/issues/14)
 
-**Exit:** household members can onboard, coordinate responsibilities, submit and decide requests, manage events, communicate, shop and plan meals through complete and permission-safe Android journeys.
-
-## P2 — Optional boundaries and commercial readiness
+## P2 — Commercial and optional modules
 
 - [ ] [#15 Feature flags, entitlements and optional module boundaries](https://github.com/tmassey1979/FamilyOS/issues/15)
 - [ ] [#17 Google Play subscriptions, 30-day trial and commercial entitlement lifecycle](https://github.com/tmassey1979/FamilyOS/issues/17)
+- [ ] [#18 Finance software: virtual envelopes, allowances and household reports](https://github.com/tmassey1979/FamilyOS/issues/18)
+- [ ] [#19 Consent-based location sharing, places, check-ins and safety alerts](https://github.com/tmassey1979/FamilyOS/issues/19)
 
-GPS/geofencing/SOS, finance/banking, smart home, health, school-provider integrations, advanced AI and other provider-dependent capabilities are not assumed to ship in this release. They require independent consent, privacy, security, provider and device validation. Paid pricing/trials must not be advertised until billing, entitlement verification, cancellation/refund handling and store compliance pass their own acceptance criteria.
+Finance issue #18 is virtual budgeting software only, not bank connectivity or stored-value accounts. Location issue #19 requires explicit revocable consent, strict retention and Android background-permission validation. SOS-style alerts are household notifications, not monitored emergency dispatch. These P2 modules must not delay core release gates and must remain disabled until their own acceptance criteria pass.
+
+Smart home, health, school-provider integrations, advanced AI and other provider-dependent capabilities remain post-release candidates unless separately planned and validated.
 
 ## 58-day cadence
 
@@ -63,4 +65,4 @@ A story is complete only when its acceptance criteria pass in the running app/AP
 
 ## Maintenance
 
-Update [issue #1](https://github.com/tmassey1979/FamilyOS/issues/1) and this roadmap when scope or dependencies change. Keep implementation evidence in the linked delivery issues.
+Update [issue #1](https://github.com/tmassey1979/FAmilyOS/issues/1) and this roadmap when scope or dependencies change. Keep implementation evidence in the linked delivery issues.
