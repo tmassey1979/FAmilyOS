@@ -22,45 +22,47 @@ bld/
 project.lock.json
 project.fragment.lock.json
 artifacts/
-*.dll
-*.pdb
-*.cache
-*.log
-*.tmp
+*.db
+*.db-shm
+*.db-wal
+
+## IDE
 .vs/
+.vscode/
 .idea/
-*.DotSettings.user
+*.swp
+*~
+
+## Environment / secrets
+.env
+.env.*
+!.env.example
+appsettings.*.local.json
+**/secrets.json
 
 ## Node / Expo
 node_modules/
-.expo/
-dist/
-web-build/
+**/.expo/
+**/dist/
+**/web-build/
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
 *.orig.*
+npm-debug.*
+yarn-error.*
 
-## OS / IDE
+## OS
 .DS_Store
 Thumbs.db
-*.swp
-*~
 
-## Secrets / local
-.env
-.env.local
-.env.*.local
-*.pem
-secrets/
-
-## Brand source (expanded at build)
-mobile/assets/brand/*.png
-!mobile/assets/brand/.gitkeep
-
-## Coverage / test
-coverage/
+## Test / coverage
 TestResults/
-*.cobertura.xml
+coverage/
+*.coverage
+*.coveragexml
+
+## Docker volumes (local)
+docker/data/

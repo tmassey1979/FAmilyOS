@@ -1,0 +1,21 @@
+appId: com.familyos.app
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 30000
+- assertVisible: "Home"
+- tapOn:
+    text: "Tasks"
+- assertVisible: "FAMILY TASKS"
+- tapOn:
+    text: "Calendar"
+- assertVisible: "CALENDAR"
+- tapOn:
+    text: "More"
+- assertVisible: "MORE FROM FAMILYOS"
+- tapOn:
+    text: "Requests & approvals"
+- assertVisible:
+    text: "REQUESTS"
+    optional: true

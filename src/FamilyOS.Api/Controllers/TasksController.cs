@@ -1,0 +1,116 @@
+using FamilyOS.Application.Tasks;
+using FamilyOS.Domain.Common;
+using MediatR;
+using FamilyOS.Infrastructure.Identity;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace FamilyOS.Api.Controllers;
+
+[ApiController]
+[Route("api/tasks")]
+[Authorize(Policy = FamilyAuthPolicies.FamilyMember)]
+public class TasksController : ControllerBase
+{
+    private readonly IMediator _mediator;
+
+    public TasksController(IMediator mediator) => _mediator = mediator;
+
+    [HttpGet("mine")]
+    public async Task<ActionResult<List<TaskDto>>> GetMine([FromQuery] FamilyTaskStatus? status, CancellationToken ct)
+        => Ok(await _mediator.Send(new GetMyTasksQuery(status), ct));
+
+    [HttpGet]
+    public async Task<ActionResult<List<TaskDto>>> GetFamily([FromQuery] FamilyTaskStatus? status, CancellationToken ct)
+        => Ok(await _mediator.Send(new GetFamilyTasksQuery(status), ct));
+
+    [HttpGet("recurrences")]
+    public async Task<ActionResult<List<RecurrenceDto>>> GetRecurrences(CancellationToken ct)
+        => Ok(await _mediator.Send(new GetRecurrencesQuery(), ct));
+
+    [HttpPost("recurrences")]
+    public async Task<ActionResult<RecurrenceDto>> CreateRecurrence([FromBody] CreateRecurrenceCommand cmd, CancellationToken ct)
+        => Ok(await _mediator.Send(cmd, ct));
+
+    [HttpPost("recurrences/{id:guid}/deactivate")]
+    public async Task<ActionResult<RecurrenceDto>> DeactivateRecurrence(Guid id, CancellationToken ct)
+        => Ok(await _mediator.Send(new DeactivateRecurrenceCommand(id), ct));
+
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<TaskDto>> Get(Guid id, CancellationToken ct)
+        => Ok(await _mediator.Send(new GetTaskQuery(id), ct));
+
+    [HttpGet("{id:guid}/history")]
+    public async Task<ActionResult<List<TaskHistoryDto>>> History(Guid id, CancellationToken ct)
+        => Ok(await _mediator.Send(new GetTaskHistoryQuery(id), ct));
+
+    [HttpPost]
+    public async Task<ActionResult<TaskDto>> Create([FromBody] CreateTaskCommand cmd, CancellationToken ct)
+        => Ok(await _mediator.Send(cmd, ct));
+
+    [HttpPost("{id:guid}/assign")]
+    public async Task<ActionResult<TaskDto>> Assign(Guid id, [FromBody] AssignBody body, CancellationToken ct)
+        => Ok(await _mediator.Send(new AssignTaskCommand(id, body.AssignToMemberId), ct));
+
+    [HttpPost("{id:guid}/accept")]
+    public async Task<ActionResult<TaskDto>> Accept(Guid id, CancellationToken ct)
+        => Ok(await _mediator.Send(new AcceptTaskCommand(id), ct));
+
+    [HttpPost("{id:guid}/decline")]
+    public async Task<ActionResult<TaskDto>> Decline(Guid id, [FromBody] DeclineBody? body, CancellationToken ct)
+        => Ok(await _mediator.Send(new DeclineTaskCommand(id, body?.ReasonId, body?.Note), ct));
+
+    [HttpPost("{id:guid}/start")]
+    public async Task<ActionResult<TaskDto>> Start(Guid id, CancellationToken ct)
+        => Ok(await _mediator.Send(new StartTaskCommand(id), ct));
+
+    [HttpPost("{id:guid}/pause")]
+    public async Task<ActionResult<TaskDto>> Pause(Guid id, CancellationToken ct)
+        => Ok(await _mediator.Send(new PauseTaskCommand(id), ct));
+
+    [HttpPost("{id:guid}/resume")]
+    public async Task<ActionResult<TaskDto>> Resume(Guid id, CancellationToken ct)
+        => Ok(await _mediator.Send(new ResumeTaskCommand(id), ct));
+
+    [HttpPost("{id:guid}/complete")]
+    public async Task<ActionResult<TaskDto>> Complete(Guid id, CancellationToken ct)
+        => Ok(await _mediator.Send(new CompleteTaskCommand(id), ct));
+
+    [HttpPost("{id:guid}/defer")]
+    public async Task<ActionResult<TaskDto>> Defer(Guid id, [FromBody] NoteBody? body, CancellationToken ct)
+        => Ok(await _mediator.Send(new DeferTaskCommand(id, body?.Note), ct));
+
+    [HttpPost("{id:guid}/cancel")]
+    public async Task<ActionResult<TaskDto>> Cancel(Guid id, [FromBody] NoteBody? body, CancellationToken ct)
+        => Ok(await _mediator.Send(new CancelTaskCommand(id, body?.Reason), ct));
+
+    [HttpPost("{id:guid}/skip")]
+    public async Task<ActionResult<TaskDto>> Skip(Guid id, [FromBody] NoteBody? body, CancellationToken ct)
+        => Ok(await _mediator.Send(new SkipTaskCommand(id, body?.Note), ct));
+
+    [HttpPost("{id:guid}/reassign")]
+    public async Task<ActionResult<TaskDto>> Reassign(Guid id, [FromBody] AssignBody body, CancellationToken ct)
+        => Ok(await _mediator.Send(new ReassignTaskCommand(id, body.AssignToMemberId), ct));
+
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<TaskDto>> UpdateDetails(Guid id, [FromBody] UpdateTaskDetailsBody body, CancellationToken ct)
+        => Ok(await _mediator.Send(new UpdateTaskDetailsCommand(
+            id, body.Title, body.Description, body.Priority, body.Category, body.DueDate, body.ClearDueDate), ct));
+
+    [HttpPut("{id:guid}/planned-times")]
+    public async Task<ActionResult<TaskDto>> SetPlannedTimes(Guid id, [FromBody] PlannedTimesBody body, CancellationToken ct)
+        => Ok(await _mediator.Send(new SetPlannedTimesCommand(
+            id, body.PlannedStartTime, body.PlannedEndTime, body.EstimatedDurationMinutes), ct));
+
+    public record AssignBody(Guid AssignToMemberId);
+    public record UpdateTaskDetailsBody(
+        string? Title,
+        string? Description,
+        TaskPriority? Priority,
+        string? Category,
+        DateTime? DueDate,
+        bool ClearDueDate = false);
+    public record DeclineBody(Guid? ReasonId, string? Note);
+    public record NoteBody(string? Note, string? Reason);
+    public record PlannedTimesBody(string? PlannedStartTime, string? PlannedEndTime, int? EstimatedDurationMinutes);
+}
