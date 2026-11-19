@@ -17,25 +17,25 @@
         <Tab Title="Home"
              Icon="menu_home.png"
              Route="home">
-            <ShellContent Title="Pulse"
+            <ShellContent x:Name="HomeShellContent" Title="Pulse"
                           ContentTemplate="{DataTemplate pages:HomePage}" />
         </Tab>
         <Tab Title="Tasks"
              Icon="menu_tasks.png"
              Route="tasks">
-            <ShellContent Title="Tasks"
+            <ShellContent x:Name="TasksShellContent" Title="Tasks"
                           ContentTemplate="{DataTemplate pages:TasksPage}" />
         </Tab>
         <Tab Title="Calendar"
              Icon="menu_calendar.png"
              Route="calendar">
-            <ShellContent Title="Calendar"
+            <ShellContent x:Name="CalendarShellContent" Title="Calendar"
                           ContentTemplate="{DataTemplate pages:CalendarPage}" />
         </Tab>
         <Tab Title="Family"
              Icon="menu_family.png"
              Route="family">
-            <ShellContent Title="Family"
+            <ShellContent x:Name="FamilyShellContent" Title="Family"
                           ContentTemplate="{DataTemplate pages:FamilyPage}" />
         </Tab>
         <Tab Title="More"

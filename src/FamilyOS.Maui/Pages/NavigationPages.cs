@@ -85,31 +85,6 @@ public abstract class FeaturePlaceholderPage : ContentPage
     }
 }
 
-public sealed class HomePage() : FeaturePlaceholderPage(
-    "Family Pulse",
-    "What needs attention, what is coming up, and the next useful action.",
-    "menu_home.png") { }
-
-public sealed class TasksPage() : FeaturePlaceholderPage(
-    "Tasks",
-    "Household tasks, assignments, routines, and progress.",
-    "menu_tasks.png") { }
-
-public sealed class CalendarPage() : FeaturePlaceholderPage(
-    "Calendar",
-    "Family events and shared schedules.",
-    "menu_calendar.png") { }
-
-public sealed class FamilyPage() : FeaturePlaceholderPage(
-    "Family",
-    "Household members, roles, and shared coordination.",
-    "menu_family.png") { }
-
-public sealed class RequestsPage() : FeaturePlaceholderPage(
-    "Requests",
-    "Submit, review, and track household requests.",
-    "menu_requests.png") { }
-
 public sealed class MealsPage() : FeaturePlaceholderPage(
     "Meals",
     "Weekly meal planning and recipes.",
@@ -129,11 +104,6 @@ public sealed class OutcomesPage() : FeaturePlaceholderPage(
     "Outcomes",
     "A view of household activity and progress.",
     "menu_outcomes.png") { }
-
-public sealed class NotificationsPage() : FeaturePlaceholderPage(
-    "Notifications",
-    "Updates and actions that need your attention.",
-    "menu_notifications.png") { }
 
 public sealed class MorePage() : FeaturePlaceholderPage(
     "More",
