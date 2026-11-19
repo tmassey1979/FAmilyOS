@@ -22,6 +22,8 @@ This index replaces the previous story-number mapping, which referenced issue ID
 | Settings, onboarding guidance, accessibility and Android release UX | [#14](https://github.com/tmassey1979/FamilyOS/issues/14) |
 | Module flags, entitlements, consent and optional-module boundaries | [#15](https://github.com/tmassey1979/FamilyOS/issues/15) |
 | Google Play subscriptions, Core trial, add-on packaging and billing lifecycle | [#17](https://github.com/tmassey1979/FamilyOS/issues/17) |
+| Finance software: virtual envelopes, allowances and reports (no bank accounts) | [#18](https://github.com/tmassey1979/FamilyOS/issues/18) |
+| Consent-based location sharing, geofences, check-ins and household SOS alerts | [#19](https://github.com/tmassey1979/FamilyOS/issues/19) |
 
 ## Product scenarios / release acceptance
 
