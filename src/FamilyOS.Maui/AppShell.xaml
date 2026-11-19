@@ -16,7 +16,7 @@
             <ShellContent x:Name="CalendarShellContent" Title="Calendar" ContentTemplate="{DataTemplate pages:CalendarPage}" />
         </Tab>
         <Tab Title="Family" Route="family">
-            <ShellContent Title="Family" ContentTemplate="{DataTemplate pages:FamilyPage}" />
+            <ShellContent x:Name="FamilyShellContent" Title="Family" ContentTemplate="{DataTemplate pages:FamilyPage}" />
         </Tab>
         <Tab Title="More" Route="more">
             <ShellContent Title="More" ContentTemplate="{DataTemplate pages:MorePage}" />
