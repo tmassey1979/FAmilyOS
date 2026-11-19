@@ -6,41 +6,147 @@ on:
   pull_request:
     branches: [main, develop]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  # Report-only until domain coverage is filled (#14). Set true to enforce.
+  DOMAIN_COVERAGE_ENFORCE: "false"
+  DOMAIN_COVERAGE_MIN: "70"
+
 jobs:
-  api:
+  build-and-test:
+    name: Build & Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
-      - name: Expand migrations
-        run: python3 scripts/expand-migrations.py || true
-      - name: Restore
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Expand EF migrations
+        run: python3 scripts/expand-migrations.py
+
+      - name: Compute version
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          if TAG=$(git describe --tags --abbrev=0 2>/dev/null); then
+            RAW_VERSION="${TAG#v}"
+          else
+            RAW_VERSION=$(grep -oP '(?<=<VersionPrefix>)[^<]+' Directory.Build.props || echo "0.1.0")
+          fi
+
+          # NuGet Version must be SemVer. Historical Android release tags such as
+          # android-v0.1.1-build1 are normalized to 0.1.1-build.1.
+          if [[ "$RAW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            VERSION="$RAW_VERSION"
+          elif [[ "$RAW_VERSION" =~ ([0-9]+\.[0-9]+\.[0-9]+)[-.]?build[-.]?([0-9]+) ]]; then
+            VERSION="${BASH_REMATCH[1]}-build.${BASH_REMATCH[2]}"
+          else
+            echo "::error::Cannot normalize '$RAW_VERSION' to a valid NuGet semantic version."
+            exit 1
+          fi
+
+          SHORT=$(git rev-parse --short HEAD)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "info=$RAW_VERSION+$SHORT" >> "$GITHUB_OUTPUT"
+          echo "Using NuGet version $VERSION (informational version $RAW_VERSION+$SHORT)"
+
+      - name: Restore solution
         run: dotnet restore FamilyOS.sln
-      - name: Build
-        run: dotnet build FamilyOS.sln -c Release --no-restore
+
+      - name: Build solution
+        run: >
+          dotnet build FamilyOS.sln
+          --configuration Release
+          --no-restore
+          -p:Version=${{ steps.ver.outputs.version }}
+          -p:InformationalVersion=${{ steps.ver.outputs.info }}
+
       - name: Test Domain
-        run: dotnet test tests/FamilyOS.Domain.Tests/FamilyOS.Domain.Tests.csproj -c Release --no-build --verbosity normal
+        run: >
+          dotnet test tests/FamilyOS.Domain.Tests/FamilyOS.Domain.Tests.csproj
+          --configuration Release
+          --no-build
+          --collect:"XPlat Code Coverage"
+          --results-directory coverage
+          -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+
+      - name: Domain coverage gate
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          COV=$(find coverage -name 'coverage.cobertura.xml' | head -1 || true)
+          if [[ -z "${COV}" ]]; then
+            echo "::warning::No cobertura file found"
+            echo "Domain line coverage: n/a" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          python3 - <<'PY'
+          import os, xml.etree.ElementTree as ET, pathlib, sys
+          paths = list(pathlib.Path('coverage').rglob('coverage.cobertura.xml'))
+          if not paths:
+              print('No cobertura'); sys.exit(0)
+          root = ET.parse(paths[0]).getroot()
+          rates = []
+          for pkg in root.findall('.//package'):
+              name = pkg.get('name') or ''
+              if 'FamilyOS.Domain' in name or name.endswith('Domain'):
+                  lr = pkg.get('line-rate')
+                  if lr:
+                      rates.append(float(lr))
+          if not rates:
+              lr = root.get('line-rate')
+              rates = [float(lr)] if lr else [0.0]
+          pct = max(rates) * 100.0
+          min_pct = float(os.environ.get('DOMAIN_COVERAGE_MIN', '70'))
+          enforce = os.environ.get('DOMAIN_COVERAGE_ENFORCE', 'false').lower() in ('1', 'true', 'yes')
+          print(f'Domain line coverage: {pct:.1f}% (min {min_pct:.0f}%, enforce={enforce})')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+              f.write(f'\n### Domain coverage\n- **{pct:.1f}%** line (target ≥ {min_pct:.0f}%, enforce={enforce})\n')
+          if pct + 1e-6 < min_pct:
+              msg = f'Domain coverage {pct:.1f}% below {min_pct:.0f}%'
+              if enforce:
+                  print(f'::error::{msg}')
+                  sys.exit(1)
+              print(f'::warning::{msg} (report-only; set DOMAIN_COVERAGE_ENFORCE=true to fail)')
+          PY
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: domain-coverage
+          path: coverage
+          retention-days: 14
 
   mobile-typecheck:
+    name: Mobile typecheck
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: mobile
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: npm
-          cache-dependency-path: mobile/package-lock.json
+          node-version: "20"
       - name: Expand brand assets
+        run: python3 scripts/expand-assets.py || true
+      - name: Seed brand fallback
+        run: python3 scripts/seed-brand-assets.py || true
+      - name: Install & typecheck
+        working-directory: mobile
         run: |
-          python3 ../scripts/expand-assets.py || python3 ../scripts/seed-brand-assets.py || true
-        working-directory: .
-      - name: Install
-        run: npm ci
-      - name: Typecheck
-        run: npx tsc --noEmit
+          npm install
+          npx tsc --noEmit
