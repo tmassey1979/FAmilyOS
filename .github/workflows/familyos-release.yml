@@ -183,7 +183,8 @@ jobs:
           OUT="artifacts/FamilyOS-MAUI-Android-v${{ steps.version.outputs.value }}-build${{ steps.version.outputs.code }}.apk"
           cp "$APK" "$OUT"
           echo "path=$OUT" >> "$GITHUB_OUTPUT"
-          sha256sum "$OUT" | tee artifacts/SHA256SUMS.txt
+          (cd artifacts && sha256sum "$(basename "$OUT")" > SHA256SUMS.txt)
+          cat artifacts/SHA256SUMS.txt
           ls -lh "$OUT"
 
       - name: Upload versioned APK artifact
