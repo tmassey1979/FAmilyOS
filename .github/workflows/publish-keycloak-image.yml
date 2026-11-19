@@ -1,0 +1,54 @@
+name: Publish Keycloak image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync realm into docker build context
+        run: |
+          mkdir -p docker/keycloak
+          if [ -f deploy/familyos/keycloak/realm-export.json ]; then
+            cp deploy/familyos/keycloak/realm-export.json docker/keycloak/realm-export.json
+          fi
+          test -f docker/keycloak/realm-export.json
+          test -f docker/keycloak/Dockerfile
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/keycloak
+          file: docker/keycloak/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/familyos-keycloak:latest
+            ghcr.io/${{ github.repository_owner }}/familyos-keycloak:${{ github.sha }}
+
+      - name: Make package public (Portainer can pull without login)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api --method PUT \
+            -H "Accept: application/vnd.github+json" \
+            "/user/packages/container/familyos-keycloak/visibility" \
+            -f visibility=public || \
+          gh api --method PUT \
+            -H "Accept: application/vnd.github+json" \
+            "/orgs/${{ github.repository_owner }}/packages/container/familyos-keycloak/visibility" \
+            -f visibility=public || true
