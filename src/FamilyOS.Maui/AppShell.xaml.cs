@@ -1,12 +1,14 @@
 using FamilyOS.Maui.Pages;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FamilyOS.Maui;
 
 public partial class AppShell : Shell
 {
-    public AppShell()
+    public AppShell(IServiceProvider services)
     {
         InitializeComponent();
+        HomeShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<HomePage>());
 
         Routing.RegisterRoute(nameof(RequestsPage), typeof(RequestsPage));
         Routing.RegisterRoute(nameof(MealsPage), typeof(MealsPage));
