@@ -244,3 +244,33 @@ jobs:
           path: artifacts/FamilyOS-android-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+      # Compilation alone cannot catch Android startup crashes. Install the exact
+      # APK produced above and verify that the MAUI process survives first launch.
+      - name: Install and launch MAUI app in Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            adb install -r artifacts/FamilyOS-android-debug.apk
+            adb logcat -c
+            adb shell monkey -p com.familyos.app 1
+            sleep 12
+
+            if ! adb shell pidof com.familyos.app >/dev/null; then
+              echo "::error::FamilyOS process exited after launch."
+              adb logcat -d -t 3000
+              exit 1
+            fi
+
+            if adb logcat -d -t 3000 | grep -E "FATAL EXCEPTION|Fatal signal [0-9]+|Process: com\\.familyos\\.app"; then
+              echo "::error::Android reported a fatal FamilyOS startup error."
+              exit 1
+            fi
+
+            echo "FamilyOS remained running after Android emulator launch."
