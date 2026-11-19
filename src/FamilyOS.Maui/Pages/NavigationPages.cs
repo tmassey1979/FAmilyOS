@@ -85,11 +85,6 @@ public abstract class FeaturePlaceholderPage : ContentPage
     }
 }
 
-public sealed class MealsPage() : FeaturePlaceholderPage(
-    "Meals",
-    "Weekly meal planning and recipes.",
-    "menu_meals.png") { }
-
 public sealed class ChatPage() : FeaturePlaceholderPage(
     "Chat",
     "Household conversations.",
