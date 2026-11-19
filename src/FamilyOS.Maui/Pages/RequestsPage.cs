@@ -1,4 +1,5 @@
 using FamilyOS.Maui.Services;
+using Microsoft.Maui.Layouts;
 
 namespace FamilyOS.Maui.Pages;
 
@@ -14,6 +15,7 @@ public sealed class RequestsPage : ContentPage
     private readonly Button _mineButton = new() { Text = "My requests" };
     private readonly Button _queueButton = new() { Text = "Approval queue" };
     private readonly Button _refreshButton = new() { Text = "Refresh" };
+    private readonly Button _createButton = new() { Text = "New request" };
     private bool _showQueue;
     private bool _loading;
 
@@ -25,9 +27,11 @@ public sealed class RequestsPage : ContentPage
         _mineButton.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         _queueButton.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         _refreshButton.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+        _createButton.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
         _mineButton.Clicked += async (_, _) => { _showQueue = false; await LoadAsync(); };
         _queueButton.Clicked += async (_, _) => { _showQueue = true; await LoadAsync(); };
         _refreshButton.Clicked += async (_, _) => await LoadAsync();
+        _createButton.Clicked += async (_, _) => await CreateRequestAsync();
 
         var heading = new Label { Text = "Requests", FontSize = 26, FontAttributes = FontAttributes.Bold };
         heading.SetDynamicResource(VisualElement.StyleProperty, "TextDisplay");
@@ -42,7 +46,7 @@ public sealed class RequestsPage : ContentPage
         {
             Padding = new Thickness(20, 12),
             Spacing = 16,
-            Children = { header, tabs, _status, _items }
+            Children = { header, tabs, _createButton, _status, _items }
         };
         Content = new RefreshView
         {
@@ -63,6 +67,7 @@ public sealed class RequestsPage : ContentPage
         if (_loading) return;
         _loading = true;
         _refreshButton.IsEnabled = false;
+        _createButton.IsEnabled = false;
         _mineButton.IsEnabled = false;
         _queueButton.IsEnabled = false;
         _status.Text = "Loading requests…";
@@ -107,8 +112,54 @@ public sealed class RequestsPage : ContentPage
         {
             _loading = false;
             _refreshButton.IsEnabled = true;
+            _createButton.IsEnabled = true;
             _mineButton.IsEnabled = true;
             _queueButton.IsEnabled = true;
+        }
+    }
+
+    private async Task CreateRequestAsync()
+    {
+        if (_loading) return;
+        _createButton.IsEnabled = false;
+        try
+        {
+            var types = await _api.GetTypesAsync();
+            if (types.Count == 0)
+            {
+                _status.Text = "No request types are currently available.";
+                return;
+            }
+
+            var labels = types.Select(x => x.Name).ToArray();
+            var selected = await DisplayActionSheetAsync("Choose a request type", "Cancel", null, labels);
+            var type = types.FirstOrDefault(x => string.Equals(x.Name, selected, StringComparison.Ordinal));
+            if (type is null) return;
+
+            var title = await DisplayPromptAsync("New request", "What do you need?", "Create", "Cancel",
+                placeholder: type.Description ?? type.Name, maxLength: 120);
+            if (string.IsNullOrWhiteSpace(title)) return;
+
+            _status.Text = "Creating request…";
+            await _api.CreateAsync(type.Code, title.Trim());
+            _showQueue = false;
+            await LoadAsync();
+        }
+        catch (FamilyApiException ex)
+        {
+            _status.Text = ex.Message;
+        }
+        catch (OperationCanceledException)
+        {
+            _status.Text = "Creating the request timed out. Try again.";
+        }
+        catch (Exception)
+        {
+            _status.Text = "The request could not be created. Try again.";
+        }
+        finally
+        {
+            _createButton.IsEnabled = true;
         }
     }
 

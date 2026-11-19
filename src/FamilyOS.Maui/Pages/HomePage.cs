@@ -69,7 +69,7 @@ public sealed class HomePage : ContentPage
         catch (FamilyApiException ex)
         {
             _status.Text = ex.Message;
-            if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            if (ex.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
                 AddSignInHint();
         }
         catch (HttpRequestException)
@@ -228,14 +228,24 @@ public sealed class HomePage : ContentPage
 
     private void AddSignInHint()
     {
+        if (_content.Children.OfType<Button>().Any(b => b.Text == "Sign in / set up household"))
+            return;
+
         var hint = new Label
         {
-            Text = "Sign in from the account screen, then return here to refresh.",
+            Text = "Sign in or finish setting up your household to use FamilyOS.",
             FontSize = 13,
             LineBreakMode = LineBreakMode.WordWrap
         };
         hint.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+        var button = new Button { Text = "Sign in / set up household" };
+        button.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
+        button.Clicked += async (_, _) =>
+        {
+            await Shell.Current.GoToAsync(nameof(OnboardingPage));
+        };
         _content.Children.Add(hint);
+        _content.Children.Add(button);
     }
 
     private static async Task NavigateForAsync(string kind)

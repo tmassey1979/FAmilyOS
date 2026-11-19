@@ -25,6 +25,23 @@ public sealed class RequestsApiClient
     public Task<List<FamilyRequestDto>> GetApprovalQueueAsync(CancellationToken ct = default)
         => SendAsync<List<FamilyRequestDto>>(HttpMethod.Get, "api/requests/approval-queue", null, ct);
 
+    public Task<List<RequestTypeOptionDto>> GetTypesAsync(CancellationToken ct = default)
+        => SendAsync<List<RequestTypeOptionDto>>(HttpMethod.Get, "api/requests/types", null, ct);
+
+    public Task<FamilyRequestDto> CreateAsync(string type, string title, CancellationToken ct = default)
+    {
+        var body = JsonSerializer.Serialize(new
+        {
+            type,
+            title,
+            answers = new Dictionary<string, object?>(),
+            amount = (decimal?)null,
+            neededBy = (DateTime?)null
+        }, JsonOptions);
+        return SendAsync<FamilyRequestDto>(HttpMethod.Post, "api/requests",
+            new StringContent(body, Encoding.UTF8, "application/json"), ct);
+    }
+
     public Task<FamilyRequestDto> RunActionAsync(Guid id, string action, string? reason = null, CancellationToken ct = default)
     {
         var body = action switch
@@ -76,3 +93,6 @@ public sealed record FamilyRequestDto(
     Guid Id, string Type, string Status, string Title, string? Summary,
     decimal? Amount, DateTime? NeededByUtc, Guid RequesterMemberId, string RequesterName,
     Guid? CurrentApproverMemberId, string? DenialReason, DateTime CreatedAtUtc);
+
+
+public sealed record RequestTypeOptionDto(Guid Id, string Code, string Name, string? Description, List<JsonElement> Questions);

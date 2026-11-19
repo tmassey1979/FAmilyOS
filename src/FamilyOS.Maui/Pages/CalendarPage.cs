@@ -185,7 +185,7 @@ public sealed class CalendarPage : ContentPage
                 System.Globalization.CultureInfo.InvariantCulture,
                 System.Globalization.DateTimeStyles.None, out var localStart))
         {
-            await DisplayAlert("Invalid date", "Enter the start as YYYY-MM-DD HH:MM.", "OK");
+            await DisplayAlertAsync("Invalid date", "Enter the start as YYYY-MM-DD HH:MM.", "OK");
             return;
         }
         var location = await DisplayPromptAsync("Location", "Optional location", "Save", "Skip", maxLength: 160);
@@ -207,7 +207,7 @@ public sealed class CalendarPage : ContentPage
                 System.Globalization.CultureInfo.InvariantCulture,
                 System.Globalization.DateTimeStyles.None, out var parsed))
         {
-            await DisplayAlert("Invalid date", "Enter the start as YYYY-MM-DD HH:MM.", "OK");
+            await DisplayAlertAsync("Invalid date", "Enter the start as YYYY-MM-DD HH:MM.", "OK");
             return;
         }
         var location = await DisplayPromptAsync("Location", "Optional location", initialValue: item.Location ?? "", maxLength: 160);
@@ -221,7 +221,7 @@ public sealed class CalendarPage : ContentPage
 
     private async Task CancelEventAsync(CalendarEventDto item)
     {
-        var confirm = await DisplayAlert("Cancel event", $"Cancel “{item.Title}”?", "Cancel event", "Keep event");
+        var confirm = await DisplayAlertAsync("Cancel event", $"Cancel “{item.Title}”?", "Cancel event", "Keep event");
         if (!confirm) return;
         try
         {
@@ -230,7 +230,7 @@ public sealed class CalendarPage : ContentPage
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Calendar update failed", ex is FamilyApiException ? ex.Message : "The event could not be cancelled.", "OK");
+            await DisplayAlertAsync("Calendar update failed", ex is FamilyApiException ? ex.Message : "The event could not be cancelled.", "OK");
         }
     }
 
@@ -239,12 +239,12 @@ public sealed class CalendarPage : ContentPage
         try
         {
             await save();
-            await DisplayAlert("Calendar", successMessage, "OK");
+            await DisplayAlertAsync("Calendar", successMessage, "OK");
             await LoadAsync();
         }
         catch (Exception ex)
         {
-            await DisplayAlert("Calendar update failed", ex is FamilyApiException ? ex.Message : "The event could not be saved.", "OK");
+            await DisplayAlertAsync("Calendar update failed", ex is FamilyApiException ? ex.Message : "The event could not be saved.", "OK");
         }
     }
 
