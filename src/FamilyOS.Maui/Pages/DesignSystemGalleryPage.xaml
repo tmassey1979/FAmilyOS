@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:FamilyOS.Maui.Controls"
+             x:Class="FamilyOS.Maui.Pages.DesignSystemGalleryPage"
+             Title="Design system">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="{StaticResource ThicknessPage}" Spacing="24">
+
+            <Label Text="FamilyOS design system" Style="{StaticResource TextTitle}" />
+            <Label Text="Component gallery — theme tokens and shared controls."
+                   Style="{StaticResource TextCaption}" />
+
+            <controls:FoSectionTitle Text="Theme" />
+            <HorizontalStackLayout Spacing="8">
+                <controls:FoButton Title="System" Variant="Secondary" Clicked="OnThemeSystem" />
+                <controls:FoButton Title="Light" Variant="Secondary" Clicked="OnThemeLight" />
+                <controls:FoButton Title="Dark" Variant="Secondary" Clicked="OnThemeDark" />
+            </HorizontalStackLayout>
+
+            <controls:FoSectionTitle Text="Buttons" />
+            <controls:FoButton Title="Primary action" Variant="Primary" />
+            <controls:FoButton Title="Secondary" Variant="Secondary" />
+            <controls:FoButton Title="Danger" Variant="Danger" />
+            <controls:FoButton Title="Ghost" Variant="Ghost" />
+            <controls:FoButton Title="Loading" Variant="Primary" IsLoading="True" />
+
+            <controls:FoSectionTitle Text="Badges" />
+            <HorizontalStackLayout Spacing="8">
+                <controls:FoBadge Text="Neutral" Tone="Neutral" />
+                <controls:FoBadge Text="Info" Tone="Info" />
+                <controls:FoBadge Text="Success" Tone="Success" />
+                <controls:FoBadge Text="Warning" Tone="Warning" />
+                <controls:FoBadge Text="Danger" Tone="Danger" />
+            </HorizontalStackLayout>
+
+            <controls:FoSectionTitle Text="Card + list" />
+            <controls:FoCard>
+                <VerticalStackLayout Spacing="8">
+                    <controls:FoListRow Title="Evening chores" Subtitle="Assigned to Mia" />
+                    <BoxView HeightRequest="1"
+                             Color="{AppThemeBinding Light={StaticResource BorderSubtle}, Dark={StaticResource BorderSubtle}}" />
+                    <controls:FoListRow Title="Grocery run" Subtitle="Pending approval" />
+                </VerticalStackLayout>
+            </controls:FoCard>
+
+            <controls:FoSectionTitle Text="Form" />
+            <controls:FoTextField Label="Display name" Placeholder="Terry" HelperText="Shown to your household" />
+            <controls:FoTextField Label="Invite code" IsError="True" HelperText="Code expired or already used" />
+
+            <controls:FoSectionTitle Text="Status" />
+            <controls:FoStatusBanner Kind="Info" Message="New invite waiting for acceptance." />
+            <controls:FoStatusBanner Kind="Offline" Message="You’re offline. Changes will sync when connected." />
+            <controls:FoStatusBanner Kind="Danger" Message="Could not reach the API." />
+
+            <controls:FoSectionTitle Text="Empty / loading / error" />
+            <controls:FoCard>
+                <controls:FoEmptyState Title="No tasks yet" Subtitle="Create a task or wait for an assignment." />
+            </controls:FoCard>
+            <controls:FoCard>
+                <controls:FoLoadingView Message="Loading household…" />
+            </controls:FoCard>
+            <controls:FoCard>
+                <controls:FoErrorView Message="We couldn’t load Pulse." />
+            </controls:FoCard>
+
+            <controls:FoSectionTitle Text="Typography" />
+            <Label Text="Display" Style="{StaticResource TextDisplay}" />
+            <Label Text="Title" Style="{StaticResource TextTitle}" />
+            <Label Text="Heading" Style="{StaticResource TextHeading}" />
+            <Label Text="Body text for household content." Style="{StaticResource TextBody}" />
+            <Label Text="Caption metadata · 2h ago" Style="{StaticResource TextCaption}" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
