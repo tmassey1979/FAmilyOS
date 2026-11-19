@@ -41,10 +41,6 @@ public abstract class FeaturePlaceholderPage : ContentPage
     }
 }
 
-public sealed class CalendarPage() : FeaturePlaceholderPage(
-    "Calendar",
-    "Family events and shared schedules.") { }
-
 public sealed class FamilyPage() : FeaturePlaceholderPage(
     "Family",
     "Household members, roles, and shared coordination.") { }
