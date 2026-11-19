@@ -9,6 +9,7 @@ public partial class AppShell : Shell
     {
         InitializeComponent();
         HomeShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<HomePage>());
+        TasksShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<TasksPage>());
 
         Routing.RegisterRoute(nameof(RequestsPage), typeof(RequestsPage));
         Routing.RegisterRoute(nameof(MealsPage), typeof(MealsPage));
