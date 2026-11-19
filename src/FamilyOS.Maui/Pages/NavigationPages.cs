@@ -41,10 +41,6 @@ public abstract class FeaturePlaceholderPage : ContentPage
     }
 }
 
-public sealed class HomePage() : FeaturePlaceholderPage(
-    "Family Pulse",
-    "A clear view of what needs attention, what is coming up, and the next useful action.") { }
-
 public sealed class TasksPage() : FeaturePlaceholderPage(
     "Tasks",
     "Household tasks, assignments, routines, and progress.") { }
