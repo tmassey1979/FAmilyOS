@@ -42,8 +42,8 @@ public sealed class KeycloakAuthService : IAuthSessionService
         var state = Pkce.CreateState();
         var challenge = Pkce.CreateChallenge(verifier);
 
-        var query = string.Join("&",
-        [
+        var query = string.Join("&", new[]
+        {
             $"client_id={Uri.EscapeDataString(ClientId)}",
             "response_type=code",
             $"redirect_uri={Uri.EscapeDataString(RedirectUri)}",
@@ -51,7 +51,7 @@ public sealed class KeycloakAuthService : IAuthSessionService
             $"state={Uri.EscapeDataString(state)}",
             $"code_challenge={Uri.EscapeDataString(challenge)}",
             "code_challenge_method=S256"
-        ]);
+        });
 
         var authResult = await WebAuthenticator.Default.AuthenticateAsync(
             new Uri($"{AuthorizationEndpoint}?{query}"),
