@@ -41,10 +41,6 @@ public abstract class FeaturePlaceholderPage : ContentPage
     }
 }
 
-public sealed class FamilyPage() : FeaturePlaceholderPage(
-    "Family",
-    "Household members, roles, and shared coordination.") { }
-
 public sealed class RequestsPage() : FeaturePlaceholderPage(
     "Requests",
     "Submit, review, and track household requests.") { }
