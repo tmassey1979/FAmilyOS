@@ -85,11 +85,6 @@ public abstract class FeaturePlaceholderPage : ContentPage
     }
 }
 
-public sealed class SettingsPage() : FeaturePlaceholderPage(
-    "Settings",
-    "Account, household, security, and app preferences.",
-    "menu_settings.png") { }
-
 public sealed class MorePage() : FeaturePlaceholderPage(
     "More",
     "Additional FamilyOS destinations.",
