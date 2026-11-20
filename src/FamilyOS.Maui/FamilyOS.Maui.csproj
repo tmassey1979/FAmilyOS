@@ -25,7 +25,7 @@
 
   <!-- Ensure launcher, splash, tab icons, and header logos exist before Resizetizer. -->
   <Target Name="ExpandMauiGraphics" BeforeTargets="ResolvePackageAssets;_CreateAppResourcesDirectory;ResizetizerBuildResources;BeforeBuild">
-    <Exec Command="python3 "$(MSBuildThisFileDirectory)../../scripts/expand-maui-graphics.py""
+    <Exec Command="python3 &quot;$(MSBuildThisFileDirectory)../../scripts/expand-maui-graphics.py&quot;"
           WorkingDirectory="$(MSBuildThisFileDirectory)../.."
           IgnoreExitCode="false"
           Condition="Exists('$(MSBuildThisFileDirectory)../../scripts/expand-maui-graphics.py')" />
