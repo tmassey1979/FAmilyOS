@@ -110,11 +110,39 @@ public sealed class OnboardingApiClient
         }
         catch (Exception ex)
         {
-            var inner = ex.InnerException;
-            var socket = ex as SocketException ?? inner as SocketException;
-            _diagnostics.RecordCheckpoint($"AUTH onboarding API transport failed; exception={ex.GetType().Name}; inner={inner?.GetType().Name ?? "none"}; socket_error={socket?.SocketErrorCode.ToString() ?? "none"}; elapsed_ms={elapsed.ElapsedMilliseconds}");
+            var http = FindException<HttpRequestException>(ex);
+            var web = FindException<WebException>(ex);
+            var socket = FindException<SocketException>(ex);
+            var webResponse = web?.Response as HttpWebResponse;
+            var exceptionChain = GetExceptionTypeChain(ex);
+            _diagnostics.RecordCheckpoint(
+                $"AUTH onboarding API transport failed; exception_chain={exceptionChain}; " +
+                $"http_request_error={http?.HttpRequestError.ToString() ?? "none"}; " +
+                $"web_exception_status={web?.Status.ToString() ?? "none"}; " +
+                $"web_response_status={(webResponse is null ? "none" : ((int)webResponse.StatusCode).ToString())}; " +
+                $"socket_error={socket?.SocketErrorCode.ToString() ?? "none"}; " +
+                $"elapsed_ms={elapsed.ElapsedMilliseconds}");
             throw;
         }
+    }
+
+    private static TException? FindException<TException>(Exception exception)
+        where TException : Exception
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is TException match) return match;
+        }
+
+        return null;
+    }
+
+    private static string GetExceptionTypeChain(Exception exception)
+    {
+        var types = new List<string>();
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+            types.Add(current.GetType().Name);
+        return string.Join(">", types);
     }
 
     private static string NormalizeCode(string code)
