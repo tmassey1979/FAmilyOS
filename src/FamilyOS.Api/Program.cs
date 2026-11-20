@@ -1,6 +1,7 @@
 using System.Text;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
+using Microsoft.IdentityModel.JsonWebTokens;
 using System.Text.Json.Serialization;
 using FamilyOS.Api.Hubs;
 using FamilyOS.Api.Middleware;
@@ -141,8 +142,12 @@ try
                 var principal = context.Principal;
                 var hasSubjectClaim = principal?.HasClaim(c => c.Type == "sub") == true;
                 var hasNameIdentifier = principal?.HasClaim(c => c.Type == ClaimTypes.NameIdentifier) == true;
-                var tokenSubject = (context.SecurityToken as JwtSecurityToken)?.Claims
-                    .FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value;
+                var tokenSubject = context.SecurityToken switch
+                {
+                    JwtSecurityToken jwt => jwt.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value,
+                    JsonWebToken json => json.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value,
+                    _ => null
+                };
 
                 if (!hasSubjectClaim && !hasNameIdentifier && !string.IsNullOrWhiteSpace(tokenSubject))
                 {
