@@ -25,6 +25,38 @@ public sealed class MeApiClient
         => SendAsync<QuietHoursDto>(HttpMethod.Put, "api/me/quiet-hours",
             new StringContent(JsonSerializer.Serialize(new UpdateQuietHoursBody(enabled, enabled ? startMinutes : null, enabled ? endMinutes : null), JsonOptions), Encoding.UTF8, "application/json"), ct);
 
+    public Task<GoogleCalendarStatusDto> GetGoogleCalendarStatusAsync(CancellationToken ct = default)
+        => SendAsync<GoogleCalendarStatusDto>(HttpMethod.Get, "api/me/google-calendar", null, ct);
+
+    public Task<GoogleCalendarAuthUrlDto> GetGoogleCalendarAuthUrlAsync(CancellationToken ct = default)
+        => SendAsync<GoogleCalendarAuthUrlDto>(HttpMethod.Get, "api/me/google-calendar/auth-url", null, ct);
+
+    public Task<GoogleCalendarSyncDto> SyncGoogleCalendarAsync(CancellationToken ct = default)
+        => SendAsync<GoogleCalendarSyncDto>(HttpMethod.Post, "api/me/google-calendar/sync", null, ct);
+
+    public Task DisconnectGoogleCalendarAsync(CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Delete, "api/me/google-calendar", ct);
+
+    private async Task SendNoContentAsync(HttpMethod method, string path, CancellationToken ct)
+    {
+        var token = await _auth.GetAccessTokenAsync(ct);
+        if (string.IsNullOrWhiteSpace(token))
+            throw new FamilyApiException(HttpStatusCode.Unauthorized, "Sign in to manage Google Calendar.");
+        using var request = new HttpRequestMessage(method, new Uri(ApiBaseUri, path));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+        if (response.IsSuccessStatusCode) return;
+        var message = response.StatusCode switch
+        {
+            HttpStatusCode.Unauthorized => "Your session has expired. Sign in again.",
+            HttpStatusCode.Forbidden => "Your account cannot manage this integration.",
+            _ => $"FamilyOS could not update Google Calendar (HTTP {(int)response.StatusCode})."
+        };
+        throw new FamilyApiException(response.StatusCode, message);
+    }
+
     private async Task<T> SendAsync<T>(HttpMethod method, string path, HttpContent? content, CancellationToken ct)
     {
         var token = await _auth.GetAccessTokenAsync(ct);
@@ -55,3 +87,7 @@ public sealed class MeApiClient
 public sealed record MeDto(string? ExternalIdentityId, Guid? UserId, Guid? FamilyId, Guid? MemberId, string? Role);
 public sealed record QuietHoursDto(bool Enabled, int? StartMinutes, int? EndMinutes, string? StartLabel, string? EndLabel);
 public sealed record UpdateQuietHoursBody(bool Enabled, int? StartMinutes, int? EndMinutes);
+
+public sealed record GoogleCalendarStatusDto(bool Connected, string? Email, string? CalendarId, DateTime? LastSyncAtUtc, bool Configured);
+public sealed record GoogleCalendarAuthUrlDto(string Url);
+public sealed record GoogleCalendarSyncDto(int Changed);
