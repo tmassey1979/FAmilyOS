@@ -19,7 +19,6 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.OpenApi.Models;
@@ -382,7 +381,6 @@ static async Task WriteDetailedHealth(HttpContext ctx, HealthReport report)
 
 file record UpdateQuietHoursBody(bool Enabled, int? StartMinutes, int? EndMinutes);
 file record RegisterDeviceBody(string Token, string Platform, string? DeviceName);
-
 
 file sealed class KeycloakSigningKeysHealthCheck : IHealthCheck
 {
