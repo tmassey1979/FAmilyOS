@@ -1,5 +1,6 @@
 using System.Text;
 using System.Security.Claims;
+using SecurityClaim = System.Security.Claims.Claim;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.JsonWebTokens;
 using System.Text.Json.Serialization;
@@ -144,15 +145,15 @@ try
                 var hasNameIdentifier = principal?.HasClaim(c => c.Type == ClaimTypes.NameIdentifier) == true;
                 var tokenSubject = context.SecurityToken switch
                 {
-                    JwtSecurityToken jwt => jwt.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value,
-                    JsonWebToken json => json.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value,
+                    JwtSecurityToken jwt => jwt.Claims.FirstOrDefault(c => c.Type == Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames.Sub)?.Value,
+                    JsonWebToken json => json.Claims.FirstOrDefault(c => c.Type == Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames.Sub)?.Value,
                     _ => null
                 };
 
                 if (!hasSubjectClaim && !hasNameIdentifier && !string.IsNullOrWhiteSpace(tokenSubject))
                 {
                     var identity = principal?.Identities.FirstOrDefault(i => i.IsAuthenticated);
-                    identity?.AddClaim(new System.Security.Claims.Claim("sub", tokenSubject!));
+                    identity?.AddClaim(new SecurityClaim("sub", tokenSubject!));
                     Log.Warning(
                         "JWT validated principal omitted subject claims; restored sub from validated security token. Path={Path} TraceId={TraceId}",
                         context.Request.Path, context.HttpContext.TraceIdentifier);
