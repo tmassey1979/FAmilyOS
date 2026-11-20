@@ -144,19 +144,31 @@ public sealed class SettingsPage : ContentPage
             var familyTask = _family.GetFamilyAsync();
             var quietTask = _me.GetQuietHoursAsync();
             var googleTask = _me.GetGoogleCalendarStatusAsync();
-            await Task.WhenAll(meTask, familyTask, quietTask, googleTask);
+            await Task.WhenAll(meTask, familyTask, quietTask);
             var me = await meTask;
             var family = await familyTask;
             var quiet = await quietTask;
-            var google = await googleTask;
-            _googleStatus.Text = !google.Configured
-                ? "Google Calendar integration is not configured on the server."
-                : google.Connected
-                    ? $"Connected{(string.IsNullOrWhiteSpace(google.Email) ? "" : $" as {google.Email}")}. Last sync: {(google.LastSyncAtUtc.HasValue ? google.LastSyncAtUtc.Value.ToLocalTime().ToString("g") : "not yet synced")}."
-                    : "Not connected.";
-            _googleConnect.IsVisible = google.Configured && !google.Connected;
-            _googleSync.IsVisible = google.Configured && google.Connected;
-            _googleDisconnect.IsVisible = google.Configured && google.Connected;
+
+            GoogleCalendarStatusDto? google = null;
+            try
+            {
+                google = await googleTask;
+            }
+            catch (FamilyApiException)
+            {
+                // An optional integration must never block core account settings.
+            }
+
+            _googleStatus.Text = google is null
+                ? "Google Calendar status is temporarily unavailable."
+                : !google.Configured
+                    ? "Google Calendar integration is not configured on the server."
+                    : google.Connected
+                        ? $"Connected{(string.IsNullOrWhiteSpace(google.Email) ? "" : $" as {google.Email}")}. Last sync: {(google.LastSyncAtUtc.HasValue ? google.LastSyncAtUtc.Value.ToLocalTime().ToString("g") : "not yet synced")}."
+                        : "Not connected.";
+            _googleConnect.IsVisible = google?.Configured == true && google.Connected == false;
+            _googleSync.IsVisible = google?.Configured == true && google.Connected;
+            _googleDisconnect.IsVisible = google?.Configured == true && google.Connected;
             _account.Text = $"Role: {me.Role ?? "Member"}\nMember ID: {me.MemberId?.ToString("D") ?? "Unavailable"}";
             _household.Text = $"{family.Name}\n{family.Members.Count(x => x.IsActive)} active members";
             _enabled.IsToggled = quiet.Enabled;
