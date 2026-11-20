@@ -22,6 +22,17 @@ public sealed class TasksApiClient
     public Task<List<FamilyTaskDto>> GetMyTasksAsync(CancellationToken cancellationToken = default)
         => SendAsync<List<FamilyTaskDto>>(HttpMethod.Get, "api/tasks/mine", null, cancellationToken);
 
+    public Task<List<RecurrenceDto>> GetRecurrencesAsync(CancellationToken cancellationToken = default)
+        => SendAsync<List<RecurrenceDto>>(HttpMethod.Get, "api/tasks/recurrences", null, cancellationToken);
+
+    public Task<RecurrenceDto> CreateRecurrenceAsync(CreateRecurrenceBody body, CancellationToken cancellationToken = default)
+        => SendAsync<RecurrenceDto>(HttpMethod.Post, "api/tasks/recurrences",
+            new StringContent(JsonSerializer.Serialize(body, JsonOptions), System.Text.Encoding.UTF8, "application/json"),
+            cancellationToken);
+
+    public Task<RecurrenceDto> DeactivateRecurrenceAsync(Guid recurrenceId, CancellationToken cancellationToken = default)
+        => SendAsync<RecurrenceDto>(HttpMethod.Post, $"api/tasks/recurrences/{recurrenceId:D}/deactivate", null, cancellationToken);
+
     public Task<FamilyTaskDto> RunActionAsync(Guid taskId, string action, CancellationToken cancellationToken = default)
     {
         var allowed = new HashSet<string>(StringComparer.Ordinal)
@@ -88,3 +99,13 @@ public sealed record FamilyTaskDto(
     Guid? RecurrenceDefinitionId = null,
     bool IsRecurring = false,
     string? RecurrenceFrequency = null);
+
+public sealed record RecurrenceDto(
+    Guid Id, string Title, string? Description, string Frequency, int Interval,
+    string? DayOfWeek, Guid? DefaultAssigneeMemberId, string DeclinePolicy,
+    bool IsActive, DateTime? NextOccurrenceUtc, string? Category);
+
+public sealed record CreateRecurrenceBody(
+    string Title, string Frequency, int Interval = 1, string? DayOfWeek = null,
+    Guid? DefaultAssigneeMemberId = null, string? Category = null,
+    string? Description = null, string DeclinePolicy = "NoChange", bool GenerateFirstInstance = true);

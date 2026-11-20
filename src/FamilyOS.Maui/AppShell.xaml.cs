@@ -5,9 +5,11 @@ namespace FamilyOS.Maui;
 
 public partial class AppShell : Shell
 {
-    public AppShell(IServiceProvider services)
+    public AppShell(IServiceProvider services, StartupDiagnosticsService diagnostics)
     {
+        diagnostics.RecordCheckpoint("AppShell constructor entered");
         InitializeComponent();
+        diagnostics.RecordCheckpoint("AppShell.InitializeComponent completed");
         HomeShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<HomePage>());
         TasksShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<TasksPage>());
         CalendarShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<CalendarPage>());
@@ -21,5 +23,11 @@ public partial class AppShell : Shell
         Routing.RegisterRoute(nameof(OutcomesPage), typeof(OutcomesPage));
         Routing.RegisterRoute(nameof(NotificationsPage), typeof(NotificationsPage));
         Routing.RegisterRoute(nameof(DesignSystemGalleryPage), typeof(DesignSystemGalleryPage));
+        Routing.RegisterRoute(nameof(StartupDiagnosticsPage), typeof(StartupDiagnosticsPage));
+        Navigated += (_, _) =>
+        {
+            diagnostics.RecordCheckpoint("AppShell navigation completed");
+            diagnostics.MarkLaunchCompleted();
+        };
     }
 }

@@ -8,7 +8,11 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
+        var diagnostics = new StartupDiagnosticsService();
+        diagnostics.BeginLaunch();
+
         var builder = MauiApp.CreateBuilder();
+        builder.Services.AddSingleton(diagnostics);
         builder
             .UseMauiApp<App>()
             .ConfigureFonts(fonts =>
@@ -17,6 +21,7 @@ public static class MauiProgram
             });
 
         builder.Services.AddSingleton<IThemeService, ThemeService>();
+        builder.Services.AddTransient<StartupDiagnosticsPage>();
         builder.Services.AddSingleton<HttpClient>();
         builder.Services.AddSingleton<IAuthSessionService, KeycloakAuthService>();
         builder.Services.AddSingleton<AppShell>();
@@ -48,6 +53,17 @@ public static class MauiProgram
         builder.Logging.AddDebug();
 #endif
 
-        return builder.Build();
+        try
+        {
+            diagnostics.RecordCheckpoint("MauiProgram.Build starting");
+            var app = builder.Build();
+            diagnostics.RecordCheckpoint("MauiProgram.Build completed");
+            return app;
+        }
+        catch (Exception ex)
+        {
+            diagnostics.RecordException("MauiProgram.Build failed", ex);
+            throw;
+        }
     }
 }

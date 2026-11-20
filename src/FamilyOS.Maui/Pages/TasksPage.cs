@@ -11,6 +11,7 @@ public sealed class TasksPage : ContentPage
 {
     private readonly TasksApiClient _tasks;
     private readonly VerticalStackLayout _items;
+    private readonly VerticalStackLayout _recurrences;
     private readonly Label _status;
     private readonly Button _refresh;
     private bool _loading;
@@ -27,6 +28,7 @@ public sealed class TasksPage : ContentPage
         _refresh.Clicked += async (_, _) => await LoadAsync();
 
         _items = new VerticalStackLayout { Spacing = 12 };
+        _recurrences = new VerticalStackLayout { Spacing = 10 };
         var header = new Grid
         {
             ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
@@ -40,7 +42,10 @@ public sealed class TasksPage : ContentPage
         {
             Padding = new Thickness(20, 12),
             Spacing = 16,
-            Children = { header, _status, _items }
+            Children = { header, _status, _items,
+                new Label { Text = "Recurring routines", FontSize = 20, FontAttributes = FontAttributes.Bold },
+                new Label { Text = "Create repeating household tasks and stop a series when it is no longer needed.", FontSize = 13 },
+                CreateRecurrenceButton(), _recurrences }
         };
         Content = new RefreshView
         {
@@ -64,11 +69,20 @@ public sealed class TasksPage : ContentPage
         _status.Text = "Loading your tasks…";
         try
         {
-            var tasks = await _tasks.GetMyTasksAsync();
+            var tasksTask = _tasks.GetMyTasksAsync();
+            var recurrencesTask = _tasks.GetRecurrencesAsync();
+            await Task.WhenAll(tasksTask, recurrencesTask);
+            var tasks = await tasksTask;
+            var recurrences = await recurrencesTask;
             _items.Children.Clear();
+            _recurrences.Children.Clear();
+            foreach (var recurrence in recurrences)
+                AddRecurrence(recurrence);
+            if (recurrences.Count == 0)
+                AddCard(_recurrences, "No recurring routines", "Add a daily, weekly, biweekly, monthly, or yearly household routine.");
             if (tasks.Count == 0)
             {
-                AddCard("No assigned tasks", "Tasks assigned to you will appear here.");
+                AddCard(_items, "No assigned tasks", "Tasks assigned to you will appear here.");
                 _status.Text = "You're all caught up.";
             }
             else
@@ -173,7 +187,118 @@ public sealed class TasksPage : ContentPage
         }
     }
 
-    private void AddCard(string title, string detail)
+    private Button CreateRecurrenceButton()
+    {
+        var button = new Button { Text = "＋ Add recurring routine" };
+        button.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+        button.Clicked += async (_, _) => await CreateRecurrenceAsync();
+        return button;
+    }
+
+    private void AddRecurrence(RecurrenceDto recurrence)
+    {
+        var frequency = recurrence.Frequency switch
+        {
+            "Daily" => recurrence.Interval == 1 ? "Daily" : $"Every {recurrence.Interval} days",
+            "Weekly" => recurrence.Interval == 1 ? "Weekly" : $"Every {recurrence.Interval} weeks",
+            "BiWeekly" => "Every two weeks",
+            "Monthly" => recurrence.Interval == 1 ? "Monthly" : $"Every {recurrence.Interval} months",
+            "Yearly" => recurrence.Interval == 1 ? "Yearly" : $"Every {recurrence.Interval} years",
+            _ => "Repeating"
+        };
+        var next = recurrence.NextOccurrenceUtc is DateTime when
+            ? $"Next: {when.ToLocalTime():ddd, MMM d}" : "Next occurrence not scheduled";
+        var detail = $"{frequency} · {next}{(string.IsNullOrWhiteSpace(recurrence.Category) ? "" : $" · {recurrence.Category}")}";
+        var stack = new VerticalStackLayout { Spacing = 5 };
+        var title = new Label { Text = recurrence.Title, FontSize = 16, FontAttributes = FontAttributes.Bold };
+        title.SetDynamicResource(VisualElement.StyleProperty, "TextBodyStrong");
+        var meta = new Label { Text = recurrence.IsActive ? detail : $"{detail} · Inactive", FontSize = 12 };
+        meta.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+        stack.Children.Add(title);
+        stack.Children.Add(meta);
+        if (recurrence.IsActive)
+        {
+            var pause = new Button { Text = "Stop series", FontSize = 12 };
+            pause.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+            pause.Clicked += async (_, _) => await DeactivateRecurrenceAsync(recurrence);
+            stack.Children.Add(pause);
+        }
+        var card = new Border { Padding = 12, Content = stack };
+        card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
+        _recurrences.Children.Add(card);
+    }
+
+    private async Task CreateRecurrenceAsync()
+    {
+        var title = await DisplayPromptAsync("New recurring routine", "What needs to repeat?", maxLength: 160);
+        if (string.IsNullOrWhiteSpace(title)) return;
+        var choice = await DisplayActionSheetAsync("Repeat", "Cancel", null,
+            "Daily", "Weekly", "Every two weeks", "Monthly", "Yearly");
+        if (choice is null or "Cancel") return;
+        var frequency = choice switch
+        {
+            "Daily" => "Daily", "Weekly" => "Weekly", "Every two weeks" => "BiWeekly",
+            "Monthly" => "Monthly", "Yearly" => "Yearly", _ => ""
+        };
+        if (string.IsNullOrEmpty(frequency)) return;
+        var interval = 1;
+        if (frequency is "Daily" or "Weekly" or "Monthly" or "Yearly")
+        {
+            var intervalText = await DisplayPromptAsync("Repeat interval", "Enter 1 for every period, 2 for every second period, etc.",
+                initialValue: "1", maxLength: 3, keyboard: Keyboard.Numeric);
+            if (string.IsNullOrWhiteSpace(intervalText)) return;
+            if (!int.TryParse(intervalText, out interval) || interval is < 1 or > 365)
+            {
+                await DisplayAlertAsync("Invalid interval", "Enter a whole number from 1 to 365.", "OK");
+                return;
+            }
+        }
+        int? dayOfWeek = null;
+        if (frequency is "Weekly" or "BiWeekly")
+        {
+            var day = await DisplayActionSheetAsync("Day of week", "Use today", null,
+                "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday");
+            if (day is not null and not "Cancel" and not "Use today")
+                dayOfWeek = Array.IndexOf(new[] { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" }, day);
+            else if (day == "Use today")
+                dayOfWeek = (int)DateTime.Today.DayOfWeek;
+        }
+        var description = await DisplayPromptAsync("Description", "Optional details", maxLength: 500);
+        var category = await DisplayPromptAsync("Category", "Optional category", maxLength: 80);
+        try
+        {
+            await _tasks.CreateRecurrenceAsync(new CreateRecurrenceBody(
+                title.Trim(), frequency, interval, dayOfWeek is null ? null : ((DayOfWeek)dayOfWeek.Value).ToString(),
+                Category: string.IsNullOrWhiteSpace(category) ? null : category.Trim(),
+                Description: string.IsNullOrWhiteSpace(description) ? null : description.Trim()));
+            _status.Text = "Recurring routine created.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlertAsync("Routine not created",
+                ex is FamilyApiException ? ex.Message : "Could not create the recurring routine.", "OK");
+        }
+    }
+
+    private async Task DeactivateRecurrenceAsync(RecurrenceDto recurrence)
+    {
+        if (!await DisplayAlertAsync("Stop recurring routine",
+                $"Stop creating future tasks for “{recurrence.Title}”? Existing tasks will remain.", "Stop series", "Keep active"))
+            return;
+        try
+        {
+            await _tasks.DeactivateRecurrenceAsync(recurrence.Id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlertAsync("Routine not paused",
+                ex is FamilyApiException ? ex.Message : "Could not pause this routine.", "OK");
+        }
+    }
+
+    private void AddCard(VerticalStackLayout target, string title, string detail)
     {
         var stack = new VerticalStackLayout { Spacing = 5 };
         var heading = new Label { Text = title, FontSize = 16, FontAttributes = FontAttributes.Bold };
@@ -184,6 +309,6 @@ public sealed class TasksPage : ContentPage
         stack.Children.Add(body);
         var border = new Border { Padding = 14, Content = stack };
         border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
-        _items.Children.Add(border);
+        target.Children.Add(border);
     }
 }
