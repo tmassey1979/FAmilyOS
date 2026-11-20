@@ -22,18 +22,25 @@ public sealed class PulseApiClient
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _http;
     private readonly IAuthSessionService _auth;
+    private readonly StartupDiagnosticsService _diagnostics;
 
-    public PulseApiClient(HttpClient http, IAuthSessionService auth)
+    public PulseApiClient(HttpClient http, IAuthSessionService auth, StartupDiagnosticsService diagnostics)
     {
         _http = http;
         _auth = auth;
+        _diagnostics = diagnostics;
     }
 
     public async Task<PulseDto> GetPulseAsync(CancellationToken cancellationToken = default)
     {
+        _diagnostics.RecordCheckpoint("AUTH API pulse request started; acquiring access token");
         var token = await _auth.GetAccessTokenAsync(cancellationToken);
         if (string.IsNullOrWhiteSpace(token))
+        {
+            _diagnostics.RecordCheckpoint("AUTH API pulse request blocked; no access token available");
             throw new FamilyApiException(HttpStatusCode.Unauthorized, "Sign in to load your family dashboard.");
+        }
+        _diagnostics.RecordCheckpoint("AUTH API pulse access token available; token value omitted");
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(ApiBaseUri, "api/pulse"));
         request.Headers.Authorization =
@@ -46,15 +53,23 @@ public sealed class PulseApiClient
         using var response = await _http.SendAsync(
             request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
 
+        _diagnostics.RecordCheckpoint($"AUTH API pulse response; http_status={(int)response.StatusCode}; success={response.IsSuccessStatusCode}");
         if (!response.IsSuccessStatusCode)
         {
             var message = await ReadErrorMessageAsync(response, timeout.Token);
+            _diagnostics.RecordCheckpoint($"AUTH API pulse rejected; status={(int)response.StatusCode}");
             throw new FamilyApiException(response.StatusCode, message);
         }
 
         await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
         var pulse = await JsonSerializer.DeserializeAsync<PulseDto>(stream, JsonOptions, timeout.Token);
-        return pulse ?? throw new InvalidOperationException("The FamilyOS API returned an empty Pulse response.");
+        if (pulse is null)
+        {
+            _diagnostics.RecordCheckpoint("AUTH API pulse response was empty or invalid");
+            throw new InvalidOperationException("The FamilyOS API returned an empty Pulse response.");
+        }
+        _diagnostics.RecordCheckpoint("AUTH API pulse deserialization succeeded");
+        return pulse;
     }
 
     private static async Task<string> ReadErrorMessageAsync(
