@@ -1,4 +1,5 @@
 using FamilyOS.Maui.Pages;
+using FamilyOS.Maui.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FamilyOS.Maui;
