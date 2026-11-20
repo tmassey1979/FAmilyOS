@@ -101,7 +101,7 @@ jobs:
             echo "::error::$name did not become healthy"
             return 1
           }
-          check_url "FamilyOS API" "https://api.18.226.226.118.sslip.io/health"
+          check_url "FamilyOS API" "https://api.18.226.226.118.sslip.io/health/ready"
           check_url "Keycloak realm discovery" "https://auth.18.226.226.118.sslip.io/realms/familyos/.well-known/openid-configuration"
 
       - name: Summary
@@ -109,4 +109,4 @@ jobs:
         run: |
           echo "## Deploy" >> "$GITHUB_STEP_SUMMARY"
           echo "- Mode: ${{ steps.deploy.outputs.mode }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- API: https://api.18.226.226.118.sslip.io/health" >> "$GITHUB_STEP_SUMMARY"
+          echo "- API: https://api.18.226.226.118.sslip.io/health/ready" >> "$GITHUB_STEP_SUMMARY"
