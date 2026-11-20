@@ -44,7 +44,7 @@ public sealed class TasksPage : ContentPage
             Spacing = 16,
             Children = { header, _status, _items,
                 new Label { Text = "Recurring routines", FontSize = 20, FontAttributes = FontAttributes.Bold },
-                new Label { Text = "Create repeating household tasks and pause a series when it is no longer needed.", FontSize = 13 },
+                new Label { Text = "Create repeating household tasks and stop a series when it is no longer needed.", FontSize = 13 },
                 CreateRecurrenceButton(), _recurrences }
         };
         Content = new RefreshView
@@ -212,13 +212,13 @@ public sealed class TasksPage : ContentPage
         var stack = new VerticalStackLayout { Spacing = 5 };
         var title = new Label { Text = recurrence.Title, FontSize = 16, FontAttributes = FontAttributes.Bold };
         title.SetDynamicResource(VisualElement.StyleProperty, "TextBodyStrong");
-        var meta = new Label { Text = recurrence.IsActive ? detail : $"{detail} · Paused", FontSize = 12 };
+        var meta = new Label { Text = recurrence.IsActive ? detail : $"{detail} · Inactive", FontSize = 12 };
         meta.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
         stack.Children.Add(title);
         stack.Children.Add(meta);
         if (recurrence.IsActive)
         {
-            var pause = new Button { Text = "Pause series", FontSize = 12 };
+            var pause = new Button { Text = "Stop series", FontSize = 12 };
             pause.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
             pause.Clicked += async (_, _) => await DeactivateRecurrenceAsync(recurrence);
             stack.Children.Add(pause);
@@ -283,8 +283,8 @@ public sealed class TasksPage : ContentPage
 
     private async Task DeactivateRecurrenceAsync(RecurrenceDto recurrence)
     {
-        if (!await DisplayAlertAsync("Pause recurring routine",
-                $"Stop creating future tasks for “{recurrence.Title}”? Existing tasks will remain.", "Pause", "Keep active"))
+        if (!await DisplayAlertAsync("Stop recurring routine",
+                $"Stop creating future tasks for “{recurrence.Title}”? Existing tasks will remain.", "Stop series", "Keep active"))
             return;
         try
         {
