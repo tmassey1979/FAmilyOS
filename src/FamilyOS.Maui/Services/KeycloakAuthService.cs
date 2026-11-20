@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.Text.Json.Serialization;
 using Microsoft.Maui.Authentication;
 using Microsoft.Maui.Storage;
+using Microsoft.Maui.Networking;
 
 namespace FamilyOS.Maui.Services;
 
