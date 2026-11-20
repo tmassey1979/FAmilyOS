@@ -202,7 +202,17 @@ public sealed class KeycloakAuthService : IAuthSessionService
     {
         var grantType = form.TryGetValue("grant_type", out var grant) ? grant : "unknown";
         var tokenUri = new Uri(TokenEndpoint);
-        _diagnostics.RecordCheckpoint($"AUTH token endpoint request started; grant_type={grantType}; host={tokenUri.Host}; network={Connectivity.Current.NetworkAccess}");
+        var networkAccess = "unavailable";
+        try
+        {
+            networkAccess = Connectivity.Current.NetworkAccess.ToString();
+        }
+        catch (Exception permissionException)
+        {
+            // Diagnostics must never prevent the authentication request itself.
+            networkAccess = $"unavailable:{permissionException.GetType().Name}";
+        }
+        _diagnostics.RecordCheckpoint($"AUTH token endpoint request started; grant_type={grantType}; host={tokenUri.Host}; network={networkAccess}");
 
         // Separate DNS failures from TLS/HTTP failures. Never log request form values.
         try
