@@ -83,8 +83,11 @@ services:
       KC_HTTP_PORT: 8080
       KC_PROXY_HEADERS: xforwarded
       KC_HTTP_ENABLED: "true"
-      KC_HOSTNAME: auth.${DOMAIN}
-      KC_HOSTNAME_STRICT: "false"
+      # Keep the public issuer stable while advertising internal backchannel URLs
+      # to services that discover Keycloak over the Docker network.
+      KC_HOSTNAME: https://auth.${DOMAIN}
+      KC_HOSTNAME_STRICT: "true"
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
       KC_HEALTH_ENABLED: "true"
       KC_HTTP_MANAGEMENT_PORT: 9000
       JAVA_OPTS_APPEND: "-Xms64m -Xmx384m"
