@@ -73,12 +73,13 @@ docker compose --env-file deploy/traefik/.env -f deploy/traefik/docker-compose.y
 
 A push to `main` starts one **FamilyOS Coordinated Release**:
 
-1. Restore, build, and test the .NET solution.
-2. Build and publish the API and Keycloak images to GHCR, tagged with the app version, source commit, and `latest`.
-3. Build the versioned MAUI Android Release APK and calculate its SHA-256 checksum.
-4. Deploy the Portainer stack only after both image publishing and APK creation succeed.
-5. Require HTTP 200 from both the API health endpoint and Keycloak realm discovery endpoint.
-6. Publish the APK as a GitHub Release only after deployment and both health checks pass.
+1. Restore, build, and test the .NET 8 API/domain projects.
+2. Run the MAUI design-system tests and Expo mobile TypeScript check.
+3. Build and publish the API and Keycloak images to GHCR, tagged with the app version, source commit, and `latest`.
+4. Build the versioned MAUI Android Release APK and calculate its SHA-256 checksum.
+5. Deploy the Portainer stack only after all validation, image publishing, and APK creation succeed.
+6. Require HTTP 200 from both the API health endpoint and Keycloak realm discovery endpoint.
+7. Publish the APK as a GitHub Release only after deployment and both health checks pass.
 
 A failed build, image push, deployment, or health check prevents the coordinated GitHub Release from being published. The coordinated workflow can also be started manually from the Actions tab on `main`.
 
