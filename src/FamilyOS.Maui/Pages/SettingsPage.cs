@@ -139,11 +139,12 @@ public sealed class SettingsPage : ContentPage
             var meTask = _me.GetAsync();
             var familyTask = _family.GetFamilyAsync();
             var quietTask = _me.GetQuietHoursAsync();
+            var googleTask = _me.GetGoogleCalendarStatusAsync();
             await Task.WhenAll(meTask, familyTask, quietTask);
+            var google = await googleTask;
             var me = await meTask;
             var family = await familyTask;
             var quiet = await quietTask;
-            var google = await googleTask;
             _googleStatus.Text = !google.Configured
                 ? "Google Calendar integration is not configured on the server."
                 : google.Connected
