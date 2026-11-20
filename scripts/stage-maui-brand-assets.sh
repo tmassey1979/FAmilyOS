@@ -146,7 +146,7 @@ for raw in sys.argv[1:]:
     if not path.is_file() or path.stat().st_size < 100:
         raise SystemExit(f"::error::MAUI brand asset was not generated: {path}")
     data = path.read_bytes()
-    if data[:8] != b"\\x89PNG\\r\\n\\x1a\\n":
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
         raise SystemExit(f"::error::MAUI brand asset is not a PNG: {path}")
     width, height = struct.unpack(">II", data[16:24])
     print(f"validated {path} ({width}x{height}, {len(data)} bytes)")
