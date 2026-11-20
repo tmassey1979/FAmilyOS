@@ -2,6 +2,9 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Diagnostics;
+using System.Net.Sockets;
+using Microsoft.Maui.Networking;
 
 namespace FamilyOS.Maui.Services;
 
@@ -12,11 +15,13 @@ public sealed class OnboardingApiClient
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _http;
     private readonly IAuthSessionService _auth;
+    private readonly StartupDiagnosticsService _diagnostics;
 
-    public OnboardingApiClient(HttpClient http, IAuthSessionService auth)
+    public OnboardingApiClient(HttpClient http, IAuthSessionService auth, StartupDiagnosticsService diagnostics)
     {
         _http = http;
         _auth = auth;
+        _diagnostics = diagnostics;
     }
 
     public async Task<FamilyDto> CreateFamilyAsync(
@@ -53,7 +58,10 @@ public sealed class OnboardingApiClient
     private async Task<T> SendAsync<T>(
         HttpMethod method, string path, HttpContent? content, bool authenticated, CancellationToken ct)
     {
-        using var request = new HttpRequestMessage(method, new Uri(ApiBaseUri, path)) { Content = content };
+        var requestUri = new Uri(ApiBaseUri, path);
+        var elapsed = Stopwatch.StartNew();
+        _diagnostics.RecordCheckpoint($"AUTH onboarding API request preparing; method={method.Method}; host={requestUri.Host}; authenticated={authenticated}");
+        using var request = new HttpRequestMessage(method, requestUri) { Content = content };
         request.Headers.Accept.ParseAdd("application/json");
 
         if (authenticated)
@@ -62,11 +70,20 @@ public sealed class OnboardingApiClient
             if (string.IsNullOrWhiteSpace(token))
                 throw new FamilyApiException(HttpStatusCode.Unauthorized, "Sign in before continuing.");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            _diagnostics.RecordCheckpoint("AUTH onboarding API bearer token attached; value omitted");
         }
 
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(TimeSpan.FromSeconds(30));
-        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+        var network = "unavailable";
+        try { network = Connectivity.Current.NetworkAccess.ToString(); }
+        catch (Exception ex) { network = $"unavailable:{ex.GetType().Name}"; }
+        _diagnostics.RecordCheckpoint($"AUTH onboarding API request starting; network={network}; timeout_seconds=30");
+
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(TimeSpan.FromSeconds(30));
+            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+            _diagnostics.RecordCheckpoint($"AUTH onboarding API response headers received; http_status={(int)response.StatusCode}; elapsed_ms={elapsed.ElapsedMilliseconds}");
         if (!response.IsSuccessStatusCode)
         {
             var message = response.StatusCode switch
@@ -80,9 +97,24 @@ public sealed class OnboardingApiClient
             throw new FamilyApiException(response.StatusCode, message);
         }
 
-        await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
-        var result = await JsonSerializer.DeserializeAsync<T>(stream, JsonOptions, timeout.Token);
-        return result ?? throw new InvalidOperationException("The FamilyOS API returned an empty onboarding response.");
+            await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
+            var result = await JsonSerializer.DeserializeAsync<T>(stream, JsonOptions, timeout.Token);
+            _diagnostics.RecordCheckpoint($"AUTH onboarding API response parsed; elapsed_ms={elapsed.ElapsedMilliseconds}");
+            return result ?? throw new InvalidOperationException("The FamilyOS API returned an empty onboarding response.");
+        }
+        catch (OperationCanceledException ex)
+        {
+            var reason = ct.IsCancellationRequested ? "caller_cancelled" : "30_second_client_timeout";
+            _diagnostics.RecordCheckpoint($"AUTH onboarding API cancelled; reason={reason}; exception={ex.GetType().Name}; elapsed_ms={elapsed.ElapsedMilliseconds}");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            var inner = ex.InnerException;
+            var socket = ex as SocketException ?? inner as SocketException;
+            _diagnostics.RecordCheckpoint($"AUTH onboarding API transport failed; exception={ex.GetType().Name}; inner={inner?.GetType().Name ?? "none"}; socket_error={socket?.SocketErrorCode.ToString() ?? "none"}; elapsed_ms={elapsed.ElapsedMilliseconds}");
+            throw;
+        }
     }
 
     private static string NormalizeCode(string code)
