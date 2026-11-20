@@ -1,5 +1,6 @@
 using System.Text;
 using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json.Serialization;
 using FamilyOS.Api.Hubs;
 using FamilyOS.Api.Middleware;
@@ -140,12 +141,13 @@ try
                 var principal = context.Principal;
                 var hasSubjectClaim = principal?.HasClaim(c => c.Type == "sub") == true;
                 var hasNameIdentifier = principal?.HasClaim(c => c.Type == ClaimTypes.NameIdentifier) == true;
-                var tokenSubject = context.SecurityToken?.Subject;
+                var tokenSubject = (context.SecurityToken as JwtSecurityToken)?.Claims
+                    .FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value;
 
                 if (!hasSubjectClaim && !hasNameIdentifier && !string.IsNullOrWhiteSpace(tokenSubject))
                 {
                     var identity = principal?.Identities.FirstOrDefault(i => i.IsAuthenticated);
-                    identity?.AddClaim(new Claim("sub", tokenSubject));
+                    identity?.AddClaim(new System.Security.Claims.Claim("sub", tokenSubject!));
                     Log.Warning(
                         "JWT validated principal omitted subject claims; restored sub from validated security token. Path={Path} TraceId={TraceId}",
                         context.Request.Path, context.HttpContext.TraceIdentifier);
