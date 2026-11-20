@@ -185,6 +185,7 @@ public sealed class SettingsPage : ContentPage
         {
             var result = await _me.SyncGoogleCalendarAsync();
             _status.Text = $"Google Calendar sync complete. {result.Changed} event(s) updated.";
+            _busy = false;
             await LoadAsync();
         }
         catch (Exception ex) { _status.Text = ex is FamilyApiException ? ex.Message : "Google Calendar sync failed."; }
@@ -202,6 +203,7 @@ public sealed class SettingsPage : ContentPage
         {
             await _me.DisconnectGoogleCalendarAsync();
             _status.Text = "Google Calendar disconnected.";
+            _busy = false;
             await LoadAsync();
         }
         catch (Exception ex) { _status.Text = ex is FamilyApiException ? ex.Message : "Could not disconnect Google Calendar."; }
