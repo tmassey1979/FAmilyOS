@@ -43,16 +43,20 @@ public sealed class SettingsPage : ContentPage
         var familyCard = Card("Household", _household);
         var quietHeading = new Label { Text = "Quiet hours", FontSize = 18, FontAttributes = FontAttributes.Bold };
         quietHeading.SetDynamicResource(VisualElement.StyleProperty, "TextTitle");
-        var toggleRow = new HorizontalStackLayout
+        var toggleRow = new Grid
         {
-            Spacing = 12,
-            VerticalOptions = LayoutOptions.Center,
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(GridLength.Star),
+                new ColumnDefinition(GridLength.Auto)
+            },
             Children =
             {
-                new Label { Text = "Enable quiet hours", VerticalOptions = LayoutOptions.Center, HorizontalOptions = LayoutOptions.StartAndExpand },
+                new Label { Text = "Enable quiet hours", VerticalOptions = LayoutOptions.Center },
                 _enabled
             }
         };
+        Grid.SetColumn(_enabled, 1);
         var timeRow = new HorizontalStackLayout
         {
             Spacing = 18,
@@ -139,7 +143,8 @@ public sealed class SettingsPage : ContentPage
             var meTask = _me.GetAsync();
             var familyTask = _family.GetFamilyAsync();
             var quietTask = _me.GetQuietHoursAsync();
-            await Task.WhenAll(meTask, familyTask, quietTask);
+            var googleTask = _me.GetGoogleCalendarStatusAsync();
+            await Task.WhenAll(meTask, familyTask, quietTask, googleTask);
             var me = await meTask;
             var family = await familyTask;
             var quiet = await quietTask;
@@ -148,7 +153,7 @@ public sealed class SettingsPage : ContentPage
                 ? "Google Calendar integration is not configured on the server."
                 : google.Connected
                     ? $"Connected{(string.IsNullOrWhiteSpace(google.Email) ? "" : $" as {google.Email}")}. Last sync: {(google.LastSyncAtUtc.HasValue ? google.LastSyncAtUtc.Value.ToLocalTime().ToString("g") : "not yet synced")}."
-                    : "Not connected."; 
+                    : "Not connected.";
             _googleConnect.IsVisible = google.Configured && !google.Connected;
             _googleSync.IsVisible = google.Configured && google.Connected;
             _googleDisconnect.IsVisible = google.Configured && google.Connected;
@@ -195,7 +200,7 @@ public sealed class SettingsPage : ContentPage
     private async Task DisconnectGoogleCalendarAsync()
     {
         if (_busy) return;
-        var confirm = await DisplayAlert("Disconnect Google Calendar", "Stop syncing this Google account with FamilyOS?", "Disconnect", "Cancel");
+        var confirm = await DisplayAlertAsync("Disconnect Google Calendar", "Stop syncing this Google account with FamilyOS?", "Disconnect", "Cancel");
         if (!confirm) return;
         _busy = true;
         _googleDisconnect.IsEnabled = false;
