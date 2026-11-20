@@ -1,4 +1,3 @@
-using Microsoft.Maui.Layouts;
 using FamilyOS.Maui.Services;
 
 namespace FamilyOS.Maui.Pages;
@@ -6,6 +5,7 @@ namespace FamilyOS.Maui.Pages;
 /// <summary>
 /// API-backed view of the signed-in member's tasks. The API remains the
 /// authority for task visibility, assignment, and allowed state transitions.
+/// Assignment is distinct from acceptance: "Assigned" requires Accept before Start.
 /// </summary>
 public sealed class TasksPage : ContentPage
 {
@@ -14,6 +14,7 @@ public sealed class TasksPage : ContentPage
     private readonly VerticalStackLayout _recurrences;
     private readonly Label _status;
     private readonly Button _refresh;
+    private readonly Button _create;
     private bool _loading;
 
     public TasksPage(TasksApiClient tasks)
@@ -23,29 +24,46 @@ public sealed class TasksPage : ContentPage
 
         _status = new Label { Text = "Loading your tasks…", FontSize = 14 };
         _status.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
-        _refresh = new Button { Text = "Refresh", HorizontalOptions = LayoutOptions.End };
+        _refresh = new Button { Text = "Refresh" };
         _refresh.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
         _refresh.Clicked += async (_, _) => await LoadAsync();
+        _create = new Button { Text = "New task" };
+        _create.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
+        _create.Clicked += async (_, _) => await CreateTaskAsync();
 
         _items = new VerticalStackLayout { Spacing = 12 };
         _recurrences = new VerticalStackLayout { Spacing = 10 };
-        var header = new Grid
-        {
-            ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
-        };
         var heading = new Label { Text = "My tasks", FontSize = 26, FontAttributes = FontAttributes.Bold };
         heading.SetDynamicResource(VisualElement.StyleProperty, "TextDisplay");
-        header.Add(heading, 0, 0);
-        header.Add(_refresh, 1, 0);
+        var toolbar = new HorizontalStackLayout
+        {
+            Spacing = 8,
+            HorizontalOptions = LayoutOptions.End,
+            Children = { _create, _refresh }
+        };
+        var header = new Grid
+        {
+            ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+            Children = { heading, toolbar }
+        };
+        Grid.SetColumn(toolbar, 1);
 
         var layout = new VerticalStackLayout
         {
             Padding = new Thickness(20, 12),
             Spacing = 16,
-            Children = { header, _status, _items,
+            Children =
+            {
+                header, _status, _items,
                 new Label { Text = "Recurring routines", FontSize = 20, FontAttributes = FontAttributes.Bold },
-                new Label { Text = "Create repeating household tasks and stop a series when it is no longer needed.", FontSize = 13 },
-                CreateRecurrenceButton(), _recurrences }
+                new Label
+                {
+                    Text = "Create repeating household tasks and stop a series when it is no longer needed.",
+                    FontSize = 13
+                },
+                CreateRecurrenceButton(),
+                _recurrences
+            }
         };
         Content = new RefreshView
         {
@@ -66,6 +84,7 @@ public sealed class TasksPage : ContentPage
         if (_loading) return;
         _loading = true;
         _refresh.IsEnabled = false;
+        _create.IsEnabled = false;
         _status.Text = "Loading your tasks…";
         try
         {
@@ -82,12 +101,15 @@ public sealed class TasksPage : ContentPage
                 AddCard(_recurrences, "No recurring routines", "Add a daily, weekly, biweekly, monthly, or yearly household routine.");
             if (tasks.Count == 0)
             {
-                AddCard(_items, "No assigned tasks", "Tasks assigned to you will appear here.");
+                AddCard(_items, "No assigned tasks", "Tasks assigned to you will appear here. Use New task to create one.");
                 _status.Text = "You're all caught up.";
             }
             else
             {
-                _status.Text = $"{tasks.Count} task{(tasks.Count == 1 ? "" : "s")} assigned to you";
+                var overdue = tasks.Count(t => t.IsOverdue);
+                _status.Text = overdue > 0
+                    ? $"{tasks.Count} task{(tasks.Count == 1 ? "" : "s")} · {overdue} overdue"
+                    : $"{tasks.Count} task{(tasks.Count == 1 ? "" : "s")} assigned to you";
                 foreach (var task in tasks.OrderBy(t => t.IsOverdue ? 0 : 1).ThenBy(t => t.DueDate ?? DateTime.MaxValue))
                     AddTask(task);
             }
@@ -112,6 +134,7 @@ public sealed class TasksPage : ContentPage
         {
             _loading = false;
             _refresh.IsEnabled = true;
+            _create.IsEnabled = true;
         }
     }
 
@@ -124,53 +147,135 @@ public sealed class TasksPage : ContentPage
 
         var details = new List<string> { task.Status, task.Priority };
         if (!string.IsNullOrWhiteSpace(task.Category)) details.Add(task.Category);
-        if (task.DueDate is not null) details.Add($"Due {task.DueDate.Value.ToLocalTime():MMM d}");
         if (task.IsOverdue) details.Add("Overdue");
-        var meta = new Label { Text = string.Join(" · ", details), FontSize = 13 };
+        if (task.IsRecurring) details.Add(task.RecurrenceFrequency is { Length: > 0 } f ? $"↻ {f}" : "↻ Recurring");
+        if (task.DueDate is { } due) details.Add($"Due {due.ToLocalTime():g}");
+        if (task.EstimatedDurationMinutes is { } est) details.Add($"Est {est} min");
+        if (task.ActualDurationMinutes is { } act) details.Add($"Actual {act} min");
+        if (!string.IsNullOrWhiteSpace(task.PlannedStartTime) || !string.IsNullOrWhiteSpace(task.PlannedEndTime))
+            details.Add($"Planned {task.PlannedStartTime ?? "?"}–{task.PlannedEndTime ?? "?"}");
+        if (task.VarianceMinutes is { } variance)
+            details.Add(variance == 0 ? "On plan" : variance > 0 ? $"+{variance} min vs plan" : $"{variance} min vs plan");
+
+        var meta = new Label { Text = string.Join(" · ", details), FontSize = 12, LineBreakMode = LineBreakMode.WordWrap };
         meta.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
         stack.Children.Add(meta);
 
         if (!string.IsNullOrWhiteSpace(task.Description))
         {
-            var description = new Label { Text = task.Description, FontSize = 14, LineBreakMode = LineBreakMode.WordWrap };
-            description.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
-            stack.Children.Add(description);
+            var desc = new Label { Text = task.Description, FontSize = 13, LineBreakMode = LineBreakMode.WordWrap };
+            desc.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
+            stack.Children.Add(desc);
         }
 
-        var actions = new FlexLayout { Wrap = FlexWrap.Wrap, Direction = FlexDirection.Row };
-        foreach (var action in ActionsFor(task.Status))
+        // Assignment ≠ acceptance: Assigned/Reassigned must Accept before Start.
+        var actions = new FlexLayout
         {
-            var button = new Button { Text = action.Label, FontSize = 13, Margin = new Thickness(0, 0, 8, 0) };
-            button.SetDynamicResource(VisualElement.StyleProperty,
-                action.Primary ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle");
-            button.Clicked += async (_, _) => await ExecuteAsync(task.Id, action.Name);
-            actions.Children.Add(button);
-        }
-        if (actions.Children.Count > 0) stack.Children.Add(actions);
+            Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap,
+            Direction = Microsoft.Maui.Layouts.FlexDirection.Row,
+            JustifyContent = Microsoft.Maui.Layouts.FlexJustify.Start
+        };
+        foreach (var (action, label, primary) in ActionsFor(task.Status))
+            actions.Children.Add(MakeActionButton(task.Id, action, label, primary));
+
+        actions.Children.Add(MakeHistoryButton(task.Id, task.Title));
+        stack.Children.Add(actions);
 
         var border = new Border { Padding = 14, Content = stack };
         border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
         _items.Children.Add(border);
     }
 
-    private static IReadOnlyList<(string Name, string Label, bool Primary)> ActionsFor(string status)
-        => status switch
+    private static (string action, string label, bool primary)[] ActionsFor(string status) => status switch
+    {
+        "Assigned" or "Reassigned" => new[]
         {
-            "Assigned" or "Reassigned" => new[] { ("accept", "Accept", true) },
-            "Accepted" => new[] { ("start", "Start", true), ("complete", "Complete", false) },
-            "InProgress" => new[] { ("pause", "Pause", false), ("complete", "Complete", true) },
-            "Paused" => new[] { ("resume", "Resume", true), ("complete", "Complete", false) },
-            "Deferred" => new[] { ("start", "Start", true) },
-            _ => Array.Empty<(string, string, bool)>()
-        };
+            ("accept", "Accept", true),
+            ("defer", "Defer", false),
+            ("cancel", "Cancel", false)
+        },
+        "Accepted" => new[]
+        {
+            ("start", "Start", true),
+            ("complete", "Complete", false),
+            ("defer", "Defer", false),
+            ("skip", "Skip", false),
+            ("cancel", "Cancel", false)
+        },
+        "InProgress" => new[]
+        {
+            ("pause", "Pause", false),
+            ("complete", "Complete", true),
+            ("defer", "Defer", false),
+            ("cancel", "Cancel", false)
+        },
+        "Paused" => new[]
+        {
+            ("resume", "Resume", true),
+            ("complete", "Complete", false),
+            ("cancel", "Cancel", false)
+        },
+        "Deferred" => new[]
+        {
+            ("start", "Start", true),
+            ("skip", "Skip", false),
+            ("cancel", "Cancel", false)
+        },
+        _ => Array.Empty<(string, string, bool)>()
+    };
+
+    private Button MakeActionButton(Guid taskId, string action, string label, bool primary)
+    {
+        var button = new Button { Text = label, FontSize = 12, Margin = new Thickness(0, 4, 8, 0) };
+        button.SetDynamicResource(VisualElement.StyleProperty, primary ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle");
+        button.Clicked += async (_, _) => await ExecuteAsync(taskId, action);
+        return button;
+    }
+
+    private Button MakeHistoryButton(Guid taskId, string title)
+    {
+        var button = new Button { Text = "History", FontSize = 12, Margin = new Thickness(0, 4, 8, 0) };
+        button.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+        button.Clicked += async (_, _) => await ShowHistoryAsync(taskId, title);
+        return button;
+    }
 
     private async Task ExecuteAsync(Guid taskId, string action)
     {
-        _status.Text = "Saving task update…";
-        _refresh.IsEnabled = false;
         try
         {
-            await _tasks.RunActionAsync(taskId, action);
+            if (action is "defer" or "skip" or "cancel")
+            {
+                var prompt = action switch
+                {
+                    "defer" => "Optional note for deferring this task:",
+                    "skip" => "Optional note for skipping this instance:",
+                    _ => "Optional reason for cancelling:"
+                };
+                var note = await DisplayPromptAsync(action[..1].ToUpper() + action[1..], prompt, "Confirm", "Cancel", maxLength: 200);
+                // null = user cancelled dialog
+                if (note is null && action == "cancel")
+                    return;
+                if (note is null && action is "defer" or "skip")
+                {
+                    // Allow empty note via blank confirm is DisplayPrompt returns "" on empty — null means cancel.
+                    return;
+                }
+
+                _ = action switch
+                {
+                    "defer" => await _tasks.DeferAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
+                    "skip" => await _tasks.SkipAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
+                    "cancel" => await _tasks.CancelAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
+                    _ => throw new InvalidOperationException()
+                };
+            }
+            else
+            {
+                await _tasks.RunActionAsync(taskId, action);
+            }
+
+            _status.Text = $"Task {action}ed.";
             await LoadAsync();
         }
         catch (FamilyApiException ex)
@@ -179,17 +284,69 @@ public sealed class TasksPage : ContentPage
         }
         catch (Exception)
         {
-            _status.Text = "The task could not be updated. Refresh and try again.";
+            _status.Text = $"Could not {action} that task.";
         }
-        finally
+    }
+
+    private async Task ShowHistoryAsync(Guid taskId, string title)
+    {
+        try
         {
-            _refresh.IsEnabled = true;
+            var history = await _tasks.GetHistoryAsync(taskId);
+            if (history.Count == 0)
+            {
+                await DisplayAlertAsync(title, "No history recorded yet.", "OK");
+                return;
+            }
+
+            var lines = history
+                .OrderByDescending(h => h.OccurredAtUtc)
+                .Take(20)
+                .Select(h =>
+                {
+                    var who = string.IsNullOrWhiteSpace(h.ActorName) ? "" : $" · {h.ActorName}";
+                    var detail = string.IsNullOrWhiteSpace(h.Detail) ? "" : $" — {h.Detail}";
+                    return $"{h.OccurredAtUtc.ToLocalTime():g} · {h.Action}{who}{detail}";
+                });
+            await DisplayAlertAsync($"History · {title}", string.Join("\n", lines), "OK");
+        }
+        catch (FamilyApiException ex)
+        {
+            _status.Text = ex.Message;
+        }
+        catch (Exception)
+        {
+            _status.Text = "Could not load task history.";
+        }
+    }
+
+    private async Task CreateTaskAsync()
+    {
+        var title = await DisplayPromptAsync("New task", "Title", "Create", "Cancel", maxLength: 120);
+        if (string.IsNullOrWhiteSpace(title)) return;
+
+        var priority = await DisplayActionSheetAsync("Priority", "Cancel", null, "Low", "Normal", "High", "Urgent");
+        if (priority is null or "Cancel") priority = "Normal";
+
+        try
+        {
+            await _tasks.CreateTaskAsync(new CreateTaskBody(title.Trim(), Priority: priority));
+            _status.Text = "Task created.";
+            await LoadAsync();
+        }
+        catch (FamilyApiException ex)
+        {
+            _status.Text = ex.Message;
+        }
+        catch (Exception)
+        {
+            _status.Text = "Could not create the task.";
         }
     }
 
     private Button CreateRecurrenceButton()
     {
-        var button = new Button { Text = "＋ Add recurring routine" };
+        var button = new Button { Text = "Add recurring routine" };
         button.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         button.Clicked += async (_, _) => await CreateRecurrenceAsync();
         return button;
@@ -197,118 +354,117 @@ public sealed class TasksPage : ContentPage
 
     private void AddRecurrence(RecurrenceDto recurrence)
     {
-        var frequency = recurrence.Frequency switch
-        {
-            "Daily" => recurrence.Interval == 1 ? "Daily" : $"Every {recurrence.Interval} days",
-            "Weekly" => recurrence.Interval == 1 ? "Weekly" : $"Every {recurrence.Interval} weeks",
-            "BiWeekly" => "Every two weeks",
-            "Monthly" => recurrence.Interval == 1 ? "Monthly" : $"Every {recurrence.Interval} months",
-            "Yearly" => recurrence.Interval == 1 ? "Yearly" : $"Every {recurrence.Interval} years",
-            _ => "Repeating"
-        };
-        var next = recurrence.NextOccurrenceUtc is DateTime when
-            ? $"Next: {when.ToLocalTime():ddd, MMM d}" : "Next occurrence not scheduled";
-        var detail = $"{frequency} · {next}{(string.IsNullOrWhiteSpace(recurrence.Category) ? "" : $" · {recurrence.Category}")}";
-        var stack = new VerticalStackLayout { Spacing = 5 };
+        var stack = new VerticalStackLayout { Spacing = 6 };
         var title = new Label { Text = recurrence.Title, FontSize = 16, FontAttributes = FontAttributes.Bold };
         title.SetDynamicResource(VisualElement.StyleProperty, "TextBodyStrong");
-        var meta = new Label { Text = recurrence.IsActive ? detail : $"{detail} · Inactive", FontSize = 12 };
-        meta.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
         stack.Children.Add(title);
+
+        var bits = new List<string>
+        {
+            recurrence.IsActive ? "Active" : "Stopped",
+            $"{recurrence.Frequency} / {recurrence.Interval}"
+        };
+        if (!string.IsNullOrWhiteSpace(recurrence.DayOfWeek)) bits.Add(recurrence.DayOfWeek);
+        if (!string.IsNullOrWhiteSpace(recurrence.Category)) bits.Add(recurrence.Category!);
+        if (recurrence.NextOccurrenceUtc is { } next) bits.Add($"Next {next.ToLocalTime():g}");
+
+        var meta = new Label { Text = string.Join(" · ", bits), FontSize = 12 };
+        meta.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
         stack.Children.Add(meta);
+
         if (recurrence.IsActive)
         {
-            var pause = new Button { Text = "Stop series", FontSize = 12 };
-            pause.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
-            pause.Clicked += async (_, _) => await DeactivateRecurrenceAsync(recurrence);
-            stack.Children.Add(pause);
+            var stop = new Button { Text = "Stop series", FontSize = 12 };
+            stop.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+            stop.Clicked += async (_, _) => await DeactivateRecurrenceAsync(recurrence);
+            stack.Children.Add(stop);
         }
-        var card = new Border { Padding = 12, Content = stack };
-        card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
-        _recurrences.Children.Add(card);
+
+        var border = new Border { Padding = 14, Content = stack };
+        border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
+        _recurrences.Children.Add(border);
     }
 
     private async Task CreateRecurrenceAsync()
     {
-        var title = await DisplayPromptAsync("New recurring routine", "What needs to repeat?", maxLength: 160);
+        var title = await DisplayPromptAsync("Recurring routine", "Title", "Next", "Cancel", maxLength: 120);
         if (string.IsNullOrWhiteSpace(title)) return;
+
         var choice = await DisplayActionSheetAsync("Repeat", "Cancel", null,
-            "Daily", "Weekly", "Every two weeks", "Monthly", "Yearly");
+            "Daily", "Weekly", "Biweekly", "Monthly", "Yearly");
         if (choice is null or "Cancel") return;
-        var frequency = choice switch
+
+        string frequency = choice switch
         {
-            "Daily" => "Daily", "Weekly" => "Weekly", "Every two weeks" => "BiWeekly",
-            "Monthly" => "Monthly", "Yearly" => "Yearly", _ => ""
+            "Daily" => "Daily",
+            "Weekly" => "Weekly",
+            "Biweekly" => "Weekly",
+            "Monthly" => "Monthly",
+            "Yearly" => "Yearly",
+            _ => "Weekly"
         };
-        if (string.IsNullOrEmpty(frequency)) return;
-        var interval = 1;
-        if (frequency is "Daily" or "Weekly" or "Monthly" or "Yearly")
+        var interval = choice == "Biweekly" ? 2 : 1;
+        string? day = null;
+        if (frequency == "Weekly")
         {
-            var intervalText = await DisplayPromptAsync("Repeat interval", "Enter 1 for every period, 2 for every second period, etc.",
-                initialValue: "1", maxLength: 3, keyboard: Keyboard.Numeric);
-            if (string.IsNullOrWhiteSpace(intervalText)) return;
-            if (!int.TryParse(intervalText, out interval) || interval is < 1 or > 365)
-            {
-                await DisplayAlertAsync("Invalid interval", "Enter a whole number from 1 to 365.", "OK");
-                return;
-            }
-        }
-        int? dayOfWeek = null;
-        if (frequency is "Weekly" or "BiWeekly")
-        {
-            var day = await DisplayActionSheetAsync("Day of week", "Use today", null,
-                "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday");
+            day = await DisplayActionSheetAsync("Day of week", "Use today", null,
+                "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday");
             if (day is not null and not "Cancel" and not "Use today")
-                dayOfWeek = Array.IndexOf(new[] { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" }, day);
-            else if (day == "Use today")
-                dayOfWeek = (int)DateTime.Today.DayOfWeek;
+            { /* keep */ }
+            else
+                day = DateTime.Today.DayOfWeek.ToString();
         }
-        var description = await DisplayPromptAsync("Description", "Optional details", maxLength: 500);
-        var category = await DisplayPromptAsync("Category", "Optional category", maxLength: 80);
+
         try
         {
             await _tasks.CreateRecurrenceAsync(new CreateRecurrenceBody(
-                title.Trim(), frequency, interval, dayOfWeek is null ? null : ((DayOfWeek)dayOfWeek.Value).ToString(),
-                Category: string.IsNullOrWhiteSpace(category) ? null : category.Trim(),
-                Description: string.IsNullOrWhiteSpace(description) ? null : description.Trim()));
+                title.Trim(), frequency, interval, day));
             _status.Text = "Recurring routine created.";
             await LoadAsync();
         }
-        catch (Exception ex)
+        catch (FamilyApiException ex)
         {
-            await DisplayAlertAsync("Routine not created",
-                ex is FamilyApiException ? ex.Message : "Could not create the recurring routine.", "OK");
+            _status.Text = ex.Message;
+        }
+        catch (Exception)
+        {
+            _status.Text = "Could not create the recurring routine.";
         }
     }
 
     private async Task DeactivateRecurrenceAsync(RecurrenceDto recurrence)
     {
-        if (!await DisplayAlertAsync("Stop recurring routine",
-                $"Stop creating future tasks for “{recurrence.Title}”? Existing tasks will remain.", "Stop series", "Keep active"))
-            return;
+        var ok = await DisplayAlertAsync("Stop series", $"Stop “{recurrence.Title}”? Existing tasks stay; no new instances will be generated.", "Stop", "Keep");
+        if (!ok) return;
         try
         {
             await _tasks.DeactivateRecurrenceAsync(recurrence.Id);
+            _status.Text = "Recurring series stopped.";
             await LoadAsync();
         }
-        catch (Exception ex)
+        catch (FamilyApiException ex)
         {
-            await DisplayAlertAsync("Routine not paused",
-                ex is FamilyApiException ? ex.Message : "Could not pause this routine.", "OK");
+            _status.Text = ex.Message;
+        }
+        catch (Exception)
+        {
+            _status.Text = "Could not stop that series.";
         }
     }
 
-    private void AddCard(VerticalStackLayout target, string title, string detail)
+    private static void AddCard(VerticalStackLayout host, string title, string body)
     {
-        var stack = new VerticalStackLayout { Spacing = 5 };
-        var heading = new Label { Text = title, FontSize = 16, FontAttributes = FontAttributes.Bold };
-        heading.SetDynamicResource(VisualElement.StyleProperty, "TextBodyStrong");
-        var body = new Label { Text = detail, FontSize = 14 };
-        body.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
-        stack.Children.Add(heading);
-        stack.Children.Add(body);
+        var stack = new VerticalStackLayout
+        {
+            Spacing = 6,
+            Children =
+            {
+                new Label { Text = title, FontSize = 16, FontAttributes = FontAttributes.Bold },
+                new Label { Text = body, FontSize = 13, LineBreakMode = LineBreakMode.WordWrap }
+            }
+        };
         var border = new Border { Padding = 14, Content = stack };
         border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
-        target.Children.Add(border);
+        host.Children.Add(border);
     }
 }
