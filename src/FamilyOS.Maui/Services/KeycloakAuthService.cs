@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Maui.Authentication;
 using Microsoft.Maui.Storage;
@@ -67,7 +68,11 @@ public sealed class KeycloakAuthService : IAuthSessionService
             new Uri($"{AuthorizationEndpoint}?{query}"),
             new Uri(RedirectUri),
             cancellationToken);
-        _diagnostics.RecordCheckpoint($"AUTH browser returned; property_count={authResult.Properties.Count}");
+        var hasState = authResult.Properties.ContainsKey("state");
+        var hasCode = authResult.Properties.TryGetValue("code", out var code) && !string.IsNullOrWhiteSpace(code);
+        var hasProviderError = authResult.Properties.TryGetValue("error", out var providerError)
+            && !string.IsNullOrWhiteSpace(providerError);
+        _diagnostics.RecordCheckpoint($"AUTH browser callback received; property_count={authResult.Properties.Count}; has_state={hasState}; has_code={hasCode}; provider_error={(hasProviderError ? providerError : "none")}");
 
         if (!authResult.Properties.TryGetValue("state", out var returnedState)
             || returnedState.Length != state.Length
@@ -78,8 +83,7 @@ public sealed class KeycloakAuthService : IAuthSessionService
             throw new InvalidOperationException("The identity provider returned an invalid sign-in state.");
         }
 
-        if (!authResult.Properties.TryGetValue("code", out var code)
-            || string.IsNullOrWhiteSpace(code))
+        if (!hasCode || string.IsNullOrWhiteSpace(code))
         {
             throw new InvalidOperationException("The identity provider did not return an authorization code.");
         }
@@ -203,10 +207,27 @@ public sealed class KeycloakAuthService : IAuthSessionService
 
         _diagnostics.RecordCheckpoint($"AUTH token endpoint response; http_status={(int)response.StatusCode}; success={response.IsSuccessStatusCode}");
         if (!response.IsSuccessStatusCode)
+        {
+            var errorCode = "unavailable";
+            try
+            {
+                var errorJson = await response.Content.ReadAsStringAsync(cancellationToken);
+                using var document = JsonDocument.Parse(errorJson);
+                if (document.RootElement.TryGetProperty("error", out var errorElement)
+                    && errorElement.ValueKind == JsonValueKind.String)
+                    errorCode = errorElement.GetString() ?? "unavailable";
+            }
+            catch
+            {
+                // Do not log the response body; it is intentionally excluded from diagnostics.
+            }
+
+            _diagnostics.RecordCheckpoint($"AUTH token endpoint rejected request; http_status={(int)response.StatusCode}; oauth_error={errorCode}");
             throw new HttpRequestException(
                 $"Keycloak token request failed with HTTP {(int)response.StatusCode}.",
                 null,
                 response.StatusCode);
+        }
 
         var tokens = await response.Content.ReadFromJsonAsync<TokenResponse>(
             cancellationToken: cancellationToken);
