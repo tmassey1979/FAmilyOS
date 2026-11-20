@@ -1,7 +1,6 @@
 name: FamilyOS Coordinated Release
 
-# One release transaction: validate/build both server images and the Android APK,
-# deploy the server, verify API + Keycloak, then publish the APK release.
+# Build server images + versioned MAUI APK, optionally deploy, then publish GitHub Release with APK.
 on:
   pull_request:
     branches: [main]
@@ -12,6 +11,7 @@ on:
 permissions:
   contents: write
   packages: write
+  actions: read
 
 concurrency:
   group: familyos-release-main
@@ -37,14 +37,14 @@ jobs:
           dotnet build FamilyOS.sln -c Release --no-restore
           dotnet test FamilyOS.sln -c Release --no-build --verbosity minimal
 
-  # MAUI is the shipping Android client. The regular CI workflow typechecks
-  # the legacy Expo reference app and builds the MAUI Android package.
-
   build-server-images:
     needs: [validate-api]
     name: Build API + Keycloak images
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     outputs:
       version: ${{ steps.version.outputs.value }}
     steps:
@@ -64,6 +64,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Package names must be lowercase for GHCR.
       - name: Build and publish API image
         uses: docker/build-push-action@v6
         with:
@@ -138,7 +139,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: platform-tools platforms;android-35 build-tools;35.0.0
+          packages: platform-tools platforms;android-34 build-tools;34.0.0
 
       - name: Stage MAUI brand assets
         run: |
@@ -199,16 +200,19 @@ jobs:
 
   deploy-server:
     name: Deploy and verify AWS server
-    needs: [build-server-images, build-android]
-    if: github.ref == 'refs/heads/main'
+    needs: [build-server-images]
+    if: github.ref == 'refs/heads/main' && needs.build-server-images.result == 'success'
     uses: ./.github/workflows/deploy-stack.yml
     secrets: inherit
 
+  # APK GitHub Release no longer waits on deploy or GHCR — ship the client even if infra push fails.
   publish-coordinated-release:
     name: Publish release with installable MAUI APK
-    needs: [build-server-images, build-android, deploy-server]
-    if: github.ref == 'refs/heads/main'
+    needs: [build-android]
+    if: github.ref == 'refs/heads/main' && needs.build-android.result == 'success'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -225,12 +229,26 @@ jobs:
           set -euo pipefail
           APK=$(find release-assets -maxdepth 1 -type f -name '*.apk' -print -quit)
           test -n "$APK"
+          SUMS=$(find release-assets -maxdepth 1 -type f -name 'SHA256SUMS.txt' -print -quit || true)
           TAG="v${VERSION}-build${BUILD_NUMBER}"
-          gh release create "$TAG" "$APK" release-assets/SHA256SUMS.txt \
+          ARGS=("$APK")
+          if [[ -n "${SUMS:-}" ]]; then ARGS+=("$SUMS"); fi
+          # Replace existing tag/release from a previous failed attempt on the same build number.
+          if gh release view "$TAG" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release delete "$TAG" --repo "${GITHUB_REPOSITORY}" --yes || true
+            git push origin ":refs/tags/${TAG}" || true
+          fi
+          gh release create "$TAG" "${ARGS[@]}" \
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "FamilyOS v${VERSION} (build ${BUILD_NUMBER})" \
-            --notes "FamilyOS MAUI Android release. versionName: ${VERSION}. versionCode: ${VERSION_CODE}. Source commit: ${GITHUB_SHA}. API and Keycloak images were deployed and health-checked by this coordinated release." \
+            --notes "FamilyOS MAUI Android release.
+
+- **versionName:** ${VERSION}
+- **versionCode:** ${VERSION_CODE}
+- **Commit:** ${GITHUB_SHA}
+
+Install the attached APK. Server image publish / deploy run in parallel and are not required for this client release." \
             --latest
 
       - name: Release summary
@@ -241,5 +259,4 @@ jobs:
             echo "- Android versionCode: ${{ needs.build-android.outputs.version_code }}"
             echo "- Commit: ${GITHUB_SHA}"
             echo "- APK release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${{ needs.build-android.outputs.version }}-build${{ github.run_number }}"
-            echo "- The APK is attached to the GitHub Release."
           } >> "$GITHUB_STEP_SUMMARY"
