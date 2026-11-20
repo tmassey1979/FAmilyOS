@@ -7,6 +7,7 @@ public sealed class OnboardingPage : ContentPage
 {
     private readonly IAuthSessionService _auth;
     private readonly OnboardingApiClient _api;
+    private readonly StartupDiagnosticsService _diagnostics;
     private readonly Entry _familyName = new() { Placeholder = "Household name" };
     private readonly Entry _displayName = new() { Placeholder = "Your display name (optional)" };
     private readonly Entry _email = new() { Placeholder = "Email (optional)", Keyboard = Keyboard.Email };
@@ -22,10 +23,11 @@ public sealed class OnboardingPage : ContentPage
     private bool _busy;
     private InvitePreviewDto? _currentInvite;
 
-    public OnboardingPage(IAuthSessionService auth, OnboardingApiClient api)
+    public OnboardingPage(IAuthSessionService auth, OnboardingApiClient api, StartupDiagnosticsService diagnostics)
     {
         _auth = auth;
         _api = api;
+        _diagnostics = diagnostics;
         Title = "Get started";
         _status.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
         _signIn.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
@@ -68,13 +70,16 @@ public sealed class OnboardingPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        _diagnostics.RecordCheckpoint("AUTH onboarding page appeared; checking existing session");
         try
         {
             _signedIn = !string.IsNullOrWhiteSpace(await _auth.GetAccessTokenAsync());
+            _diagnostics.RecordCheckpoint($"AUTH onboarding session check completed; signed_in={_signedIn}");
             _status.Text = _signedIn ? "You're signed in. Choose how to continue." : "Sign in to get started.";
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _diagnostics.RecordCheckpoint($"AUTH onboarding session check failed; exception={ex.GetType().Name}");
             _signedIn = false;
             _status.Text = "Sign in to get started.";
         }
@@ -84,19 +89,23 @@ public sealed class OnboardingPage : ContentPage
     private async Task SignInAsync()
     {
         if (_busy) return;
+        _diagnostics.RecordCheckpoint("AUTH onboarding sign-in button tapped");
         SetBusy(true, "Opening secure sign-in…");
         try
         {
             await _auth.SignInAsync();
             _signedIn = true;
+            _diagnostics.RecordCheckpoint("AUTH onboarding sign-in succeeded; UI state updated to signed_in=true");
             _status.Text = "You're signed in. Create or join a household below.";
         }
         catch (OperationCanceledException)
         {
+            _diagnostics.RecordCheckpoint("AUTH onboarding sign-in cancelled");
             _status.Text = "Sign-in was cancelled.";
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _diagnostics.RecordCheckpoint($"AUTH onboarding sign-in failed; exception={ex.GetType().Name}; http_status={(ex is HttpRequestException http && http.StatusCode.HasValue ? (int)http.StatusCode.Value : 0)}");
             _status.Text = "Sign-in did not complete. Check your connection and try again.";
         }
         finally
@@ -114,6 +123,7 @@ public sealed class OnboardingPage : ContentPage
             return;
         }
 
+        _diagnostics.RecordCheckpoint("AUTH household creation started; input values omitted");
         SetBusy(true, "Creating your household…");
         try
         {
@@ -122,18 +132,22 @@ public sealed class OnboardingPage : ContentPage
                 _displayName.Text,
                 _email.Text,
                 TimeZoneInfo.Local.Id);
+            _diagnostics.RecordCheckpoint("AUTH household creation API succeeded");
             await FinishAsync("Your household is ready.");
         }
         catch (FamilyApiException ex)
         {
+            _diagnostics.RecordCheckpoint($"AUTH household creation rejected; status={(int)ex.StatusCode}");
             _status.Text = ex.Message;
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+            _diagnostics.RecordCheckpoint($"AUTH household creation network failure; exception={ex.GetType().Name}; http_status={(ex.StatusCode.HasValue ? (int)ex.StatusCode.Value : 0)}");
             _status.Text = "FamilyOS could not be reached. Check your connection and try again.";
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _diagnostics.RecordCheckpoint($"AUTH household creation failed; exception={ex.GetType().Name}");
             _status.Text = "The household could not be created. Try again.";
         }
         finally
@@ -151,10 +165,12 @@ public sealed class OnboardingPage : ContentPage
             return;
         }
 
+        _diagnostics.RecordCheckpoint("AUTH invite preview started; invite code omitted");
         SetBusy(true, "Checking invitation…");
         try
         {
             _currentInvite = await _api.PreviewInviteAsync(_inviteCode.Text);
+            _diagnostics.RecordCheckpoint($"AUTH invite preview completed; open={_currentInvite.IsOpen}; role={_currentInvite.Role}");
             _invitePreview.Text = $"{_currentInvite.FamilyName} · {_currentInvite.Role} · " +
                 (_currentInvite.IsOpen ? $"Expires {_currentInvite.ExpiresAtUtc.ToLocalTime():g}" : "This invitation is closed");
             _invitePreview.IsVisible = true;
@@ -189,10 +205,12 @@ public sealed class OnboardingPage : ContentPage
             return;
         }
 
+        _diagnostics.RecordCheckpoint("AUTH accept-invitation started; invite code omitted");
         SetBusy(true, "Joining household…");
         try
         {
             await _api.AcceptInviteAsync(_inviteCode.Text, _joinName.Text);
+            _diagnostics.RecordCheckpoint("AUTH accept-invitation API succeeded");
             await FinishAsync($"You've joined {_currentInvite.FamilyName}.");
         }
         catch (FamilyApiException ex)
