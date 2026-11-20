@@ -289,11 +289,11 @@ jobs:
             --title "FamilyOS v${VERSION} (build ${BUILD_NUMBER})" \
             --notes "FamilyOS MAUI Android release.
 
-- **versionName:** ${VERSION}
-- **versionCode:** ${VERSION_CODE}
-- **Commit:** ${GITHUB_SHA}
+          - **versionName:** ${VERSION}
+          - **versionCode:** ${VERSION_CODE}
+          - **Commit:** ${GITHUB_SHA}
 
-Install the attached APK. This release is published only after API and Keycloak deployment health checks pass." \
+          Install the attached APK. This release is published only after API and Keycloak deployment health checks pass." \
             --latest
 
       - name: Release summary
