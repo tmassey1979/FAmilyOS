@@ -6,7 +6,9 @@
             StrokeThickness="0"
             Padding="16,12"
             BackgroundColor="{AppThemeBinding Light={StaticResource BgSurface}, Dark={StaticResource BgSurface}}">
-        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" MinimumHeightRequest="{StaticResource ControlHeightMin}">
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto"
+              ColumnSpacing="12"
+              MinimumHeightRequest="{StaticResource ControlHeightMin}">
             <Button x:Name="LeadingButton"
                     Grid.Column="0"
                     Text="‹"
@@ -15,7 +17,15 @@
                     IsVisible="False"
                     Clicked="OnLeadingClicked"
                     SemanticProperties.Description="Back" />
-            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2">
+            <Image x:Name="MarkImage"
+                   Grid.Column="1"
+                   Source="logo_mark.png"
+                   WidthRequest="28"
+                   HeightRequest="28"
+                   Aspect="AspectFit"
+                   VerticalOptions="Center"
+                   SemanticProperties.Description="FamilyOS" />
+            <VerticalStackLayout Grid.Column="2" VerticalOptions="Center" Spacing="2">
                 <Label x:Name="TitleLabel"
                        Style="{StaticResource TextHeading}"
                        LineBreakMode="TailTruncation"
@@ -27,7 +37,7 @@
                        MaxLines="1" />
             </VerticalStackLayout>
             <HorizontalStackLayout x:Name="TrailingHost"
-                                   Grid.Column="2"
+                                   Grid.Column="3"
                                    Spacing="4"
                                    VerticalOptions="Center" />
         </Grid>
