@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using FamilyOS.Application.Common;
 using FamilyOS.Application.Interfaces;
 using FamilyOS.Domain.Common;
@@ -41,16 +43,22 @@ public class FamilyCommandHandlers :
 {
     private readonly IFamilyOsDbContext _db;
     private readonly ICurrentUserService _current;
+    private readonly ILogger<FamilyCommandHandlers> _logger;
 
-    public FamilyCommandHandlers(IFamilyOsDbContext db, ICurrentUserService current)
+    public FamilyCommandHandlers(IFamilyOsDbContext db, ICurrentUserService current, ILogger<FamilyCommandHandlers> logger)
     {
         _db = db;
         _current = current;
+        _logger = logger;
     }
 
     public async Task<FamilyDto> Handle(CreateFamilyCommand cmd, CancellationToken ct)
     {
+        var total = Stopwatch.StartNew();
+        _logger.LogInformation("Create-family handler entered.");
+        var currentLoad = Stopwatch.StartNew();
         await _current.EnsureLoadedAsync(ct);
+        _logger.LogInformation("Create-family current-user check completed in {ElapsedMs}ms.", currentLoad.Elapsed.TotalMilliseconds);
 
         if (_current.FamilyId.HasValue)
             throw new DomainException("You already belong to a family. Leave it before creating another.");
@@ -58,7 +66,10 @@ public class FamilyCommandHandlers :
         var externalId = _current.ExternalIdentityId
             ?? throw new ForbiddenException("Sign in before creating a family.");
 
+        var userLookup = Stopwatch.StartNew();
         var user = await _db.Users.FirstOrDefaultAsync(u => u.ExternalIdentityId == externalId, ct);
+        _logger.LogInformation("Create-family user lookup completed in {ElapsedMs}ms. Found={Found}.",
+            userLookup.Elapsed.TotalMilliseconds, user is not null);
         if (user == null)
         {
             user = User.Create(
@@ -67,7 +78,10 @@ public class FamilyCommandHandlers :
                 cmd.OwnerFirstName ?? "Owner",
                 cmd.OwnerLastName ?? "");
             _db.Users.Add(user);
+            var userSave = Stopwatch.StartNew();
+            _logger.LogInformation("Create-family user save started.");
             await _db.SaveChangesAsync(ct);
+            _logger.LogInformation("Create-family user save completed in {ElapsedMs}ms.", userSave.Elapsed.TotalMilliseconds);
         }
         else if (user.FamilyId.HasValue)
         {
@@ -76,7 +90,10 @@ public class FamilyCommandHandlers :
 
         var family = FamilyOS.Domain.Family.Family.Create(cmd.Name, cmd.TimeZone ?? "America/Chicago", cmd.Currency ?? "USD");
         _db.Families.Add(family);
+        var familySave = Stopwatch.StartNew();
+        _logger.LogInformation("Create-family family save started.");
         await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("Create-family family save completed in {ElapsedMs}ms.", familySave.Elapsed.TotalMilliseconds);
 
         var displayName = string.IsNullOrWhiteSpace(cmd.OwnerDisplayName)
             ? user.DisplayName
@@ -84,8 +101,12 @@ public class FamilyCommandHandlers :
 
         var owner = family.AddMember(user, FamilyRole.Owner, displayName);
         user.AssignToFamily(family.Id, owner.Id);
+        var membershipSave = Stopwatch.StartNew();
+        _logger.LogInformation("Create-family membership save started.");
         await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("Create-family membership save completed in {ElapsedMs}ms.", membershipSave.Elapsed.TotalMilliseconds);
 
+        _logger.LogInformation("Create-family handler completed in {ElapsedMs}ms.", total.Elapsed.TotalMilliseconds);
         return new FamilyDto(
             family.Id, family.Name, family.TimeZone, family.Currency,
             new List<MemberDto>

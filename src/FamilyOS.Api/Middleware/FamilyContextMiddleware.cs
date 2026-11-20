@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using FamilyOS.Application.Interfaces;
 
 namespace FamilyOS.Api.Middleware;
@@ -8,14 +10,47 @@ namespace FamilyOS.Api.Middleware;
 public sealed class FamilyContextMiddleware
 {
     private readonly RequestDelegate _next;
+    private readonly ILogger<FamilyContextMiddleware> _logger;
 
-    public FamilyContextMiddleware(RequestDelegate next) => _next = next;
+    public FamilyContextMiddleware(RequestDelegate next, ILogger<FamilyContextMiddleware> logger)
+    {
+        _next = next;
+        _logger = logger;
+    }
 
     public async Task InvokeAsync(HttpContext context, ICurrentUserService currentUser)
     {
-        if (context.User.Identity?.IsAuthenticated == true)
-            await currentUser.EnsureLoadedAsync(context.RequestAborted);
+        var elapsed = Stopwatch.StartNew();
+        var authenticated = context.User.Identity?.IsAuthenticated == true;
+        _logger.LogInformation(
+            "Request pipeline: family context entered. Method={Method} Path={Path} Authenticated={Authenticated} TraceId={TraceId}",
+            context.Request.Method, context.Request.Path, authenticated, context.TraceIdentifier);
 
-        await _next(context);
+        try
+        {
+            if (authenticated)
+            {
+                var load = Stopwatch.StartNew();
+                await currentUser.EnsureLoadedAsync(context.RequestAborted);
+                _logger.LogInformation(
+                    "Request pipeline: family context loaded in {ElapsedMs}ms. HasUser={HasUser} HasFamily={HasFamily} TraceId={TraceId}",
+                    load.Elapsed.TotalMilliseconds, currentUser.UserId.HasValue, currentUser.FamilyId.HasValue, context.TraceIdentifier);
+            }
+
+            await _next(context);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Request pipeline: family context/downstream failed after {ElapsedMs}ms. TraceId={TraceId}",
+                elapsed.Elapsed.TotalMilliseconds, context.TraceIdentifier);
+            throw;
+        }
+        finally
+        {
+            _logger.LogInformation(
+                "Request pipeline: family context completed in {ElapsedMs}ms. StatusCode={StatusCode} TraceId={TraceId}",
+                elapsed.Elapsed.TotalMilliseconds, context.Response.StatusCode, context.TraceIdentifier);
+        }
     }
 }

@@ -128,6 +128,24 @@ try
                 if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
                     context.Token = accessToken;
                 return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                Log.Information("JWT authentication succeeded. Path={Path} TraceId={TraceId}",
+                    context.Request.Path, context.HttpContext.TraceIdentifier);
+                return Task.CompletedTask;
+            },
+            OnAuthenticationFailed = context =>
+            {
+                Log.Warning(context.Exception, "JWT authentication failed. Path={Path} TraceId={TraceId}",
+                    context.Request.Path, context.HttpContext.TraceIdentifier);
+                return Task.CompletedTask;
+            },
+            OnChallenge = context =>
+            {
+                Log.Warning("JWT authentication challenge. Error={Error} Path={Path} TraceId={TraceId}",
+                    context.Error, context.Request.Path, context.HttpContext.TraceIdentifier);
+                return Task.CompletedTask;
             }
         };
     });
