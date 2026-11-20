@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
-using FamilyOS.Maui.Services;
 
 namespace FamilyOS.Maui.Services;
 
@@ -22,17 +22,31 @@ public sealed class TasksApiClient
     public Task<List<FamilyTaskDto>> GetMyTasksAsync(CancellationToken cancellationToken = default)
         => SendAsync<List<FamilyTaskDto>>(HttpMethod.Get, "api/tasks/mine", null, cancellationToken);
 
+    public Task<List<FamilyTaskDto>> GetFamilyTasksAsync(CancellationToken cancellationToken = default)
+        => SendAsync<List<FamilyTaskDto>>(HttpMethod.Get, "api/tasks", null, cancellationToken);
+
     public Task<List<RecurrenceDto>> GetRecurrencesAsync(CancellationToken cancellationToken = default)
         => SendAsync<List<RecurrenceDto>>(HttpMethod.Get, "api/tasks/recurrences", null, cancellationToken);
 
     public Task<RecurrenceDto> CreateRecurrenceAsync(CreateRecurrenceBody body, CancellationToken cancellationToken = default)
-        => SendAsync<RecurrenceDto>(HttpMethod.Post, "api/tasks/recurrences",
-            new StringContent(JsonSerializer.Serialize(body, JsonOptions), System.Text.Encoding.UTF8, "application/json"),
-            cancellationToken);
+        => SendAsync<RecurrenceDto>(HttpMethod.Post, "api/tasks/recurrences", JsonBody(body), cancellationToken);
 
     public Task<RecurrenceDto> DeactivateRecurrenceAsync(Guid recurrenceId, CancellationToken cancellationToken = default)
         => SendAsync<RecurrenceDto>(HttpMethod.Post, $"api/tasks/recurrences/{recurrenceId:D}/deactivate", null, cancellationToken);
 
+    public Task<FamilyTaskDto> CreateTaskAsync(CreateTaskBody body, CancellationToken cancellationToken = default)
+        => SendAsync<FamilyTaskDto>(HttpMethod.Post, "api/tasks", JsonBody(body), cancellationToken);
+
+    public Task<List<TaskHistoryDto>> GetHistoryAsync(Guid taskId, CancellationToken cancellationToken = default)
+        => SendAsync<List<TaskHistoryDto>>(HttpMethod.Get, $"api/tasks/{taskId:D}/history", null, cancellationToken);
+
+    public Task<FamilyTaskDto> UpdateDetailsAsync(Guid taskId, UpdateTaskDetailsBody body, CancellationToken cancellationToken = default)
+        => SendAsync<FamilyTaskDto>(HttpMethod.Put, $"api/tasks/{taskId:D}", JsonBody(body), cancellationToken);
+
+    public Task<FamilyTaskDto> SetPlannedTimesAsync(Guid taskId, PlannedTimesBody body, CancellationToken cancellationToken = default)
+        => SendAsync<FamilyTaskDto>(HttpMethod.Put, $"api/tasks/{taskId:D}/planned-times", JsonBody(body), cancellationToken);
+
+    /// <summary>Simple lifecycle actions without a body (accept/start/pause/resume/complete).</summary>
     public Task<FamilyTaskDto> RunActionAsync(Guid taskId, string action, CancellationToken cancellationToken = default)
     {
         var allowed = new HashSet<string>(StringComparer.Ordinal)
@@ -44,6 +58,18 @@ public sealed class TasksApiClient
 
         return SendAsync<FamilyTaskDto>(HttpMethod.Post, $"api/tasks/{taskId:D}/{action}", null, cancellationToken);
     }
+
+    public Task<FamilyTaskDto> DeferAsync(Guid taskId, string? note = null, CancellationToken cancellationToken = default)
+        => SendAsync<FamilyTaskDto>(HttpMethod.Post, $"api/tasks/{taskId:D}/defer", JsonBody(new NoteBody(note, null)), cancellationToken);
+
+    public Task<FamilyTaskDto> CancelAsync(Guid taskId, string? reason = null, CancellationToken cancellationToken = default)
+        => SendAsync<FamilyTaskDto>(HttpMethod.Post, $"api/tasks/{taskId:D}/cancel", JsonBody(new NoteBody(null, reason)), cancellationToken);
+
+    public Task<FamilyTaskDto> SkipAsync(Guid taskId, string? note = null, CancellationToken cancellationToken = default)
+        => SendAsync<FamilyTaskDto>(HttpMethod.Post, $"api/tasks/{taskId:D}/skip", JsonBody(new NoteBody(note, null)), cancellationToken);
+
+    private static StringContent JsonBody<T>(T value)
+        => new(JsonSerializer.Serialize(value, JsonOptions), Encoding.UTF8, "application/json");
 
     private async Task<T> SendAsync<T>(
         HttpMethod method, string path, HttpContent? content, CancellationToken cancellationToken)
@@ -67,6 +93,7 @@ public sealed class TasksApiClient
                 HttpStatusCode.Unauthorized => "Your session has expired. Sign in again.",
                 HttpStatusCode.Forbidden => "You do not have permission to perform that task action.",
                 HttpStatusCode.NotFound => "That task could not be found.",
+                HttpStatusCode.Conflict => "That task action is not allowed in the current state.",
                 _ => $"FamilyOS could not complete the task action (HTTP {(int)response.StatusCode})."
             };
             throw new FamilyApiException(response.StatusCode, message);
@@ -109,3 +136,34 @@ public sealed record CreateRecurrenceBody(
     string Title, string Frequency, int Interval = 1, string? DayOfWeek = null,
     Guid? DefaultAssigneeMemberId = null, string? Category = null,
     string? Description = null, string DeclinePolicy = "NoChange", bool GenerateFirstInstance = true);
+
+public sealed record CreateTaskBody(
+    string Title,
+    string? Description = null,
+    string Priority = "Normal",
+    string? Category = null,
+    DateTime? DueDate = null,
+    int? EstimatedDurationMinutes = null,
+    Guid? AssignToMemberId = null);
+
+public sealed record UpdateTaskDetailsBody(
+    string? Title = null,
+    string? Description = null,
+    string? Priority = null,
+    string? Category = null,
+    DateTime? DueDate = null,
+    bool ClearDueDate = false);
+
+public sealed record PlannedTimesBody(
+    string? PlannedStartTime = null,
+    string? PlannedEndTime = null,
+    int? EstimatedDurationMinutes = null);
+
+public sealed record TaskHistoryDto(
+    string Action,
+    string? Detail,
+    DateTime OccurredAtUtc,
+    Guid? ActorMemberId = null,
+    string? ActorName = null);
+
+internal sealed record NoteBody(string? Note, string? Reason);
