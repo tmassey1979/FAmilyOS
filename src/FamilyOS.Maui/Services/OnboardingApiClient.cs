@@ -24,6 +24,36 @@ public sealed class OnboardingApiClient
         _diagnostics = diagnostics;
     }
 
+    public async Task<bool> ProbeApiHealthAsync(CancellationToken ct = default)
+    {
+        var uri = new Uri(ApiBaseUri, "health");
+        var timer = Stopwatch.StartNew();
+        _diagnostics.RecordCheckpoint("AUTH API health probe started; scheme=" + uri.Scheme + "; host=" + uri.Host + "; port=" + uri.Port);
+        try
+        {
+            using (var dns = CancellationTokenSource.CreateLinkedTokenSource(ct))
+            {
+                dns.CancelAfter(TimeSpan.FromSeconds(8));
+                var addresses = await Dns.GetHostAddressesAsync(uri.DnsSafeHost, dns.Token);
+                _diagnostics.RecordCheckpoint("AUTH API health DNS resolved; addresses=" + string.Join(",", addresses.Select(a => a.ToString())));
+            }
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(TimeSpan.FromSeconds(12));
+            using var response = await _http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+            _diagnostics.RecordCheckpoint("AUTH API health response; scheme=" + uri.Scheme + "; http_status=" + (int)response.StatusCode + "; elapsed_ms=" + timer.ElapsedMilliseconds);
+            return response.IsSuccessStatusCode;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex)
+        {
+            var http = FindException<HttpRequestException>(ex);
+            var web = FindException<WebException>(ex);
+            var socket = FindException<SocketException>(ex);
+            _diagnostics.RecordCheckpoint("AUTH API health failed; scheme=" + uri.Scheme + "; exception_chain=" + GetExceptionTypeChain(ex) + "; http_request_error=" + (http?.HttpRequestError.ToString() ?? "none") + "; web_exception_status=" + (web?.Status.ToString() ?? "none") + "; socket_error=" + (socket?.SocketErrorCode.ToString() ?? "none") + "; elapsed_ms=" + timer.ElapsedMilliseconds);
+            return false;
+        }
+    }
+
     public async Task<FamilyDto> CreateFamilyAsync(
         string name, string? displayName, string? email, string timeZone, CancellationToken ct = default)
     {

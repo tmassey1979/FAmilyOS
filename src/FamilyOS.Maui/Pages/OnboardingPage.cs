@@ -125,6 +125,16 @@ public sealed class OnboardingPage : ContentPage
         SetBusy(true, "Creating your household…", _create);
         try
         {
+            _status.Text = "Checking secure connection to FamilyOS…";
+            var apiReachable = await _api.ProbeApiHealthAsync();
+            if (!apiReachable)
+            {
+                _diagnostics.RecordCheckpoint("AUTH household creation stopped; API health probe failed; no household POST was sent");
+                _status.Text = "FamilyOS could not be reached securely. No household was created. Please share the latest diagnostics.";
+                return;
+            }
+
+            _status.Text = "Connection verified. Creating your household…";
             await _api.CreateFamilyAsync(
                 _familyName.Text.Trim(),
                 _displayName.Text,
