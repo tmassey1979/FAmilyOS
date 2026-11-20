@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using FamilyOS.Application.Interfaces;
 
