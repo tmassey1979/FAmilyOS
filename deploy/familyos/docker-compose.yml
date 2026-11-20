@@ -1,0 +1,156 @@
+# Family OS production stack
+# Keycloak uses the shared PostgreSQL server with its own persistent database.
+# Realm import runs only when the "familyos" realm does not already exist.
+
+name: familyos
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    shm_size: 128mb
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-familyos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-familyos}
+    volumes:
+      - postgres_data_fresh:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # Idempotently provisions a separate Keycloak database on the same server.
+  # This also works with an already-initialized postgres_data volume; initdb
+  # scripts alone would not run against an existing volume.
+  keycloak-db-init:
+    image: postgres:16-alpine
+    restart: "no"
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER:-familyos}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      PGDATABASE: postgres
+    command:
+      - sh
+      - -ec
+      - |
+        echo "Waiting for PostgreSQL at $$PGHOST:$$PGPORT as $$PGUSER..."
+        pg_isready -h "$$PGHOST" -p "$$PGPORT" -U "$$PGUSER" -d "$$PGDATABASE"
+        echo "Checking whether the Keycloak database exists..."
+        EXISTS="$(psql -v ON_ERROR_STOP=1 -Atq -d "$$PGDATABASE" -c "SELECT 1 FROM pg_database WHERE datname = 'keycloak'")"
+        if [ "$$EXISTS" != "1" ]; then
+          echo "Creating Keycloak database owned by $$PGUSER..."
+          createdb -h "$$PGHOST" -p "$$PGPORT" -U "$$PGUSER" --owner="$$PGUSER" keycloak
+        else
+          echo "Keycloak database already exists."
+        fi
+        echo "Keycloak database initialization completed."
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+
+  rabbitmq:
+    profiles: ["messaging"]
+    image: rabbitmq:3.13-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-familyos}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-familyos}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - internal
+
+  keycloak:
+    image: ghcr.io/tmassey1979/familyos-keycloak:latest
+    restart: unless-stopped
+    command: ["start", "--import-realm", "--hostname-strict=false"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: ${POSTGRES_USER:-familyos}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      KC_DB_SCHEMA: public
+      KC_HTTP_PORT: 8080
+      KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME: auth.${DOMAIN}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_MANAGEMENT_PORT: 9000
+      JAVA_OPTS_APPEND: "-Xms64m -Xmx384m"
+    depends_on:
+      keycloak-db-init:
+        condition: service_completed_successfully
+    networks:
+      - internal
+      - proxy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/9000' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 180s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.keycloak.rule=Host(`auth.${DOMAIN}`)
+      - traefik.http.routers.keycloak.entrypoints=websecure
+      - traefik.http.routers.keycloak.tls.certresolver=le
+      - traefik.http.services.keycloak.loadbalancer.server.port=8080
+      # Do NOT attach sec-headers@file — X-Frame-Options DENY + stacked CSP break admin console after login
+
+  api:
+    image: ghcr.io/tmassey1979/familyos-api:latest
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:5080
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-familyos};Username=${POSTGRES_USER:-familyos};Password=${POSTGRES_PASSWORD}"
+      Keycloak__Authority: "https://auth.${DOMAIN}/realms/familyos"
+      Keycloak__MetadataAddress: "http://keycloak:8080/realms/familyos/.well-known/openid-configuration"
+      Keycloak__Audience: familyos-mobile
+      Seed__Enabled: ${SEED_ENABLED:-true}
+      Auth__UseDevBypass: ${AUTH_USE_DEV_BYPASS:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    networks:
+      - internal
+      - proxy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 120s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.familyos-api.rule=Host(`api.${DOMAIN}`)
+      - traefik.http.routers.familyos-api.entrypoints=websecure
+      - traefik.http.routers.familyos-api.tls.certresolver=le
+      - traefik.http.services.familyos-api.loadbalancer.server.port=5080
+      - traefik.http.routers.familyos-api.middlewares=sec-headers@file
+
+volumes:
+  postgres_data_fresh:
+  rabbitmq_data:
+
+networks:
+  proxy:
+    external: true
+  internal:
+    driver: bridge
+    internal: true

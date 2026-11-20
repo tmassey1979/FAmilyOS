@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<?xaml-comp compile="true" ?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+
+    <Color x:Key="PaletteNavy950">#0F172A</Color>
+    <Color x:Key="PaletteSlate800">#1E293B</Color>
+    <Color x:Key="PaletteSlate700">#334155</Color>
+    <Color x:Key="PaletteSlate600">#475569</Color>
+    <Color x:Key="PaletteSky400">#38BDF8</Color>
+    <Color x:Key="PaletteSlate50">#F8FAFC</Color>
+    <Color x:Key="PaletteSlate400">#94A3B8</Color>
+    <Color x:Key="PaletteRed400">#F87171</Color>
+    <Color x:Key="PaletteGreen400">#4ADE80</Color>
+    <Color x:Key="PaletteAmber400">#FBBF24</Color>
+    <Color x:Key="PaletteCream">#F8F5F0</Color>
+    <Color x:Key="PaletteWhite">#FFFFFF</Color>
+    <Color x:Key="PaletteNavyText">#0F172A</Color>
+    <Color x:Key="PaletteSlate500">#64748B</Color>
+    <Color x:Key="PaletteCreamAlt">#F1EDE6</Color>
+    <Color x:Key="PaletteBorderLight">#E2E8F0</Color>
+    <Color x:Key="PaletteScrimLight">#00000066</Color>
+    <Color x:Key="PaletteScrimDark">#00000099</Color>
+
+</ResourceDictionary>
