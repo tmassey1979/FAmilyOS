@@ -1,9 +1,8 @@
 name: FamilyOS Coordinated Release
 
-# Build server images + versioned MAUI APK, optionally deploy, then publish GitHub Release with APK.
+# Build server images + versioned MAUI APK, deploy only after both are ready,
+# then publish the APK release only after production health checks pass.
 on:
-  pull_request:
-    branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
@@ -19,7 +18,7 @@ concurrency:
 
 jobs:
   validate-api:
-    name: Build and test .NET API
+    name: Build and test .NET solution
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +32,7 @@ jobs:
         run: python3 scripts/expand-migrations.py
       - name: Restore, build, and test
         run: |
+          set -euo pipefail
           dotnet restore FamilyOS.sln
           dotnet build FamilyOS.sln -c Release --no-restore
           dotnet test FamilyOS.sln -c Release --no-build --verbosity minimal
@@ -53,6 +53,7 @@ jobs:
       - name: Read app version
         id: version
         run: |
+          set -euo pipefail
           VERSION=$(grep -oP '(?<=<VersionPrefix>)[^<]+' Directory.Build.props | head -1)
           test -n "$VERSION"
           echo "value=$VERSION" >> "$GITHUB_OUTPUT"
@@ -78,6 +79,7 @@ jobs:
 
       - name: Sync realm into docker build context
         run: |
+          set -euo pipefail
           mkdir -p docker/keycloak
           if [ -f deploy/familyos/keycloak/realm-export.json ]; then
             cp deploy/familyos/keycloak/realm-export.json docker/keycloak/realm-export.json
@@ -198,18 +200,19 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  # Deploy only when both the server images and installable client have built.
   deploy-server:
     name: Deploy and verify AWS server
-    needs: [build-server-images]
-    if: github.ref == 'refs/heads/main' && needs.build-server-images.result == 'success'
+    needs: [build-server-images, build-android]
+    if: github.ref == 'refs/heads/main' && needs.build-server-images.result == 'success' && needs.build-android.result == 'success'
     uses: ./.github/workflows/deploy-stack.yml
     secrets: inherit
 
-  # APK GitHub Release no longer waits on deploy or GHCR — ship the client even if infra push fails.
+  # Do not publish a client release when the production deployment or health checks fail.
   publish-coordinated-release:
     name: Publish release with installable MAUI APK
-    needs: [build-android]
-    if: github.ref == 'refs/heads/main' && needs.build-android.result == 'success'
+    needs: [build-android, deploy-server]
+    if: github.ref == 'refs/heads/main' && needs.build-android.result == 'success' && needs.deploy-server.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -233,7 +236,7 @@ jobs:
           TAG="v${VERSION}-build${BUILD_NUMBER}"
           ARGS=("$APK")
           if [[ -n "${SUMS:-}" ]]; then ARGS+=("$SUMS"); fi
-          # Replace existing tag/release from a previous failed attempt on the same build number.
+          # Replace an existing tag only when retrying this exact run's release.
           if gh release view "$TAG" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
             gh release delete "$TAG" --repo "${GITHUB_REPOSITORY}" --yes || true
             git push origin ":refs/tags/${TAG}" || true
@@ -248,7 +251,7 @@ jobs:
 - **versionCode:** ${VERSION_CODE}
 - **Commit:** ${GITHUB_SHA}
 
-Install the attached APK. Server image publish / deploy run in parallel and are not required for this client release." \
+Install the attached APK. This release is published only after API and Keycloak deployment health checks pass." \
             --latest
 
       - name: Release summary
