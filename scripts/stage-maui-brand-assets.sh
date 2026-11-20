@@ -46,18 +46,17 @@ find_src() {
   return 1
 }
 
-ICON_SRC=""
-SPLASH_SRC=""
-ICON_SRC="$(find_src \
-  "$ROOT/mobile/assets/brand/icon-app-1024.png" \
-  "$ROOT/mobile/assets/icon.png" \
-  "$ROOT/mobile/assets/adaptive-icon.png" \
-  "$ROOT/mobile/assets/brand/play-icon-512.png" || true)"
-SPLASH_SRC="$(find_src \
-  "$ROOT/mobile/assets/splash-icon.png" \
-  "$ROOT/mobile/assets/brand/icon-app-1024.png" \
-  "$ROOT/mobile/assets/icon.png" \
-  "$ROOT/mobile/assets/adaptive-icon.png" || true)"
+# MAUI must use the same canonical app icon and splash artwork as the mobile app.
+# These are committed source assets; fail the build instead of silently generating placeholders.
+ICON_SRC="$ROOT/mobile/assets/icon.png"
+SPLASH_SRC="$ROOT/mobile/assets/splash-icon.png"
+
+for source in "$ICON_SRC" "$SPLASH_SRC"; do
+  if [[ ! -s "$source" ]]; then
+    echo "::error::Required mobile brand asset is missing: $source"
+    exit 1
+  fi
+done
 
 echo "ICON_SRC=${ICON_SRC:-<none>}"
 echo "SPLASH_SRC=${SPLASH_SRC:-<none>}"
@@ -134,6 +133,23 @@ else:
     mark = Image.new("RGBA", (splash_size, splash_size), (0, 0, 0, 0))
     save_png(mark, splash_path, flatten_navy=False)
     print("::warning::No splash source; empty transparent splash (navy Color only)")
+PY
+
+# Verify both generated MAUI inputs exist and are valid PNGs before MSBuild consumes them.
+python3 - "$APPICON_DIR/appicon.png" "$APPICON_DIR/appicon_foreground.png" "$SPLASH_DIR/splash.png" <<'PY'
+import struct
+import sys
+from pathlib import Path
+
+for raw in sys.argv[1:]:
+    path = Path(raw)
+    if not path.is_file() or path.stat().st_size < 100:
+        raise SystemExit(f"::error::MAUI brand asset was not generated: {path}")
+    data = path.read_bytes()
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise SystemExit(f"::error::MAUI brand asset is not a PNG: {path}")
+    width, height = struct.unpack(">II", data[16:24])
+    print(f"validated {path} ({width}x{height}, {len(data)} bytes)")
 PY
 
 # Tab + More-menu line icons (monochrome, transparent)

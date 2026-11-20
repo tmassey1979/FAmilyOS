@@ -2,5 +2,26 @@
 <ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="FamilyOS.Maui.Controls.FoButton">
-    <Button x:Name="InnerButton" Clicked="OnInnerClicked" HorizontalOptions="Fill" />
+    <Grid>
+        <Button x:Name="InnerButton"
+                Clicked="OnInnerClicked"
+                HorizontalOptions="Fill" />
+        <HorizontalStackLayout x:Name="LoadingContent"
+                               HorizontalOptions="Center"
+                               VerticalOptions="Center"
+                               Spacing="10"
+                               IsVisible="False"
+                               InputTransparent="True">
+            <ActivityIndicator x:Name="LoadingIndicator"
+                               WidthRequest="18"
+                               HeightRequest="18"
+                               IsRunning="False"
+                               Color="{StaticResource TextOnAccent}" />
+            <Label x:Name="LoadingLabel"
+                   Text="Working…"
+                   FontAttributes="Bold"
+                   VerticalTextAlignment="Center"
+                   TextColor="{StaticResource TextOnAccent}" />
+        </HorizontalStackLayout>
+    </Grid>
 </ContentView>
