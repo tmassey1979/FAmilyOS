@@ -121,7 +121,7 @@ public sealed class StartupDiagnosticsService
 
     private void AppendUnsafe(string line)
     {
-        File.AppendAllText(_logPath, line + Environment.NewLine, Encoding.UTF8);
+        File.AppendAllText(_logPath, line + System.Environment.NewLine, Encoding.UTF8);
         var info = new FileInfo(_logPath);
         if (info.Length > MaxLogBytes)
         {
