@@ -101,11 +101,11 @@ public sealed record FamilyTaskDto(
     string? RecurrenceFrequency = null);
 
 public sealed record RecurrenceDto(
-    Guid Id, string Title, string? Description, int Frequency, int Interval,
-    int? DayOfWeek, Guid? DefaultAssigneeMemberId, int DeclinePolicy,
+    Guid Id, string Title, string? Description, string Frequency, int Interval,
+    string? DayOfWeek, Guid? DefaultAssigneeMemberId, string DeclinePolicy,
     bool IsActive, DateTime? NextOccurrenceUtc, string? Category);
 
 public sealed record CreateRecurrenceBody(
-    string Title, int Frequency, int Interval = 1, int? DayOfWeek = null,
+    string Title, string Frequency, int Interval = 1, string? DayOfWeek = null,
     Guid? DefaultAssigneeMemberId = null, string? Category = null,
-    string? Description = null, int DeclinePolicy = 0, bool GenerateFirstInstance = true);
+    string? Description = null, string DeclinePolicy = "NoChange", bool GenerateFirstInstance = true);

@@ -199,11 +199,11 @@ public sealed class TasksPage : ContentPage
     {
         var frequency = recurrence.Frequency switch
         {
-            0 => "Daily",
-            1 => recurrence.Interval == 1 ? "Weekly" : $"Every {recurrence.Interval} weeks",
-            2 => "Every two weeks",
-            3 => recurrence.Interval == 1 ? "Monthly" : $"Every {recurrence.Interval} months",
-            4 => "Yearly",
+            "Daily" => recurrence.Interval == 1 ? "Daily" : $"Every {recurrence.Interval} days",
+            "Weekly" => recurrence.Interval == 1 ? "Weekly" : $"Every {recurrence.Interval} weeks",
+            "BiWeekly" => "Every two weeks",
+            "Monthly" => recurrence.Interval == 1 ? "Monthly" : $"Every {recurrence.Interval} months",
+            "Yearly" => recurrence.Interval == 1 ? "Yearly" : $"Every {recurrence.Interval} years",
             _ => "Repeating"
         };
         var next = recurrence.NextOccurrenceUtc is DateTime when
@@ -237,12 +237,12 @@ public sealed class TasksPage : ContentPage
         if (choice is null or "Cancel") return;
         var frequency = choice switch
         {
-            "Daily" => 0, "Weekly" => 1, "Every two weeks" => 2,
-            "Monthly" => 3, "Yearly" => 4, _ => -1
+            "Daily" => "Daily", "Weekly" => "Weekly", "Every two weeks" => "BiWeekly",
+            "Monthly" => "Monthly", "Yearly" => "Yearly", _ => ""
         };
-        if (frequency < 0) return;
+        if (string.IsNullOrEmpty(frequency)) return;
         var interval = 1;
-        if (frequency is 0 or 1 or 3 or 4)
+        if (frequency is "Daily" or "Weekly" or "Monthly" or "Yearly")
         {
             var intervalText = await DisplayPromptAsync("Repeat interval", "Enter 1 for every period, 2 for every second period, etc.",
                 initialValue: "1", maxLength: 3, keyboard: Keyboard.Numeric);
@@ -254,7 +254,7 @@ public sealed class TasksPage : ContentPage
             }
         }
         int? dayOfWeek = null;
-        if (frequency is 1 or 2)
+        if (frequency is "Weekly" or "BiWeekly")
         {
             var day = await DisplayActionSheetAsync("Day of week", "Use today", null,
                 "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday");
@@ -268,7 +268,7 @@ public sealed class TasksPage : ContentPage
         try
         {
             await _tasks.CreateRecurrenceAsync(new CreateRecurrenceBody(
-                title.Trim(), frequency, interval, dayOfWeek,
+                title.Trim(), frequency, interval, dayOfWeek is null ? null : ((DayOfWeek)dayOfWeek.Value).ToString(),
                 Category: string.IsNullOrWhiteSpace(category) ? null : category.Trim(),
                 Description: string.IsNullOrWhiteSpace(description) ? null : description.Trim()));
             _status.Text = "Recurring routine created.";
