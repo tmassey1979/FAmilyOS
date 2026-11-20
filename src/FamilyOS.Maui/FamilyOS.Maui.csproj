@@ -24,6 +24,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Generated from mobile/assets/icon.png and mobile/assets/splash-icon.png by stage-maui-brand-assets.sh. -->
     <MauiIcon Include="Resources/AppIcon/appicon.png"
               ForegroundFile="Resources/AppIcon/appicon_foreground.png"
               Color="#0F172A" />

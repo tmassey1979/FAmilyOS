@@ -1,4 +1,5 @@
-using FamilyOS.Maui.Controls;\nusing FamilyOS.Maui.Services;
+using FamilyOS.Maui.Controls;
+using FamilyOS.Maui.Services;
 
 namespace FamilyOS.Maui.Pages;
 
@@ -20,7 +21,8 @@ public sealed class OnboardingPage : ContentPage
     private readonly FoButton _preview = new() { Title = "Check invite", LoadingText = "Checking invitation…", Variant = FoButtonVariant.Secondary };
     private readonly FoButton _join = new() { Title = "Join household", LoadingText = "Joining household…" };
     private bool _signedIn;
-    private bool _busy;\n    private FoButton? _busyButton;
+    private bool _busy;
+    private FoButton? _busyButton;
     private InvitePreviewDto? _currentInvite;
 
     public OnboardingPage(IAuthSessionService auth, OnboardingApiClient api, StartupDiagnosticsService diagnostics)
@@ -30,10 +32,6 @@ public sealed class OnboardingPage : ContentPage
         _diagnostics = diagnostics;
         Title = "Get started";
         _status.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
-        _signIn.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
-        _create.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
-        _preview.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
-        _join.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
 
         _signIn.Clicked += async (_, _) => await SignInAsync();
         _create.Clicked += async (_, _) => await CreateHouseholdAsync();
@@ -238,9 +236,21 @@ public sealed class OnboardingPage : ContentPage
         await Shell.Current.GoToAsync("//home");
     }
 
-    private void SetBusy(bool busy, string? message = null)
+    private void SetBusy(bool busy, string? message = null, FoButton? activeButton = null)
     {
+        if (!busy && _busyButton is not null)
+        {
+            _busyButton.IsLoading = false;
+            _busyButton = null;
+        }
+
         _busy = busy;
+        if (busy && activeButton is not null)
+        {
+            _busyButton = activeButton;
+            activeButton.IsLoading = true;
+        }
+
         if (message is not null) _status.Text = message;
         UpdateEnabledState();
     }
