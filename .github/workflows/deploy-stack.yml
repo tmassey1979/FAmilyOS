@@ -55,7 +55,7 @@ jobs:
           if [ -n "${PORTAINER_WEBHOOK_URL:-}" ]; then
             echo "Portainer webhook"
             code=$(curl -sS -o /tmp/pw.out -w "%{http_code}" -X POST "$PORTAINER_WEBHOOK_URL" -H "Content-Type: application/json" --max-time 180 || echo "000")
-            echo "HTTP $code"; head -c 400 /tmp/pw.out 2>/dev/null || true; echo
+            echo "Webhook HTTP $code"
             if [ "$code" = "200" ] || [ "$code" = "202" ] || [ "$code" = "204" ]; then MODE=webhook; else echo "::warning::Webhook HTTP $code"; fi
           fi
 
@@ -64,11 +64,13 @@ jobs:
             EP="${PORTAINER_ENDPOINT_ID:-2}"
             STACK_ID="${PORTAINER_STACK_ID:-2}"
             if [ -n "$STACK_ID" ]; then
-              if [ ! -f /tmp/stack_env.json ]; then echo '[]' > /tmp/stack_env.json; fi
-              python3 -c "import json;from pathlib import Path;env=json.loads(Path('/tmp/stack_env.json').read_text());Path('/tmp/redeploy_body.json').write_text(json.dumps({'PullImage':True,'RepositoryAuthentication':False,'Env':env}))"
+              # Omit Env and repository-auth fields so Portainer retains the stack's
+              # stored environment variables and Git credentials. Never send Env: [].
+              printf '%s\n' '{"PullImage":true}' > /tmp/redeploy_body.json
               echo "git/redeploy stack=$STACK_ID endpoint=$EP"
               code=$(curl -sS -o /tmp/pa.out -w "%{http_code}" -X PUT "${BASE}/api/stacks/${STACK_ID}/git/redeploy?endpointId=${EP}" -H "X-API-Key: ${PORTAINER_API_KEY}" -H "Content-Type: application/json" --data-binary @/tmp/redeploy_body.json --max-time 300 || echo "000")
-              echo "HTTP $code"; head -c 2000 /tmp/pa.out 2>/dev/null || true; echo
+              # Do not print the response body: some Portainer versions return stored Env values.
+              echo "Portainer API HTTP $code"
               if [ "$code" = "200" ] || [ "$code" = "204" ]; then MODE=api-git; else echo "::warning::API HTTP $code"; fi
             fi
           fi
