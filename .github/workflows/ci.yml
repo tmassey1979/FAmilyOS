@@ -3,7 +3,7 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    branches: [develop]
+    branches: [develop, main]
   pull_request:
     branches: [main, develop]
 
@@ -60,7 +60,6 @@ jobs:
           SHORT=$(git rev-parse --short HEAD)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "info=$RAW_VERSION+$SHORT" >> "$GITHUB_OUTPUT"
-          echo "Using NuGet version $VERSION (informational version $RAW_VERSION+$SHORT)"
 
       - name: Restore backend + domain tests
         run: |
@@ -110,7 +109,6 @@ jobs:
           COV=$(find coverage -name 'coverage.cobertura.xml' | head -1 || true)
           if [[ -z "${COV}" ]]; then
             echo "::warning::No cobertura file found"
-            echo "Domain line coverage: n/a" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           python3 - <<'PY'
@@ -132,15 +130,9 @@ jobs:
           pct = max(rates) * 100.0
           min_pct = float(os.environ.get('DOMAIN_COVERAGE_MIN', '70'))
           enforce = os.environ.get('DOMAIN_COVERAGE_ENFORCE', 'false').lower() in ('1', 'true', 'yes')
-          print(f'Domain line coverage: {pct:.1f}% (min {min_pct:.0f}%, enforce={enforce})')
-          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
-              f.write(f'\n### Domain coverage\n- **{pct:.1f}%** line (target ≥ {min_pct:.0f}%, enforce={enforce})\n')
-          if pct + 1e-6 < min_pct:
-              msg = f'Domain coverage {pct:.1f}% below {min_pct:.0f}%'
-              if enforce:
-                  print(f'::error::{msg}')
-                  sys.exit(1)
-              print(f'::warning::{msg} (report-only; set DOMAIN_COVERAGE_ENFORCE=true to fail)')
+          print(f'Domain line coverage: {pct:.1f}%')
+          if pct + 1e-6 < min_pct and enforce:
+              sys.exit(1)
           PY
 
       - name: Upload coverage
@@ -207,13 +199,14 @@ jobs:
         with:
           packages: platform-tools platforms;android-35 build-tools;35.0.0
 
-      - name: Stage MAUI brand assets
+      - name: Expand MAUI graphics (icon, splash, brand, menus)
         run: |
           set -euo pipefail
           python3 -m pip install --upgrade pip
           python3 -m pip install pillow
-          chmod +x scripts/stage-maui-brand-assets.sh
-          ./scripts/stage-maui-brand-assets.sh
+          python3 scripts/expand-maui-graphics.py
+          ls -la src/FamilyOS.Maui/Resources/AppIcon src/FamilyOS.Maui/Resources/Splash \
+            src/FamilyOS.Maui/Resources/Images/Menu src/FamilyOS.Maui/Resources/Images/Brand
 
       - name: Resolve MAUI app version
         id: maui-version
@@ -253,7 +246,6 @@ jobs:
           fi
           if [[ -z "$APK" ]]; then
             echo "::error::MAUI Android build completed without producing an APK."
-            find src/FamilyOS.Maui/bin/Debug/net11.0-android -maxdepth 5 -type f -print || true
             exit 1
           fi
           mkdir -p artifacts
