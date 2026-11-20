@@ -1,4 +1,7 @@
 using System.Text;
+using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.IdentityModel.JsonWebTokens;
 using System.Text.Json.Serialization;
 using FamilyOS.Api.Hubs;
 using FamilyOS.Api.Middleware;
@@ -132,7 +135,43 @@ try
             },
             OnTokenValidated = context =>
             {
-                Log.Information("JWT authentication succeeded. Path={Path} TraceId={TraceId}",
+                // Some JWT handler configurations expose the validated subject on the
+                // SecurityToken but omit both the raw "sub" and mapped NameIdentifier
+                // claims from ClaimsPrincipal. Restore only from the already-validated
+                // token subject; never fall back to a mutable username or email.
+                var principal = context.Principal;
+                var hasSubjectClaim = principal?.HasClaim(c => c.Type == "sub") == true;
+                var hasNameIdentifier = principal?.HasClaim(c => c.Type == ClaimTypes.NameIdentifier) == true;
+                var tokenSubject = context.SecurityToken switch
+                {
+                    JwtSecurityToken jwt => jwt.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value,
+                    JsonWebToken json => json.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value,
+                    _ => null
+                };
+
+                if (!hasSubjectClaim && !hasNameIdentifier && !string.IsNullOrWhiteSpace(tokenSubject))
+                {
+                    var identity = principal?.Identities.FirstOrDefault(i => i.IsAuthenticated);
+                    identity?.AddClaim(new System.Security.Claims.Claim("sub", tokenSubject!));
+                    Log.Warning(
+                        "JWT validated principal omitted subject claims; restored sub from validated security token. Path={Path} TraceId={TraceId}",
+                        context.Request.Path, context.HttpContext.TraceIdentifier);
+                }
+                else if (!hasSubjectClaim && !hasNameIdentifier)
+                {
+                    var claimTypes = principal is null
+                        ? "none"
+                        : string.Join(",", principal.Claims.Select(c => c.Type).Distinct().OrderBy(x => x));
+                    Log.Error(
+                        "JWT validated without a usable subject. SecurityTokenSubjectPresent={SubjectPresent} ClaimTypes={ClaimTypes} Path={Path} TraceId={TraceId}",
+                        !string.IsNullOrWhiteSpace(tokenSubject), claimTypes,
+                        context.Request.Path, context.HttpContext.TraceIdentifier);
+                }
+
+                Log.Information(
+                    "JWT authentication succeeded. HasSub={HasSub} HasNameIdentifier={HasNameIdentifier} Path={Path} TraceId={TraceId}",
+                    principal?.HasClaim(c => c.Type == "sub") == true,
+                    principal?.HasClaim(c => c.Type == ClaimTypes.NameIdentifier) == true,
                     context.Request.Path, context.HttpContext.TraceIdentifier);
                 return Task.CompletedTask;
             },
