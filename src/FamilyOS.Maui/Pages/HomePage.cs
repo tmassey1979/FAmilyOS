@@ -27,14 +27,55 @@ public sealed class HomePage : ContentPage
 
         _content = new VerticalStackLayout { Padding = new Thickness(20, 12), Spacing = 16 };
 
+        var brand = new HorizontalStackLayout
+        {
+            Spacing = 10,
+            VerticalOptions = LayoutOptions.Center,
+            Children =
+            {
+                new Image
+                {
+                    Source = "logo_mark.png",
+                    WidthRequest = 32,
+                    HeightRequest = 32,
+                    Aspect = Aspect.AspectFit,
+                    VerticalOptions = LayoutOptions.Center
+                },
+                new Image
+                {
+                    Source = "logo_wordmark_on_dark.png",
+                    HeightRequest = 24,
+                    Aspect = Aspect.AspectFit,
+                    VerticalOptions = LayoutOptions.Center
+                }
+            }
+        };
+
         var header = new Grid
         {
-            ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(GridLength.Star),
+                new ColumnDefinition(GridLength.Auto)
+            },
+            RowDefinitions =
+            {
+                new RowDefinition(GridLength.Auto),
+                new RowDefinition(GridLength.Auto)
+            }
         };
-        var heading = new Label { Text = "Family Pulse", FontSize = 26, FontAttributes = FontAttributes.Bold,
-            VerticalOptions = LayoutOptions.Center }.WithStyle("TextDisplay");
-        header.Add(heading, 0, 0);
+        header.Add(brand, 0, 0);
         header.Add(_refresh, 1, 0);
+        var heading = new Label
+        {
+            Text = "Family Pulse",
+            FontSize = 26,
+            FontAttributes = FontAttributes.Bold,
+            VerticalOptions = LayoutOptions.Center,
+            Margin = new Thickness(0, 8, 0, 0)
+        }.WithStyle("TextDisplay");
+        header.Add(heading, 0, 1);
+        Grid.SetColumnSpan(heading, 2);
 
         var layout = new VerticalStackLayout { Spacing = 8, Children = { header, _status, _content } };
         Content = new RefreshView
