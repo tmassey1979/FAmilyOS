@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Net.Sockets;
 using System.Text.Json.Serialization;
 using Microsoft.Maui.Authentication;
 using Microsoft.Maui.Storage;
@@ -199,12 +200,43 @@ public sealed class KeycloakAuthService : IAuthSessionService
         CancellationToken cancellationToken)
     {
         var grantType = form.TryGetValue("grant_type", out var grant) ? grant : "unknown";
-        _diagnostics.RecordCheckpoint($"AUTH token endpoint request started; grant_type={grantType}");
-        using var response = await _httpClient.PostAsync(
-            TokenEndpoint,
-            new FormUrlEncodedContent(form),
-            cancellationToken);
+        var tokenUri = new Uri(TokenEndpoint);
+        _diagnostics.RecordCheckpoint($"AUTH token endpoint request started; grant_type={grantType}; host={tokenUri.Host}; network={Connectivity.Current.NetworkAccess}");
 
+        // Separate DNS failures from TLS/HTTP failures. Never log request form values.
+        try
+        {
+            using var dnsTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            dnsTimeout.CancelAfter(TimeSpan.FromSeconds(8));
+            var addresses = await Dns.GetHostAddressesAsync(tokenUri.Host, dnsTimeout.Token);
+            _diagnostics.RecordCheckpoint($"AUTH token endpoint DNS resolved; address_count={addresses.Length}; address_families={string.Join(",", addresses.Select(x => x.AddressFamily.ToString()).Distinct())}");
+        }
+        catch (Exception dnsException)
+        {
+            var socketCode = dnsException is SocketException socket ? socket.SocketErrorCode.ToString() : "none";
+            _diagnostics.RecordCheckpoint($"AUTH token endpoint DNS diagnostic failed; exception={dnsException.GetType().Name}; socket_error={socketCode}; message={SafeDiagnosticText(dnsException.Message)}");
+        }
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.PostAsync(
+                TokenEndpoint,
+                new FormUrlEncodedContent(form),
+                cancellationToken);
+        }
+        catch (Exception requestException)
+        {
+            var inner = requestException.InnerException;
+            var innerType = inner?.GetType().Name ?? "none";
+            var innerMessage = inner is null ? "none" : SafeDiagnosticText(inner.Message);
+            var socketCode = requestException is SocketException socket ? socket.SocketErrorCode.ToString()
+                : inner is SocketException innerSocket ? innerSocket.SocketErrorCode.ToString() : "none";
+            _diagnostics.RecordCheckpoint($"AUTH token endpoint transport failed; exception={requestException.GetType().Name}; inner={innerType}; socket_error={socketCode}; message={SafeDiagnosticText(requestException.Message)}; inner_message={innerMessage}");
+            throw;
+        }
+
+        using var responseScope = response;
         _diagnostics.RecordCheckpoint($"AUTH token endpoint response; http_status={(int)response.StatusCode}; success={response.IsSuccessStatusCode}");
         if (!response.IsSuccessStatusCode)
         {
@@ -240,6 +272,13 @@ public sealed class KeycloakAuthService : IAuthSessionService
 
         _diagnostics.RecordCheckpoint($"AUTH token response parsed; expires_in_seconds={tokens.ExpiresIn}; refresh_token_present={!string.IsNullOrWhiteSpace(tokens.RefreshToken)}");
         return tokens;
+    }
+
+    private static string SafeDiagnosticText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "empty";
+        var text = value.Replace("\r", " ").Replace("\n", " ");
+        return text.Length <= 180 ? text : text[..180];
     }
 
     private static async Task SaveTokensAsync(TokenResponse tokens, string? fallbackRefreshToken)
