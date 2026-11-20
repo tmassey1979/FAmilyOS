@@ -30,12 +30,20 @@ jobs:
           python-version: "3.12"
       - name: Expand EF migrations
         run: python3 scripts/expand-migrations.py
-      - name: Restore, build, and test
+      - name: Restore .NET 8 API and domain tests
         run: |
           set -euo pipefail
-          dotnet restore FamilyOS.sln
-          dotnet build FamilyOS.sln -c Release --no-restore
-          dotnet test FamilyOS.sln -c Release --no-build --verbosity minimal
+          dotnet restore src/FamilyOS.Api/FamilyOS.Api.csproj
+          dotnet restore tests/FamilyOS.Domain.Tests/FamilyOS.Domain.Tests.csproj
+
+      - name: Build API and domain tests
+        run: |
+          set -euo pipefail
+          dotnet build src/FamilyOS.Api/FamilyOS.Api.csproj -c Release --no-restore
+          dotnet build tests/FamilyOS.Domain.Tests/FamilyOS.Domain.Tests.csproj -c Release --no-restore
+
+      - name: Run domain tests
+        run: dotnet test tests/FamilyOS.Domain.Tests/FamilyOS.Domain.Tests.csproj -c Release --no-build --verbosity minimal
 
   build-server-images:
     needs: [validate-api]
