@@ -48,7 +48,7 @@ docker compose --env-file deploy/traefik/.env -f deploy/traefik/docker-compose.y
 |--------|----------|-------|
 | `PORTAINER_WEBHOOK_URL` | **Preferred** | Full webhook URL from Portainer |
 | `PORTAINER_URL` | Fallback | `https://portainer.18.226.226.118.sslip.io` |
-| `PORTAINER_API_KEY` | Fallback | Access token (rotate if leaked) |
+| `PORTAINER_API_KEY` | Fallback | Portainer access token |
 | `PORTAINER_STACK_ID` | Fallback | `2` |
 | `PORTAINER_ENDPOINT_ID` | Fallback | `2` |
 
@@ -60,35 +60,34 @@ docker compose --env-file deploy/traefik/.env -f deploy/traefik/docker-compose.y
 4. Copy the webhook URL
 5. GitHub → Settings → Secrets → Actions → `PORTAINER_WEBHOOK_URL` = that URL
 
-The coordinated `FamilyOS Coordinated Release` workflow calls the webhook only after the API tests, both GHCR image builds, and the Android APK build/verification have succeeded. It publishes the GitHub APK release only after the API and Keycloak health checks pass.
-
 ## Keycloak production database and realm
 
 - PostgreSQL remains a single server/container with the existing `postgres_data` volume.
-- Family OS API continues using the `familyos` database (`POSTGRES_DB`).
-- A one-shot `keycloak-db-init` service idempotently creates a separate `keycloak` database on that same PostgreSQL server. It also works when the volume already exists; it does not reset or recreate the Family OS database.
+- FamilyOS API continues using the `familyos` database (`POSTGRES_DB`).
+- A one-shot `keycloak-db-init` service idempotently creates a separate `keycloak` database on that same PostgreSQL server. It also works when the volume already exists; it does not reset or recreate the FamilyOS database.
 - Keycloak uses the published `ghcr.io/tmassey1979/familyos-keycloak:latest` image, connects to `postgres:5432/keycloak`, and imports the `familyos` realm on first creation. Keycloak keeps its data in PostgreSQL, not its development H2 database.
 - Keycloak's realm import is create-if-missing; it does not overwrite an already existing realm on later deploys. Existing Keycloak users/realm data are not deleted by this configuration.
 - The checked-in realm no longer seeds shared `password` demo accounts. New users register through the enabled realm registration flow.
 
-## How CI deploys
+## How CI and release work
 
-Every push to `main` starts one **FamilyOS Coordinated Release**:
+A push to `main` starts one **FamilyOS Coordinated Release**:
 
 1. Restore, build, and test the .NET solution.
-2. Build and publish the API and Keycloak images to GHCR, tagged with the source commit and `latest`.
-3. Typecheck and validate the Expo Android app, build the production APK with EAS, download it, and verify the APK archive.
-4. Only after both image builds and the APK build succeed, redeploy the Portainer stack.
+2. Build and publish the API and Keycloak images to GHCR, tagged with the app version, source commit, and `latest`.
+3. Build the versioned MAUI Android Release APK and calculate its SHA-256 checksum.
+4. Deploy the Portainer stack only after both image publishing and APK creation succeed.
 5. Require HTTP 200 from both the API health endpoint and Keycloak realm discovery endpoint.
-6. Only after both health checks pass, publish the APK as a GitHub Release.
+6. Publish the APK as a GitHub Release only after deployment and both health checks pass.
 
-A failed build or health check prevents the coordinated GitHub Release from being published. The older standalone API/Keycloak image workflows are manual-only; they do not trigger partial automatic deployments.
+A failed build, image push, deployment, or health check prevents the coordinated GitHub Release from being published. The coordinated workflow can also be started manually from the Actions tab on `main`.
 
 ## Manual redeploy
 
-Actions → **Deploy stack (Portainer)** → Run workflow
+Actions → **Deploy stack (Portainer)** → Run workflow. This redeploys the currently configured Git stack; it does not build or publish new images. For a complete build-and-deploy cycle, run **FamilyOS Coordinated Release** instead.
 
 ## Notes
 
-- Both `familyos-api` and `familyos-keycloak` are published to GHCR by the coordinated workflow and pulled by Portainer during redeployment.
-- Env vars (Postgres, RabbitMQ, Keycloak) live on the Portainer stack; API redeploy must include them.
+- The coordinated release workflow is the only workflow that builds and publishes the production API and Keycloak images.
+- Environment variables (Postgres, RabbitMQ, Keycloak) are configured in the Portainer stack and must be preserved during redeployment.
+- Never delete or recreate the existing PostgreSQL data volume or Traefik certificate volume as part of a routine release.
