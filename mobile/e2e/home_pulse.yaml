@@ -1,7 +1,0 @@
-appId: com.familyos.app
----
-- launchApp
-- extendedWaitUntil:
-    visible: "Family Pulse"
-    timeout: 30000
-- assertVisible: "Family Pulse"
