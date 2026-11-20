@@ -1,4 +1,4 @@
-using FamilyOS.Maui.Services;
+using FamilyOS.Maui.Controls;\nusing FamilyOS.Maui.Services;
 
 namespace FamilyOS.Maui.Pages;
 
@@ -15,12 +15,12 @@ public sealed class OnboardingPage : ContentPage
     private readonly Entry _joinName = new() { Placeholder = "Your display name (optional)" };
     private readonly Label _status = new() { FontSize = 13 };
     private readonly Label _invitePreview = new() { FontSize = 14, IsVisible = false };
-    private readonly Button _signIn = new() { Text = "Sign in with FamilyOS" };
-    private readonly Button _create = new() { Text = "Create household" };
-    private readonly Button _preview = new() { Text = "Check invite" };
-    private readonly Button _join = new() { Text = "Join household" };
+    private readonly FoButton _signIn = new() { Title = "Sign in with FamilyOS", LoadingText = "Opening sign-in…" };
+    private readonly FoButton _create = new() { Title = "Create household", LoadingText = "Creating household…" };
+    private readonly FoButton _preview = new() { Title = "Check invite", LoadingText = "Checking invitation…", Variant = FoButtonVariant.Secondary };
+    private readonly FoButton _join = new() { Title = "Join household", LoadingText = "Joining household…" };
     private bool _signedIn;
-    private bool _busy;
+    private bool _busy;\n    private FoButton? _busyButton;
     private InvitePreviewDto? _currentInvite;
 
     public OnboardingPage(IAuthSessionService auth, OnboardingApiClient api, StartupDiagnosticsService diagnostics)
@@ -90,7 +90,7 @@ public sealed class OnboardingPage : ContentPage
     {
         if (_busy) return;
         _diagnostics.RecordCheckpoint("AUTH onboarding sign-in button tapped");
-        SetBusy(true, "Opening secure sign-in…");
+        SetBusy(true, "Opening secure sign-in…", _signIn);
         try
         {
             await _auth.SignInAsync();
@@ -124,7 +124,7 @@ public sealed class OnboardingPage : ContentPage
         }
 
         _diagnostics.RecordCheckpoint("AUTH household creation started; input values omitted");
-        SetBusy(true, "Creating your household…");
+        SetBusy(true, "Creating your household…", _create);
         try
         {
             await _api.CreateFamilyAsync(
@@ -166,7 +166,7 @@ public sealed class OnboardingPage : ContentPage
         }
 
         _diagnostics.RecordCheckpoint("AUTH invite preview started; invite code omitted");
-        SetBusy(true, "Checking invitation…");
+        SetBusy(true, "Checking invitation…", _preview);
         try
         {
             _currentInvite = await _api.PreviewInviteAsync(_inviteCode.Text);
@@ -206,7 +206,7 @@ public sealed class OnboardingPage : ContentPage
         }
 
         _diagnostics.RecordCheckpoint("AUTH accept-invitation started; invite code omitted");
-        SetBusy(true, "Joining household…");
+        SetBusy(true, "Joining household…", _join);
         try
         {
             await _api.AcceptInviteAsync(_inviteCode.Text, _joinName.Text);
