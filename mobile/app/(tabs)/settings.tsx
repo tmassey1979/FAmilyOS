@@ -3,7 +3,7 @@ import {
   ActivityIndicator, Alert, Linking, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as Clipboard from 'expo-clipboard';
+import { copyInviteCode } from '../../src/inviteShare';
 import { Badge, Button, Card, EmptyState, SectionTitle } from '../../src/components/ui';
 import {
   familyApi,
@@ -159,8 +159,9 @@ function SettingsScreen() {
       return;
     }
     try {
-      await Clipboard.setStringAsync(accessToken);
-      Alert.alert('Copied', 'The access token was copied to your clipboard. Treat it like a password and do not share it publicly.');
+      const copied = await copyInviteCode(accessToken);
+      if (copied) Alert.alert('Ready to copy', 'The system share sheet opened. Choose Copy to put the token on your clipboard. Treat it like a password.');
+      else Alert.alert('Copy failed', 'FamilyOS could not open the share sheet.');
     } catch {
       Alert.alert('Copy failed', 'FamilyOS could not access the clipboard.');
     }
