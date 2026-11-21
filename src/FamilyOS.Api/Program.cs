@@ -147,7 +147,7 @@ try
                 var tokenSubject = context.SecurityToken switch
                 {
                     JwtSecurityToken jwt => jwt.Claims.FirstOrDefault(c => c.Type == Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames.Sub)?.Value,
-                    JsonWebToken json => json.GetClaim("sub"),
+                    JsonWebToken json => json.Subject,
                     _ => null
                 };
 
