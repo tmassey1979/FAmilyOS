@@ -2,7 +2,8 @@ using System.Text;
 using System.Security.Claims;
 using SecurityClaim = System.Security.Claims.Claim;
 using System.IdentityModel.Tokens.Jwt;
-using Microsoft.IdentityModel.JsonWebTokens;
+using JsonWebToken = Microsoft.IdentityModel.JsonWebTokens.JsonWebToken;
+using JwtRegisteredClaimNames = System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames;
 using System.Text.Json.Serialization;
 using FamilyOS.Api.Hubs;
 using FamilyOS.Api.Middleware;
@@ -146,7 +147,7 @@ try
                 var tokenSubject = context.SecurityToken switch
                 {
                     JwtSecurityToken jwt => jwt.Claims.FirstOrDefault(c => c.Type == Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames.Sub)?.Value,
-                    JsonWebToken json => json.Claims.FirstOrDefault(c => c.Type == Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames.Sub)?.Value,
+                    JsonWebToken json => json.GetClaim("sub"),
                     _ => null
                 };
 
