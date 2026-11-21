@@ -3,7 +3,7 @@ import {
   ActivityIndicator, Alert, Linking, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { copyInviteCode } from '../../src/inviteShare';
+import { copyText } from '../../src/inviteShare';
 import { Badge, Button, Card, EmptyState, SectionTitle } from '../../src/components/ui';
 import {
   familyApi,
@@ -159,7 +159,7 @@ function SettingsScreen() {
       return;
     }
     try {
-      const copied = await copyInviteCode(accessToken);
+      const copied = await copyText(accessToken);
       if (copied) Alert.alert('Ready to copy', 'The system share sheet opened. Choose Copy to put the token on your clipboard. Treat it like a password.');
       else Alert.alert('Copy failed', 'FamilyOS could not open the share sheet.');
     } catch {
