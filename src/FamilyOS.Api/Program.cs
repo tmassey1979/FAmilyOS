@@ -110,6 +110,10 @@ try
 
     authBuilder.AddJwtBearer(options =>
     {
+        // Keep OIDC claim names verbatim. Inbound mapping can translate `sub` to a
+        // framework URI claim and makes identity resolution depend on handler defaults.
+        // CurrentUserService and the validated-token fallback both resolve the raw `sub`.
+        options.MapInboundClaims = false;
         options.Authority = keycloakAuthority;
         options.RequireHttpsMetadata = false;
         // Docker: authority is the public issuer (https://auth…); metadata is fetched on the internal network
