@@ -292,9 +292,19 @@ public sealed class HomePage : ContentPage
 
     private static async Task NavigateForAsync(string kind)
     {
-        var route = kind.Equals("Request", StringComparison.OrdinalIgnoreCase)
-            ? nameof(RequestsPage)
-            : "//tasks";
+        // Pulse items can represent more than tasks and requests. Keep shortcuts
+        // pointed at the matching feature instead of sending every unknown item
+        // to Tasks and making unrelated cards appear broken.
+        var route = kind.Trim().ToLowerInvariant() switch
+        {
+            "request" => nameof(RequestsPage),
+            "event" or "calendar" => "//calendar",
+            "meal" or "recipe" => nameof(MealsPage),
+            "message" or "chat" => nameof(ChatPage),
+            "notification" => nameof(NotificationsPage),
+            "family" or "member" or "shopping" or "procurement" => "//family",
+            _ => "//tasks"
+        };
         await Shell.Current.GoToAsync(route);
     }
 }
