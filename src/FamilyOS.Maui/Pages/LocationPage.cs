@@ -268,12 +268,12 @@ public sealed class LocationPage : ContentPage
             var result = await _api.SetLocationHistoryConsentAsync(enabled);
             _loadingHistorySwitch = true;
             _historyEnabled = result.HistoryEnabled;
-            _historyEnabled = result.HistoryEnabled;
             _historySwitch.IsToggled = result.HistoryEnabled;
             _loadingHistorySwitch = false;
             _historyStatus.Text = result.HistoryEnabled
                 ? "Location history is on. Uploaded points are retained for up to 30 days."
                 : "Location history is off and stored points have been deleted.";
+            RefreshState();
         }
         catch (Exception ex)
         {
@@ -282,6 +282,7 @@ public sealed class LocationPage : ContentPage
             _historyEnabled = !enabled;
             _loadingHistorySwitch = false;
             _historyStatus.Text = $"Could not update history settings: {ex.Message}";
+            RefreshState();
         }
     }
 
