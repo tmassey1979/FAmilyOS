@@ -195,6 +195,7 @@ public sealed class LocationPage : ContentPage
         _viewerControls.Children.Clear();
         if (!_sharingEnabled)
         {
+            _hasViewerGrant = false;
             _viewerStatus.Text = "Enable household sharing before granting anyone access to your location.";
             return;
         }
