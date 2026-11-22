@@ -29,6 +29,13 @@ public sealed class FamilyApiClient
     public async Task RevokeInviteAsync(Guid inviteId, CancellationToken ct = default)
         => await SendNoContentAsync(HttpMethod.Post, $"api/invites/{inviteId:D}/revoke", ct);
 
+    public async Task<FamilyMemberDto> ChangeMemberRoleAsync(Guid memberId, string role, CancellationToken ct = default)
+        => await SendAsync<FamilyMemberDto>(HttpMethod.Post, $"api/family/members/{memberId:D}/change-role",
+            JsonContent.Create(new { role }, options: JsonOptions), ct);
+
+    public async Task<FamilyMemberDto> DeactivateMemberAsync(Guid memberId, CancellationToken ct = default)
+        => await SendAsync<FamilyMemberDto>(HttpMethod.Post, $"api/family/members/{memberId:D}/deactivate", null, ct);
+
     private async Task<T> SendAsync<T>(HttpMethod method, string path, HttpContent? content, CancellationToken ct)
     {
         var token = await _auth.GetAccessTokenAsync(ct);
