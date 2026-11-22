@@ -133,7 +133,7 @@ public class FamilyCommandHandlers :
             new List<MemberDto>
             {
                 new(owner.Id, user.Id, owner.DisplayName, owner.Role, owner.IsActive)
-            });
+            }, owner.Id);
     }
 
     public async Task<MemberDto> Handle(AddFamilyMemberCommand cmd, CancellationToken ct)
