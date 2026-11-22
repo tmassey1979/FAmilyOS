@@ -1,53 +1,54 @@
 # FamilyOS location module
 
-## Current milestone
+## Implemented capabilities
 
-The first location-sharing milestone now connects the MAUI app to authenticated FamilyOS APIs:
+The location feature now includes the following consent-gated capabilities:
 
-- Android device permission is while-in-use only and off by default.
-- An explicitly started Android location foreground service now attempts periodic updates (about once per minute), shows an ongoing notification with a Stop action, checks server sharing consent before each update, and does not request background location permission or restart itself after process death.
+- Android device location permission is while-in-use only and off by default.
 - Household sharing is a separate server-side opt-in, also off by default.
-- The user must explicitly request a location fix and separately tap to share it. Future continuous sharing must be started from a visible screen and run as an Android location foreground service with a persistent notification; the app will not silently restart tracking after process death or reboot.
-- The server stores only the latest shared fix, not a location history.
-- A member's location is private by default; only individually granted active household members can see the latest fix.
-- Each member manages their own viewer list; household membership or guardian role never grants location access automatically.
-- Revoking one viewer removes their access immediately. Revoking sharing clears coordinates and all grants.
-- Stopping sharing clears the stored coordinates immediately.
-- Deactivating a household member deletes their stored location record.
-- Disabling device location also attempts to revoke household sharing.
-- The API rejects invalid coordinates, inaccurate values outside its accepted bounds, timestamps more than five minutes in the future, and fixes older than 24 hours.
-- The API checks active household membership on consent, update, and read operations.
+- Latest location is visible only to individually authorized active household members. Membership and guardian role never grant access automatically.
+- A one-time location fix can be uploaded only when at least one viewer is explicitly authorized.
+- Continuous tracking is started from a visible app screen and runs as an Android location foreground service with a persistent notification and Stop action. It does not request background location permission or silently restart after process death or reboot.
+- Continuous tracking requires either an explicit viewer grant or the owner's separate personal-history opt-in. The service rechecks both consent and purpose while running and stops when neither remains.
+- Personal location history is a separate opt-in. History points are retained for at most 30 days; the API limits each query to seven days and supports deletion.
+- Saved places support configurable 50–5,000 meter geofences and arrival/departure alerts. The first fix establishes a baseline rather than generating a false arrival; a 25-meter exit hysteresis reduces GPS drift alerts.
+- The family map displays recent shared locations and saved-place circles. It refreshes while open. History routes and derived trip summaries can be displayed for members the viewer is authorized to see.
+- Trip summaries are derived from history segments separated by gaps over ten minutes, with a minimum 500-meter path and two-minute duration. They are estimates, not authoritative odometer or driving records.
+- Deactivating a household member removes their location record, viewer grants in both directions, history, and geofence presence state.
 
-The MAUI app now includes a household map that plots the latest explicitly shared fixes, with last-shared time and reported accuracy. Map tiles are loaded from OpenStreetMap and include attribution. The map is refreshed on demand; it is not a live feed.
+## Android tracking behavior and limitations
 
-The Android foreground service is the first continuous-tracking implementation, not yet a production-validated Life360 equivalent. It must pass Android APK CI and physical-device testing for Android-version behavior, notification actions, permission denial, process death, battery restrictions, offline behavior, and immediate consent revocation. It currently has no bounded offline queue, adaptive movement/distance thresholds, or cross-device status heartbeat. Location history, saved places, geofences, check-ins, SOS delivery, and driving safety are still unimplemented.
+The foreground service updates approximately once per minute while running. Android requires a visible foreground-service notification, and the service must be started while the app is visible. The implementation intentionally uses while-in-use permission rather than `ACCESS_BACKGROUND_LOCATION`. Android may still restrict execution because of battery management, force-stop, process termination, permission changes, or vendor-specific behavior. The app does not silently restart tracking.
+
+The current implementation is not yet validated as a production Life360 replacement. Physical-device validation is required for Android 13–17 notification behavior, screen-off/background operation, Stop action, permission revocation, process death, battery restrictions, location-services-off behavior, and network loss/recovery. There is no bounded offline queue, adaptive movement sampling, battery telemetry, or cross-device service heartbeat.
 
 ## API
 
-- `GET /api/location/consent` — current member's sharing state.
-- `PUT /api/location/consent` — explicit opt-in/out. Opt-out deletes the saved fix.
-- `POST /api/location/current` — submit one user-initiated location fix after consent.
-- `GET /api/location/family` — latest fixes explicitly shared with the caller by active household members, limited to the last 24 hours.
-- `GET /api/location/viewers` — active household members and whether the current member has granted them location visibility.
-- `PUT /api/location/viewers/{viewerMemberId}` — explicitly grant or revoke one active household member's access.
+- `GET /api/location/consent` and `PUT /api/location/consent` — read or change household-sharing consent. Opt-out removes coordinates, viewer grants, and saved history.
+- `POST /api/location/current` — upload a fresh location only when sharing is enabled and there is an explicit viewer grant or personal-history consent.
+- `GET /api/location/family` — latest fixes explicitly shared with the caller by active household members.
+- `GET /api/location/viewers` and `PUT /api/location/viewers/{viewerMemberId}` — manage per-person access. Revoking the final viewer removes stored coordinates when personal history is not enabled.
+- `GET /api/location/history/consent` and `PUT /api/location/history/consent` — separate personal-history consent.
+- `GET /api/location/history/{targetMemberId}` — authorized history query, defaulting to the last 24 hours; maximum seven-day query window and 30-day retention horizon.
+- `DELETE /api/location/history` — delete the current member's stored history without disabling future recording.
+- `GET /api/location/trips/{targetMemberId}` — derived trip segments over an authorized history range.
+- `GET /api/location/places`, `POST /api/location/places`, `PUT /api/location/places/{placeId}`, and `DELETE /api/location/places/{placeId}` — household saved-place management.
 
-Per-viewer grants are enforced by the API. A location owner can grant or revoke access to each active household member. Existing opt-in sharers from before this privacy change have no viewer grants by default and must explicitly re-allow each person. Grants are separate from the owner's location-sharing consent and do not submit or collect coordinates. New members receive no grants. Member deactivation deletes grants in either direction. Sharing revocation deletes all grants owned by that member and erases the saved fix. The location-grant table is provisioned by the existing idempotent location schema ensure step; it does not require an EF migration.
+## Privacy and security invariants
 
-## Required next milestones
-
-1. Guardian/child consent rules and independent, age-appropriate consent review.
-2. Validate and harden the Android location foreground service: confirm visible-activity start restrictions, stop action behavior, bounded offline queue, battery-aware sampling, tracking heartbeat/status, and immediate consent revocation. Retain while-in-use location permission; do not request `ACCESS_BACKGROUND_LOCATION` unless a separately justified background-start use case is added.
-3. Add authenticated location freshness/status metadata and map refresh automation while the viewer is active, with stale/offline states and member-level controls.
-4. Saved places, configurable geofence radii, and deduplicated arrival/departure transitions with notification preferences.
-5. Location history and trip summaries with explicit opt-in, retention limits, export, and deletion controls.
-6. User-initiated check-ins, household SOS workflows, device push delivery, delivery receipts, and clear emergency-service limitations.
-7. Driving trip detection and driving insights; crash detection only after sensor validation and false-positive handling.
-
-## Security and release gates
-
-- Never infer consent from household membership or a parent/guardian role.
-- Stop accepting updates immediately after consent withdrawal or membership removal; member deactivation also deletes the stored record.
-- Do not show coordinates to anyone outside the active household.
-- Keep location history disabled until retention, deletion, and access auditing are designed.
 - No default-on tracking, silent background collection, or emergency-dispatch claims.
-- Physical Android tests must cover permission denial, approximate location, app process death, reboot, battery restrictions, offline delivery, membership removal, and consent revocation before background sharing is enabled in production.
+- A check-in request or emergency event must never silently enable location collection.
+- A household member sees coordinates only with an active, explicit viewer grant.
+- History is separately consented to and can be deleted by its owner.
+- Revoking sharing clears coordinates and grants; revoking the last viewer clears coordinates unless the owner independently opted into personal history.
+- Notifications for geofence transitions are sent only to members with explicit viewer grants.
+- The API validates coordinate bounds, accuracy bounds, timestamp freshness, active family membership, and consent before accepting or returning data.
+
+## Remaining work / release gates
+
+1. Guardian/child consent rules and age-appropriate consent review.
+2. User-initiated check-ins with due times, explicit safe responses, overdue state, and no automatic location collection.
+3. Explicit SOS workflow with confirmation, emergency-contact configuration, acknowledgment/resolution, optional consented location snapshot, and clear notice that FamilyOS does not contact emergency services.
+4. Driving insights based on validated trip data. Crash detection must not be claimed until sensor behavior and false-positive handling are validated on physical devices.
+5. Offline handling, battery-aware sampling, location freshness/status, and operational telemetry.
+6. Physical Android device tests and end-to-end multi-member authorization tests before production rollout.
