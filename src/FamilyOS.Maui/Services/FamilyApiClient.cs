@@ -50,6 +50,13 @@ public sealed class FamilyApiClient
     public Task<List<FamilyLocationDto>> GetFamilyLocationsAsync(CancellationToken ct = default)
         => SendAsync<List<FamilyLocationDto>>(HttpMethod.Get, "api/location/family", null, ct);
 
+    public Task<List<LocationViewerDto>> GetLocationViewersAsync(CancellationToken ct = default)
+        => SendAsync<List<LocationViewerDto>>(HttpMethod.Get, "api/location/viewers", null, ct);
+
+    public Task SetLocationViewerAsync(Guid viewerMemberId, bool enabled, CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Put, $"api/location/viewers/{viewerMemberId:D}",
+            JsonContent.Create(new { enabled }, options: JsonOptions), ct);
+
     private async Task<T> SendAsync<T>(HttpMethod method, string path, HttpContent? content, CancellationToken ct)
     {
         var token = await _auth.GetAccessTokenAsync(ct);
@@ -122,3 +129,4 @@ public sealed record FamilyDto(Guid Id, string Name, string? TimeZone, string? C
 public sealed record FamilyMemberDto(Guid Id, Guid UserId, string DisplayName, string Role, bool IsActive);
 public sealed record LocationConsentDto(bool SharingEnabled, DateTime? ConsentUpdatedAtUtc);
 public sealed record FamilyLocationDto(Guid MemberId, string DisplayName, double? Latitude, double? Longitude, double? AccuracyMeters, DateTime? UpdatedAtUtc);
+public sealed record LocationViewerDto(Guid MemberId, string DisplayName, bool CanView);
