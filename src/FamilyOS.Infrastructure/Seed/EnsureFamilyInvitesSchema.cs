@@ -37,6 +37,7 @@ public static class EnsureFamilyInvitesSchema
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Ensure FamilyInvites schema failed");
+            throw;
         }
     }
 }
