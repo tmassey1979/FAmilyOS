@@ -160,6 +160,8 @@ public sealed class TasksPage : ContentPage
         stack.Children.Add(title);
 
         var details = new List<string> { task.Status, task.Priority };
+        if (_showFamilyTasks && !string.IsNullOrWhiteSpace(task.AssignedToName))
+            details.Add($"Assigned to {task.AssignedToName}");
         if (!string.IsNullOrWhiteSpace(task.Category)) details.Add(task.Category);
         if (task.IsOverdue) details.Add("Overdue");
         if (task.IsRecurring) details.Add(task.RecurrenceFrequency is { Length: > 0 } f ? $"↻ {f}" : "↻ Recurring");
