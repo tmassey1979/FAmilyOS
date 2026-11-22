@@ -154,6 +154,7 @@ public static class SeedData
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Could not ensure quiet hours columns (may already exist or non-Postgres)");
+            throw;
         }
     }
 
@@ -182,6 +183,7 @@ public static class SeedData
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Could not ensure DeviceRegistrations table (may already exist or non-Postgres)");
+            throw;
         }
     }
 
@@ -216,6 +218,7 @@ public static class SeedData
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Could not ensure Google Calendar schema (may already exist or non-Postgres)");
+            throw;
         }
     }
 
@@ -254,6 +257,7 @@ public static class SeedData
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Could not ensure Chat schema (may already exist or non-Postgres)");
+            throw;
         }
     }
 
