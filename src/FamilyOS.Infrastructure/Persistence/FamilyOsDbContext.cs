@@ -23,6 +23,8 @@ public partial class FamilyOsDbContext : DbContext, FamilyOS.Application.Interfa
     public DbSet<FamilyMember> FamilyMembers => Set<FamilyMember>();
     public DbSet<MemberLocation> MemberLocations => Set<MemberLocation>();
     public DbSet<MemberLocationViewerGrant> MemberLocationViewerGrants => Set<MemberLocationViewerGrant>();
+    public DbSet<SavedPlace> SavedPlaces => Set<SavedPlace>();
+    public DbSet<MemberPlacePresence> MemberPlacePresences => Set<MemberPlacePresence>();
     public DbSet<DeclineReason> DeclineReasons => Set<DeclineReason>();
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
     public DbSet<TaskHistoryEntry> TaskHistory => Set<TaskHistoryEntry>();
