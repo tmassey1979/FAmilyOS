@@ -49,6 +49,7 @@ public static class MauiProgram
         builder.Services.AddTransient<SettingsPage>();
         builder.Services.AddTransient<OutcomesPage>();
         builder.Services.AddTransient<NotificationsPage>();
+        builder.Services.AddTransient<MorePage>();
 
 #if DEBUG
         builder.Logging.AddDebug();
