@@ -95,5 +95,6 @@ public sealed class FamilyApiClient
     }
 }
 
-public sealed record FamilyInviteDto(Guid Id, string Code, string Role, string? EmailHint, DateTime ExpiresAtUtc, bool IsOpen, DateTime? AcceptedAtUtc);\npublic sealed record FamilyDto(Guid Id, string Name, string? TimeZone, string? Currency, List<FamilyMemberDto> Members);
+public sealed record FamilyInviteDto(Guid Id, string Code, string Role, string? EmailHint, DateTime ExpiresAtUtc, bool IsOpen, DateTime? AcceptedAtUtc);
+public sealed record FamilyDto(Guid Id, string Name, string? TimeZone, string? Currency, List<FamilyMemberDto> Members);
 public sealed record FamilyMemberDto(Guid Id, Guid UserId, string DisplayName, string Role, bool IsActive);
