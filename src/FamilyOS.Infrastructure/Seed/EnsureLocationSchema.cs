@@ -12,6 +12,24 @@ public static class EnsureLocationSchema
         {
             await db.Database.ExecuteSqlRawAsync(
                 """
+                CREATE TABLE IF NOT EXISTS familyos."CheckInRequests" (
+                    "Id" uuid NOT NULL PRIMARY KEY,
+                    "FamilyId" uuid NOT NULL,
+                    "RequesterMemberId" uuid NOT NULL,
+                    "TargetMemberId" uuid NOT NULL,
+                    "CreatedAtUtc" timestamp with time zone NOT NULL,
+                    "DueAtUtc" timestamp with time zone NOT NULL,
+                    "Status" character varying(20) NOT NULL,
+                    "RespondedAtUtc" timestamp with time zone NULL,
+                    "ResponseMessage" character varying(500) NULL,
+                    "CreatedAtUtc_Entity" timestamp with time zone NULL,
+                    "UpdatedAtUtc" timestamp with time zone NULL,
+                    "IsDeleted" boolean NOT NULL DEFAULT false
+                );
+                CREATE INDEX IF NOT EXISTS "IX_CheckInRequests_FamilyId_TargetMemberId_Status_DueAtUtc"
+                    ON familyos."CheckInRequests" ("FamilyId", "TargetMemberId", "Status", "DueAtUtc");
+                CREATE INDEX IF NOT EXISTS "IX_CheckInRequests_FamilyId_RequesterMemberId_CreatedAtUtc"
+                    ON familyos."CheckInRequests" ("FamilyId", "RequesterMemberId", "CreatedAtUtc");
                 CREATE TABLE IF NOT EXISTS familyos."MemberLocations" (
                     "Id" uuid NOT NULL PRIMARY KEY,
                     "FamilyId" uuid NOT NULL,
