@@ -42,6 +42,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<FamilyApiClient>();
         builder.Services.AddSingleton<DeviceLocationService>();
         builder.Services.AddTransient<LocationPage>();
+        builder.Services.AddTransient<CheckInsPage>();
         builder.Services.AddTransient<FamilyMapPage>();
         builder.Services.AddTransient<SavedPlacesPage>();
         builder.Services.AddSingleton<MeApiClient>();
