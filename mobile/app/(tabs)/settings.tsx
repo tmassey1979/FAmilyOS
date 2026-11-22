@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Linking, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View,
+  ActivityIndicator, Linking, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { copyText } from '../../src/inviteShare';
 import { Badge, Button, Card, EmptyState, SectionTitle } from '../../src/components/ui';
 import {
   familyApi,
@@ -19,7 +18,6 @@ import { invitesApi, type InviteDto } from '../../src/api/onboarding';
 import { copyInviteCode, shareInviteCode } from '../../src/inviteShare';
 import {
   isBiometricUnlockEnabled,
-  loadStoredAccessToken,
   setBiometricUnlockEnabled,
   signOut,
 } from '../../src/auth/keycloak';
@@ -33,8 +31,6 @@ function SettingsScreen() {
   const [familyName, setFamilyName] = useState('');
   const [memberCount, setMemberCount] = useState(0);
   const [bio, setBio] = useState(false);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [showAccessToken, setShowAccessToken] = useState(false);
   const [quiet, setQuiet] = useState<QuietHoursDto | null>(null);
   const [quietOn, setQuietOn] = useState(false);
   const [quietStart, setQuietStart] = useState('22:00');
@@ -80,7 +76,6 @@ function SettingsScreen() {
       setFamilyName(fam?.name ?? '');
       setMemberCount(mems.filter((m) => m.isActive !== false).length);
       setBio(bioOn);
-      setAccessToken(await loadStoredAccessToken());
       setLocalToken(tok);
       setGcal(gc);
       if (qh) {
@@ -153,19 +148,6 @@ function SettingsScreen() {
     }
   };
 
-  const copyAccessToken = async () => {
-    if (!accessToken) {
-      Alert.alert('No access token', 'Sign in again to obtain an access token.');
-      return;
-    }
-    try {
-      const copied = await copyText(accessToken);
-      if (copied) Alert.alert('Ready to copy', 'The system share sheet opened. Choose Copy to put the token on your clipboard. Treat it like a password.');
-      else Alert.alert('Copy failed', 'FamilyOS could not open the share sheet.');
-    } catch {
-      Alert.alert('Copy failed', 'FamilyOS could not access the clipboard.');
-    }
-  };
 
   const onToggleBio = async (on: boolean) => {
     setBio(on);
@@ -421,28 +403,6 @@ function SettingsScreen() {
           />
         </View>
       </Card>
-      <Card style={styles.card}>
-        <Text style={typography.body}>Keycloak access token</Text>
-        <Text style={typography.caption}>
-          Debugging only. This is a bearer credential that grants access as your signed-in account. Keep it private and avoid pasting it into tickets or chats.
-        </Text>
-        <Text selectable style={styles.tokenText}>
-          {accessToken ? (showAccessToken ? accessToken : '••••••••••••••••••••••••••••••••') : 'No access token is stored. Sign in again.'}
-        </Text>
-        <View style={styles.row}>
-          <Button
-            title={showAccessToken ? 'Hide token' : 'Reveal token'}
-            variant="secondary"
-            disabled={!accessToken}
-            onPress={() => setShowAccessToken((v) => !v)}
-          />
-          <Button
-            title="Copy token"
-            disabled={!accessToken}
-            onPress={() => void copyAccessToken()}
-          />
-        </View>
-      </Card>
 
       <SectionTitle>Google Calendar</SectionTitle>
       <Card style={styles.card}>
@@ -541,7 +501,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap', marginBottom: spacing.sm },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   hint: { ...typography.caption, color: colors.danger, marginBottom: spacing.sm },
-  tokenText: { ...typography.caption, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', color: colors.text, lineHeight: 18 },
 });
 
 export default withObserveScreen(SettingsScreen);
