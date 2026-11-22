@@ -15,6 +15,8 @@ public sealed class FamilyMapPage : ContentPage
     private readonly Label _status;
     private readonly Button _refresh;
     private bool _loading;
+    private bool _isVisible;
+    private bool _timerStarted;
 
     public FamilyMapPage(FamilyApiClient api)
     {
@@ -31,7 +33,7 @@ public sealed class FamilyMapPage : ContentPage
 
         var explanation = new Label
         {
-            Text = "Pins appear only when a household member has explicitly shared a location. A pin is the last shared reading, not a live position.",
+            Text = "Pins show the latest locations shared by household members. This map refreshes automatically while open; location updates still depend on each member's tracking settings and connectivity.",
             FontSize = 13,
             LineBreakMode = LineBreakMode.WordWrap
         };
@@ -90,7 +92,28 @@ public sealed class FamilyMapPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+        _isVisible = true;
+        if (!_timerStarted)
+        {
+            _timerStarted = true;
+            Dispatcher.StartTimer(TimeSpan.FromSeconds(30), () =>
+            {
+                if (!_isVisible)
+                {
+                    _timerStarted = false;
+                    return false;
+                }
+                _ = RefreshAsync();
+                return true;
+            });
+        }
         await RefreshAsync();
+    }
+
+    protected override void OnDisappearing()
+    {
+        _isVisible = false;
+        base.OnDisappearing();
     }
 
     private async Task RefreshAsync()
@@ -111,7 +134,7 @@ public sealed class FamilyMapPage : ContentPage
             _map.Source = new HtmlWebViewSource { Html = BuildMapHtml(valid) };
             _status.Text = valid.Count == 0
                 ? "No active household members have shared a location in the last 24 hours."
-                : $"{valid.Count} shared location(s). Pins show the last submitted reading; refresh to check for updates.";
+                 : $"{valid.Count} shared location(s). Last received update: {valid.Max(x => x.UpdatedAtUtc!.Value).ToLocalTime():g}.";
         }
         catch (Exception ex)
         {
@@ -169,7 +192,9 @@ public sealed class FamilyMapPage : ContentPage
                     const name = document.createElement('strong');
                     name.textContent = item.displayName || 'Household member';
                     const updated = document.createElement('div');
-                    updated.textContent = 'Last shared: ' + new Date(item.updatedAtUtc).toLocaleString();
+                    const ageMinutes = (Date.now() - new Date(item.updatedAtUtc).getTime()) / 60000;
+                    const freshness = ageMinutes < 2 ? 'Recently updated' : ageMinutes < 15 ? 'A few minutes old' : ageMinutes < 60 ? 'Stale location' : 'Old location';
+                    updated.textContent = freshness + ' · Last shared: ' + new Date(item.updatedAtUtc).toLocaleString();
                     popup.append(name, updated);
                     if (Number.isFinite(item.accuracyMeters)) {
                       const accuracy = document.createElement('div');
