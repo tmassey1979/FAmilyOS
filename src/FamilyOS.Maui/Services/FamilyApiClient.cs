@@ -198,7 +198,8 @@ public sealed class FamilyApiClient
 public sealed record FamilyInviteDto(Guid Id, string Code, string Role, string? EmailHint, DateTime ExpiresAtUtc, bool IsOpen, DateTime? AcceptedAtUtc);
 public sealed record FamilyDto(Guid Id, string Name, string? TimeZone, string? Currency, List<FamilyMemberDto> Members, Guid CurrentMemberId);
 public sealed record FamilyMemberDto(Guid Id, Guid UserId, string DisplayName, string Role, bool IsActive);
-public sealed record SosResultDto(int AlertsSent, bool LocationIncluded);\npublic sealed record LocationConsentDto(bool SharingEnabled, DateTime? ConsentUpdatedAtUtc);
+public sealed record SosResultDto(int AlertsSent, bool LocationIncluded);
+public sealed record LocationConsentDto(bool SharingEnabled, DateTime? ConsentUpdatedAtUtc);
 public sealed record FamilyLocationDto(Guid MemberId, string DisplayName, double? Latitude, double? Longitude, double? AccuracyMeters, DateTime? UpdatedAtUtc);
 public sealed record LocationViewerDto(Guid MemberId, string DisplayName, bool CanView);
 
