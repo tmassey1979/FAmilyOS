@@ -57,6 +57,27 @@ public sealed class FamilyApiClient
         => SendNoContentAsync(HttpMethod.Put, $"api/location/viewers/{viewerMemberId:D}",
             JsonContent.Create(new { enabled }, options: JsonOptions), ct);
 
+    public Task<LocationHistoryConsentDto> GetLocationHistoryConsentAsync(CancellationToken ct = default)
+        => SendAsync<LocationHistoryConsentDto>(HttpMethod.Get, "api/location/history/consent", null, ct);
+
+    public Task<LocationHistoryConsentDto> SetLocationHistoryConsentAsync(bool enabled, CancellationToken ct = default)
+        => SendAsync<LocationHistoryConsentDto>(HttpMethod.Put, "api/location/history/consent",
+            JsonContent.Create(new { enabled }, options: JsonOptions), ct);
+
+    public Task<List<LocationHistoryPointDto>> GetLocationHistoryAsync(Guid memberId,
+        DateTimeOffset? fromUtc = null, DateTimeOffset? toUtc = null, CancellationToken ct = default)
+    {
+        var path = $"api/location/history/{memberId:D}";
+        var query = new List<string>();
+        if (fromUtc.HasValue) query.Add($"fromUtc={Uri.EscapeDataString(fromUtc.Value.ToString("O"))}");
+        if (toUtc.HasValue) query.Add($"toUtc={Uri.EscapeDataString(toUtc.Value.ToString("O"))}");
+        if (query.Count > 0) path += "?" + string.Join("&", query);
+        return SendAsync<List<LocationHistoryPointDto>>(HttpMethod.Get, path, null, ct);
+    }
+
+    public Task ClearLocationHistoryAsync(CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Delete, "api/location/history", null, ct);
+
     public Task<List<SavedPlaceDto>> GetSavedPlacesAsync(CancellationToken ct = default)
         => SendAsync<List<SavedPlaceDto>>(HttpMethod.Get, "api/location/places", null, ct);
 
@@ -148,3 +169,5 @@ public sealed record FamilyLocationDto(Guid MemberId, string DisplayName, double
 public sealed record LocationViewerDto(Guid MemberId, string DisplayName, bool CanView);
 
 public sealed record SavedPlaceDto(Guid Id, string Name, double Latitude, double Longitude, double RadiusMeters, bool AlertOnArrival, bool AlertOnDeparture, bool CanEdit);
+public sealed record LocationHistoryConsentDto(bool HistoryEnabled);
+public sealed record LocationHistoryPointDto(double Latitude, double Longitude, double AccuracyMeters, DateTime RecordedAtUtc);
