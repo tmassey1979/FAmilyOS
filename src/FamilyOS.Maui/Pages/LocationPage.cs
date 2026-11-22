@@ -12,6 +12,8 @@ public sealed class LocationPage : ContentPage
     private readonly FamilyApiClient _api;
     private readonly Label _sharingStatus;
     private readonly Label _familyStatus;
+    private readonly VerticalStackLayout _viewerControls;
+    private readonly Label _viewerStatus;
     private bool _sharingEnabled;
     private readonly Label _consentStatus;
     private readonly Label _fixStatus;
@@ -72,6 +74,9 @@ public sealed class LocationPage : ContentPage
         _shareNow.Clicked += async (_, _) => await ShareCurrentLocationAsync();
         _stopSharing = new Button { Text = "Stop household sharing", IsEnabled = false };
         _stopSharing.Clicked += async (_, _) => await SetSharingAsync(false);
+        _viewerStatus = new Label { Text = "Choose exactly who can view your shared location.", FontSize = 13, LineBreakMode = LineBreakMode.WordWrap };
+        _viewerStatus.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
+        _viewerControls = new VerticalStackLayout { Spacing = 8 };
         _familyStatus = new Label { Text = "Household locations have not been loaded.", FontSize = 13, LineBreakMode = LineBreakMode.WordWrap };
         _familyStatus.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
         _refreshFamily = new Button { Text = "Refresh household locations", IsEnabled = true };
@@ -79,7 +84,7 @@ public sealed class LocationPage : ContentPage
 
         var privacy = new Label
         {
-            Text = "Privacy: device permission and household sharing are separate choices. A shared location is visible to active members of your household and is retained as the latest fix until you stop sharing. Stopping sharing immediately removes the saved coordinates.",
+            Text = "Privacy: device permission and household sharing are separate choices. You choose each household member who can view your location. New members get no access automatically. Stopping sharing immediately removes saved coordinates and all viewer grants.",
             FontSize = 12,
             LineBreakMode = LineBreakMode.WordWrap
         };
@@ -91,7 +96,7 @@ public sealed class LocationPage : ContentPage
             Content = new VerticalStackLayout
             {
                 Spacing = 12,
-                Children = { heading, explanation, _consentStatus, _enable, _update, _disable, _sharingStatus, _enableSharing, _shareNow, _stopSharing, _familyStatus, _refreshFamily, _fixStatus, privacy }
+                Children = { heading, explanation, _consentStatus, _enable, _update, _disable, _sharingStatus, _enableSharing, _viewerStatus, _viewerControls, _shareNow, _stopSharing, _familyStatus, _refreshFamily, _fixStatus, privacy }
             }
         };
         card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
@@ -139,6 +144,7 @@ public sealed class LocationPage : ContentPage
             _sharingStatus.Text = _sharingEnabled
                 ? "Household sharing is enabled. Only locations you explicitly submit are shared."
                 : "Household sharing is off. Your coordinates are not sent to the server.";
+            await LoadViewerGrantsAsync();
             await RefreshFamilyLocationsAsync();
         }
         catch (Exception ex)
@@ -167,6 +173,74 @@ public sealed class LocationPage : ContentPage
         catch (Exception ex)
         {
             _sharingStatus.Text = $"Could not update household sharing: {ex.Message}";
+        }
+    }
+
+    private async Task LoadViewerGrantsAsync()
+    {
+        try
+        {
+            var viewers = await _api.GetLocationViewersAsync();
+            _viewerControls.Children.Clear();
+            if (viewers.Count == 0)
+            {
+                _viewerStatus.Text = "There are no other active household members to grant access to.";
+                return;
+            }
+
+            _viewerStatus.Text = "Location access is private until you explicitly allow a person below.";
+            foreach (var viewer in viewers)
+            {
+                var row = new HorizontalStackLayout
+                {
+                    Spacing = 10,
+                    VerticalOptions = LayoutOptions.Center
+                };
+                var name = new Label
+                {
+                    Text = viewer.DisplayName,
+                    VerticalOptions = LayoutOptions.Center,
+                    HorizontalOptions = LayoutOptions.FillAndExpand
+                };
+                name.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
+                var action = new Button
+                {
+                    Text = viewer.CanView ? "Revoke access" : "Allow access",
+                    FontSize = 12,
+                    Padding = new Thickness(10, 6),
+                    CommandParameter = viewer.MemberId
+                };
+                action.Clicked += async (_, _) => await ChangeViewerGrantAsync(
+                    viewer.MemberId, !viewer.CanView, viewer.DisplayName);
+                row.Children.Add(name);
+                row.Children.Add(action);
+                _viewerControls.Children.Add(row);
+            }
+        }
+        catch (Exception ex)
+        {
+            _viewerStatus.Text = $"Could not load location access list: {ex.Message}";
+        }
+    }
+
+    private async Task ChangeViewerGrantAsync(Guid viewerMemberId, bool enabled, string displayName)
+    {
+        if (enabled && !await DisplayAlertAsync("Allow location access?",
+            $"{displayName} will be able to see the latest location you share. This does not enable tracking or share your current coordinates by itself.",
+            "Allow", "Cancel")) return;
+        if (!enabled && !await DisplayAlertAsync("Revoke location access?",
+            $"{displayName} will no longer be able to see your shared location.",
+            "Revoke", "Cancel")) return;
+
+        try
+        {
+            await _api.SetLocationViewerAsync(viewerMemberId, enabled);
+            await LoadViewerGrantsAsync();
+            await RefreshFamilyLocationsAsync();
+        }
+        catch (Exception ex)
+        {
+            _viewerStatus.Text = $"Could not update access for {displayName}: {ex.Message}";
         }
     }
 
