@@ -57,6 +57,22 @@ public sealed class FamilyApiClient
         => SendNoContentAsync(HttpMethod.Put, $"api/location/viewers/{viewerMemberId:D}",
             JsonContent.Create(new { enabled }, options: JsonOptions), ct);
 
+    public Task<List<SavedPlaceDto>> GetSavedPlacesAsync(CancellationToken ct = default)
+        => SendAsync<List<SavedPlaceDto>>(HttpMethod.Get, "api/location/places", null, ct);
+
+    public Task<SavedPlaceDto> CreateSavedPlaceAsync(string name, double latitude, double longitude,
+        double radiusMeters, bool alertOnArrival, bool alertOnDeparture, CancellationToken ct = default)
+        => SendAsync<SavedPlaceDto>(HttpMethod.Post, "api/location/places",
+            JsonContent.Create(new { name, latitude, longitude, radiusMeters, alertOnArrival, alertOnDeparture }, options: JsonOptions), ct);
+
+    public Task UpdateSavedPlaceAsync(Guid placeId, string name, double latitude, double longitude,
+        double radiusMeters, bool alertOnArrival, bool alertOnDeparture, CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Put, $"api/location/places/{placeId:D}",
+            JsonContent.Create(new { name, latitude, longitude, radiusMeters, alertOnArrival, alertOnDeparture }, options: JsonOptions), ct);
+
+    public Task DeleteSavedPlaceAsync(Guid placeId, CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Delete, $"api/location/places/{placeId:D}", null, ct);
+
     private async Task<T> SendAsync<T>(HttpMethod method, string path, HttpContent? content, CancellationToken ct)
     {
         var token = await _auth.GetAccessTokenAsync(ct);
@@ -130,3 +146,5 @@ public sealed record FamilyMemberDto(Guid Id, Guid UserId, string DisplayName, s
 public sealed record LocationConsentDto(bool SharingEnabled, DateTime? ConsentUpdatedAtUtc);
 public sealed record FamilyLocationDto(Guid MemberId, string DisplayName, double? Latitude, double? Longitude, double? AccuracyMeters, DateTime? UpdatedAtUtc);
 public sealed record LocationViewerDto(Guid MemberId, string DisplayName, bool CanView);
+
+public sealed record SavedPlaceDto(Guid Id, string Name, double Latitude, double Longitude, double RadiusMeters, bool AlertOnArrival, bool AlertOnDeparture, bool CanEdit);
