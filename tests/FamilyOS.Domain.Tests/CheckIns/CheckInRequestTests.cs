@@ -106,9 +106,10 @@ public class CheckInRequestTests
     [Fact]
     public void Effective_status_becomes_overdue_without_blocking_safe_response()
     {
-        var request = CreateRequest(DateTime.UtcNow.AddMinutes(-1));
+        var dueAtUtc = DateTime.UtcNow.AddHours(1);
+        var request = CreateRequest(dueAtUtc);
 
-        request.GetEffectiveStatus(DateTime.UtcNow).Should().Be("Overdue");
+        request.GetEffectiveStatus(dueAtUtc.AddSeconds(1)).Should().Be("Overdue");
         request.Status.Should().Be("Pending");
 
         request.RespondSafe(null);
