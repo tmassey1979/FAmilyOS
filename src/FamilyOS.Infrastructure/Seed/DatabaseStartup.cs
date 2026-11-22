@@ -16,7 +16,8 @@ public static class DatabaseStartup
         bool applyMigrations,
         CancellationToken cancellationToken = default)
     {
-        await db.Database.CanConnectAsync(cancellationToken);
+        if (!await db.Database.CanConnectAsync(cancellationToken))
+            throw new InvalidOperationException("FamilyOS database is not reachable; refusing to start the API.");
 
         var applied = (await db.Database.GetAppliedMigrationsAsync(cancellationToken)).ToArray();
         var pending = (await db.Database.GetPendingMigrationsAsync(cancellationToken)).ToArray();
@@ -75,7 +76,7 @@ public static class DatabaseStartup
         try
         {
             await using var command = connection.CreateCommand();
-            command.CommandText = "SELECT to_regclass('familyos.\\"Users\\"') IS NOT NULL;";
+            command.CommandText = "SELECT to_regclass(format('%I.%I', 'familyos', 'Users')) IS NOT NULL;";
             var result = await command.ExecuteScalarAsync(cancellationToken);
             return result is bool exists && exists;
         }
