@@ -536,6 +536,53 @@ public sealed class LocationController : ControllerBase
         return Ok(locations);
     }
 
+    [HttpPost("sos")]
+    public async Task<IActionResult> SendSos([FromBody] SosBody body, CancellationToken ct)
+    {
+        var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
+        if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
+
+        if (body.Message?.Length > 500)
+            return BadRequest(new { error = "The emergency message must be 500 characters or fewer." });
+
+        string? mapLink = null;
+        if (body.IncludeLocation)
+        {
+            if (body.Latitude is not double latitude || body.Longitude is not double longitude
+                || !double.IsFinite(latitude) || !double.IsFinite(longitude)
+                || latitude is < -90 or > 90 || longitude is < -180 or > 180)
+                return BadRequest(new { error = "A valid one-time location fix is required when including location." });
+
+            mapLink = FormattableString.Invariant(
+                $"https://www.openstreetmap.org/?mlat={latitude:F6}&mlon={longitude:F6}#map=16/{latitude:F6}/{longitude:F6}");
+        }
+        else if (body.Latitude.HasValue || body.Longitude.HasValue)
+        {
+            return BadRequest(new { error = "Location coordinates were supplied without explicit location consent." });
+        }
+
+        var sender = await _db.FamilyMembers.AsNoTracking()
+            .SingleAsync(x => x.Id == memberId && x.FamilyId == familyId && x.IsActive, ct);
+        var recipients = await _db.FamilyMembers.AsNoTracking()
+            .Where(x => x.FamilyId == familyId && x.IsActive && x.Id != memberId)
+            .Select(x => x.Id).ToListAsync(ct);
+        if (recipients.Count == 0)
+            return Conflict(new { error = "There are no other active household members to alert." });
+
+        var message = string.IsNullOrWhiteSpace(body.Message)
+            ? $"{sender.DisplayName} sent an emergency SOS alert."
+            : $"{sender.DisplayName} sent an emergency SOS alert: {body.Message.Trim()}";
+        if (mapLink is not null)
+            message += $" One-time location shared with this alert: {mapLink}";
+
+        foreach (var recipientId in recipients)
+            _db.Notifications.Add(Notification.Create(familyId, recipientId,
+                NotificationType.EmergencySos, "EMERGENCY SOS", message, null, "EmergencySos"));
+
+        await _db.SaveChangesAsync(ct);
+        return Ok(new { alertsSent = recipients.Count, locationIncluded = mapLink is not null });
+    }
+
     private Task<bool> IsActiveMemberAsync(Guid familyId, Guid memberId, CancellationToken ct)
         => _db.FamilyMembers.AnyAsync(x => x.Id == memberId && x.FamilyId == familyId && x.IsActive, ct);
 
@@ -546,5 +593,5 @@ public sealed class LocationController : ControllerBase
     public sealed record PlaceDto(Guid Id, string Name, double Latitude, double Longitude, double RadiusMeters, bool AlertOnArrival, bool AlertOnDeparture, bool CanEdit);
     public sealed record ConsentBody(bool Enabled);
     public sealed record ViewerGrantBody(bool Enabled);
-    public sealed record LocationBody(double Latitude, double Longitude, double AccuracyMeters, DateTimeOffset MeasuredAtUtc);
+    public sealed record LocationBody(double Latitude, double Longitude, double AccuracyMeters, DateTimeOffset MeasuredAtUtc);\n    public sealed record SosBody(string? Message, bool IncludeLocation, double? Latitude, double? Longitude);
 }
