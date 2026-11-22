@@ -22,6 +22,7 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<IThemeService, ThemeService>();
         builder.Services.AddTransient<StartupDiagnosticsPage>();
+        builder.Services.AddTransient<AccessTokenPage>();
         builder.Services.AddSingleton<HttpClient>();
         builder.Services.AddSingleton<IAuthSessionService, KeycloakAuthService>();
         builder.Services.AddSingleton<AppShell>();
