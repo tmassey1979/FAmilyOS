@@ -268,7 +268,7 @@ public sealed class LocationController : ControllerBase
 
             foreach (var place in places)
             {
-                var distance = DistanceMeters(body.Latitude, body.Longitude, place.Latitude, place.Longitude);
+                var distance = GeofenceMath.DistanceMeters(body.Latitude, body.Longitude, place.Latitude, place.Longitude);
                 var presence = await _db.MemberPlacePresences.SingleOrDefaultAsync(x =>
                     x.FamilyId == familyId && x.PlaceId == place.Id && x.MemberId == memberId && !x.IsDeleted, ct);
                 if (presence is null)
@@ -279,7 +279,7 @@ public sealed class LocationController : ControllerBase
                         FamilyId = familyId,
                         PlaceId = place.Id,
                         MemberId = memberId,
-                        IsInside = distance <= place.RadiusMeters,
+                        IsInside = GeofenceMath.IsInside(false, distance, place.RadiusMeters),
                         LastLocationUpdatedAtUtc = measuredAt
                     });
                     continue;
@@ -289,9 +289,7 @@ public sealed class LocationController : ControllerBase
                     continue;
 
                 // A 25m exit buffer prevents GPS drift at the boundary from spamming alerts.
-                var isInside = presence.IsInside
-                    ? distance <= place.RadiusMeters + 25
-                    : distance <= place.RadiusMeters;
+                var isInside = GeofenceMath.IsInside(presence.IsInside, distance, place.RadiusMeters);
                 var changed = isInside != presence.IsInside;
                 presence.LastLocationUpdatedAtUtc = measuredAt;
                 if (!changed)
@@ -327,17 +325,6 @@ public sealed class LocationController : ControllerBase
         }
 
         return NoContent();
-    }
-
-    private static double DistanceMeters(double latitude1, double longitude1, double latitude2, double longitude2)
-    {
-        const double earthRadiusMeters = 6_371_000;
-        var dLat = (latitude2 - latitude1) * Math.PI / 180;
-        var dLon = (longitude2 - longitude1) * Math.PI / 180;
-        var a = Math.Pow(Math.Sin(dLat / 2), 2)
-            + Math.Cos(latitude1 * Math.PI / 180) * Math.Cos(latitude2 * Math.PI / 180)
-            * Math.Pow(Math.Sin(dLon / 2), 2);
-        return earthRadiusMeters * 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
     }
 
     [HttpGet("family")]
