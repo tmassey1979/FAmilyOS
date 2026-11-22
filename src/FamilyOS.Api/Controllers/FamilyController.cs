@@ -73,13 +73,22 @@ public class FamilyController : ControllerBase
     public async Task<ActionResult<MemberDto>> Deactivate(Guid id, CancellationToken ct)
     {
         var member = await _mediator.Send(new DeactivateMemberCommand(id), ct);
-        await _db.MemberLocationViewerGrants.Where(x => x.SharingMemberId == id || x.ViewerMemberId == id).ExecuteDeleteAsync(ct);
-        var location = await _db.MemberLocations.SingleOrDefaultAsync(x => x.MemberId == id, ct);
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        // Serialize cleanup with any in-flight viewer grant operation for this member.
+        var location = await _db.MemberLocations
+            .FromSqlInterpolated($"""
+                SELECT * FROM familyos."MemberLocations"
+                WHERE "MemberId" = {id}
+                FOR UPDATE
+                """)
+            .SingleOrDefaultAsync(ct);
+        await _db.MemberLocationViewerGrants
+            .Where(x => x.SharingMemberId == id || x.ViewerMemberId == id)
+            .ExecuteDeleteAsync(ct);
         if (location is not null)
-        {
             _db.MemberLocations.Remove(location);
-            await _db.SaveChangesAsync(ct);
-        }
+        await _db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return Ok(member);
     }
 
