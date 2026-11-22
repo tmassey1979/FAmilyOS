@@ -1,5 +1,7 @@
 using FamilyOS.Application.Interfaces;
 using FamilyOS.Domain.Location;
+using FamilyOS.Domain.Common;
+using FamilyOS.Domain.Notifications;
 using FamilyOS.Infrastructure.Identity;
 using FamilyOS.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -16,11 +18,13 @@ public sealed class LocationController : ControllerBase
     private static readonly TimeSpan MaximumAge = TimeSpan.FromHours(24);
     private readonly FamilyOsDbContext _db;
     private readonly ICurrentUserService _current;
+    private readonly IPushNotificationSender _push;
 
-    public LocationController(FamilyOsDbContext db, ICurrentUserService current)
+    public LocationController(FamilyOsDbContext db, ICurrentUserService current, IPushNotificationSender push)
     {
         _db = db;
         _current = current;
+        _push = push;
     }
 
     [HttpGet("consent")]
@@ -130,6 +134,98 @@ public sealed class LocationController : ControllerBase
         return NoContent();
     }
 
+
+    [HttpGet("places")]
+    public async Task<IActionResult> GetPlaces(CancellationToken ct)
+    {
+        var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
+        if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
+        var places = await _db.SavedPlaces.AsNoTracking()
+            .Where(x => x.FamilyId == familyId && x.IsActive && !x.IsDeleted)
+            .OrderBy(x => x.Name)
+            .Select(x => new PlaceDto(x.Id, x.Name, x.Latitude, x.Longitude, x.RadiusMeters,
+                x.AlertOnArrival, x.AlertOnDeparture, x.CreatedByMemberId == memberId))
+            .ToListAsync(ct);
+        return Ok(places);
+    }
+
+    [HttpPost("places")]
+    public async Task<IActionResult> CreatePlace([FromBody] PlaceBody body, CancellationToken ct)
+    {
+        var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
+        if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
+        var validation = ValidatePlace(body);
+        if (validation is not null) return BadRequest(new { error = validation });
+        var place = new SavedPlace
+        {
+            FamilyId = familyId,
+            CreatedByMemberId = memberId,
+            Name = body.Name.Trim(),
+            Latitude = body.Latitude,
+            Longitude = body.Longitude,
+            RadiusMeters = body.RadiusMeters,
+            AlertOnArrival = body.AlertOnArrival,
+            AlertOnDeparture = body.AlertOnDeparture
+        };
+        _db.SavedPlaces.Add(place);
+        await _db.SaveChangesAsync(ct);
+        return CreatedAtAction(nameof(GetPlaces), new { }, new PlaceDto(place.Id, place.Name,
+            place.Latitude, place.Longitude, place.RadiusMeters, place.AlertOnArrival,
+            place.AlertOnDeparture, true));
+    }
+
+    [HttpPut("places/{placeId:guid}")]
+    public async Task<IActionResult> UpdatePlace(Guid placeId, [FromBody] PlaceBody body, CancellationToken ct)
+    {
+        var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
+        if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
+        var validation = ValidatePlace(body);
+        if (validation is not null) return BadRequest(new { error = validation });
+        var place = await _db.SavedPlaces.SingleOrDefaultAsync(x =>
+            x.Id == placeId && x.FamilyId == familyId && x.IsActive && !x.IsDeleted, ct);
+        if (place is null) return NotFound();
+        if (place.CreatedByMemberId != memberId) return Forbid();
+        place.Name = body.Name.Trim();
+        place.Latitude = body.Latitude;
+        place.Longitude = body.Longitude;
+        place.RadiusMeters = body.RadiusMeters;
+        place.AlertOnArrival = body.AlertOnArrival;
+        place.AlertOnDeparture = body.AlertOnDeparture;
+        place.MarkUpdated();
+        await _db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
+    [HttpDelete("places/{placeId:guid}")]
+    public async Task<IActionResult> DeletePlace(Guid placeId, CancellationToken ct)
+    {
+        var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
+        if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
+        var place = await _db.SavedPlaces.SingleOrDefaultAsync(x =>
+            x.Id == placeId && x.FamilyId == familyId && x.IsActive && !x.IsDeleted, ct);
+        if (place is null) return NotFound();
+        if (place.CreatedByMemberId != memberId) return Forbid();
+        place.IsActive = false;
+        place.SoftDelete();
+        await _db.MemberPlacePresences
+            .Where(x => x.FamilyId == familyId && x.PlaceId == placeId)
+            .ExecuteDeleteAsync(ct);
+        await _db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
+    private static string? ValidatePlace(PlaceBody body)
+    {
+        if (string.IsNullOrWhiteSpace(body.Name) || body.Name.Trim().Length > 120)
+            return "Place name must contain 1 to 120 characters.";
+        if (!double.IsFinite(body.Latitude) || body.Latitude is < -90 or > 90
+            || !double.IsFinite(body.Longitude) || body.Longitude is < -180 or > 180)
+            return "Place coordinates are outside valid bounds.";
+        if (!double.IsFinite(body.RadiusMeters) || body.RadiusMeters is < 50 or > 5000)
+            return "Geofence radius must be between 50 and 5,000 meters.";
+        return null;
+    }
+
     [HttpPost("current")]
     public async Task<IActionResult> UpdateCurrentLocation([FromBody] LocationBody body, CancellationToken ct)
     {
@@ -196,7 +292,7 @@ public sealed class LocationController : ControllerBase
     private Task<bool> IsActiveMemberAsync(Guid familyId, Guid memberId, CancellationToken ct)
         => _db.FamilyMembers.AnyAsync(x => x.Id == memberId && x.FamilyId == familyId && x.IsActive, ct);
 
-    public sealed record ConsentBody(bool Enabled);
+    public sealed record PlaceBody(string Name, double Latitude, double Longitude, double RadiusMeters, bool AlertOnArrival, bool AlertOnDeparture);\n    public sealed record PlaceDto(Guid Id, string Name, double Latitude, double Longitude, double RadiusMeters, bool AlertOnArrival, bool AlertOnDeparture, bool CanEdit);\n    public sealed record ConsentBody(bool Enabled);
     public sealed record ViewerGrantBody(bool Enabled);
     public sealed record LocationBody(double Latitude, double Longitude, double AccuracyMeters, DateTimeOffset MeasuredAtUtc);
 }
