@@ -1,4 +1,5 @@
 using FamilyOS.Maui.Services;
+using System.Globalization;
 
 namespace FamilyOS.Maui.Pages;
 
@@ -322,15 +323,50 @@ public sealed class TasksPage : ContentPage
 
     private async Task CreateTaskAsync()
     {
-        var title = await DisplayPromptAsync("New task", "Title", "Create", "Cancel", maxLength: 120);
+        var title = await DisplayPromptAsync("New task", "What needs to get done?", "Next", "Cancel", maxLength: 120);
         if (string.IsNullOrWhiteSpace(title)) return;
 
+        var description = await DisplayPromptAsync("Task details", "Add instructions or context (optional):", "Next", "Skip", maxLength: 1000);
         var priority = await DisplayActionSheetAsync("Priority", "Cancel", null, "Low", "Normal", "High", "Urgent");
         if (priority is null or "Cancel") priority = "Normal";
 
+        var category = await DisplayPromptAsync("Category", "Optional category (for example: Chores, School, Home):", "Next", "Skip", maxLength: 60);
+        var dueText = await DisplayPromptAsync("Due date", "Optional date in YYYY-MM-DD format:", "Next", "Skip", maxLength: 10);
+        DateTime? dueDate = null;
+        if (!string.IsNullOrWhiteSpace(dueText))
+        {
+            if (!DateTime.TryParseExact(dueText.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var parsedDate))
+            {
+                await DisplayAlertAsync("Invalid date", "Enter the due date as YYYY-MM-DD, or leave it blank.", "OK");
+                return;
+            }
+
+            dueDate = DateTime.SpecifyKind(parsedDate.Date.AddHours(23).AddMinutes(59), DateTimeKind.Local).ToUniversalTime();
+        }
+
+        var estimateText = await DisplayPromptAsync("Time estimate", "Estimated minutes (optional):", "Create", "Skip", maxLength: 5, keyboard: Keyboard.Numeric);
+        int? estimate = null;
+        if (!string.IsNullOrWhiteSpace(estimateText))
+        {
+            if (!int.TryParse(estimateText, NumberStyles.None, CultureInfo.InvariantCulture, out var minutes) || minutes is < 1 or > 10080)
+            {
+                await DisplayAlertAsync("Invalid estimate", "Enter a whole number from 1 to 10080 minutes, or leave it blank.", "OK");
+                return;
+            }
+
+            estimate = minutes;
+        }
+
         try
         {
-            await _tasks.CreateTaskAsync(new CreateTaskBody(title.Trim(), Priority: priority));
+            await _tasks.CreateTaskAsync(new CreateTaskBody(
+                title.Trim(),
+                Description: string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+                Priority: priority,
+                Category: string.IsNullOrWhiteSpace(category) ? null : category.Trim(),
+                DueDate: dueDate,
+                EstimatedDurationMinutes: estimate));
             _status.Text = "Task created.";
             await LoadAsync();
         }
