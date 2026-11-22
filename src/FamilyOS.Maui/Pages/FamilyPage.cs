@@ -1,3 +1,4 @@
+using System.Net;
 using FamilyOS.Maui.Services;
 
 namespace FamilyOS.Maui.Pages;
@@ -204,9 +205,7 @@ public sealed class FamilyPage : ContentPage
         {
             var invite = await _family.CreateInviteAsync(role, string.IsNullOrWhiteSpace(email) ? null : email.Trim());
             await Microsoft.Maui.ApplicationModel.Clipboard.Default.SetTextAsync(invite.Code);
-            await DisplayAlertAsync("Invitation created", $"Code: {invite.Code}
-
-Copied to clipboard. Expires {invite.ExpiresAtUtc.ToLocalTime():g}.", "Done");
+            await DisplayAlertAsync("Invitation created", $"Code: {invite.Code}\n\nCopied to clipboard. Expires {invite.ExpiresAtUtc.ToLocalTime():g}.", "Done");
             await LoadInvitesAsync();
         }
         catch (FamilyApiException ex) { await DisplayAlertAsync("Could not create invitation", ex.Message, "OK"); }
