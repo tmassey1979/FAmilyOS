@@ -16,6 +16,7 @@ public sealed class LocationPage : ContentPage
     private readonly Label _viewerStatus;
     private bool _sharingEnabled;
     private bool _hasViewerGrant;
+    private bool _historyEnabled;
     private readonly Label _trackingStatus;
     private readonly Button _startTracking;
     private readonly Button _stopTracking;
@@ -154,9 +155,9 @@ public sealed class LocationPage : ContentPage
         _update.IsEnabled = enabled && !_busy;
         _disable.IsEnabled = enabled && !_busy;
         _enableSharing.IsEnabled = !_busy && enabled && !_sharingEnabled;
-        _shareNow.IsEnabled = !_busy && enabled && _sharingEnabled && _lastLocation is not null;
+        _shareNow.IsEnabled = !_busy && enabled && _sharingEnabled && _hasViewerGrant && _lastLocation is not null;
         _stopSharing.IsEnabled = !_busy && _sharingEnabled;
-        _startTracking.IsEnabled = !_busy && enabled && _sharingEnabled && _hasViewerGrant;
+        _startTracking.IsEnabled = !_busy && enabled && _sharingEnabled && (_hasViewerGrant || _historyEnabled);
 #if ANDROID
         var tracking = FamilyOS.Maui.Platforms.Android.LocationTrackingForegroundService.IsTracking;
         _trackingStatus.Text = tracking
@@ -220,6 +221,7 @@ public sealed class LocationPage : ContentPage
         try
         {
             var result = await _api.GetLocationHistoryConsentAsync();
+            _historyEnabled = result.HistoryEnabled;
             _historySwitch.IsToggled = result.HistoryEnabled;
             _historyStatus.Text = result.HistoryEnabled
                 ? "Location history is on. Uploaded points are visible only to people you allowed and are automatically deleted after 30 days."
@@ -227,6 +229,7 @@ public sealed class LocationPage : ContentPage
         }
         catch (Exception ex)
         {
+            _historyEnabled = false;
             _historyStatus.Text = $"Could not load history settings: {ex.Message}";
         }
         finally
@@ -264,6 +267,8 @@ public sealed class LocationPage : ContentPage
         {
             var result = await _api.SetLocationHistoryConsentAsync(enabled);
             _loadingHistorySwitch = true;
+            _historyEnabled = result.HistoryEnabled;
+            _historyEnabled = result.HistoryEnabled;
             _historySwitch.IsToggled = result.HistoryEnabled;
             _loadingHistorySwitch = false;
             _historyStatus.Text = result.HistoryEnabled
@@ -274,6 +279,7 @@ public sealed class LocationPage : ContentPage
         {
             _loadingHistorySwitch = true;
             _historySwitch.IsToggled = !enabled;
+            _historyEnabled = !enabled;
             _loadingHistorySwitch = false;
             _historyStatus.Text = $"Could not update history settings: {ex.Message}";
         }
@@ -380,7 +386,7 @@ public sealed class LocationPage : ContentPage
 
     private async Task ShareCurrentLocationAsync()
     {
-        if (!_sharingEnabled || _lastLocation is null) return;
+        if (!_sharingEnabled || !_hasViewerGrant || _lastLocation is null) return;
         if (!_lastLocation.Accuracy.HasValue)
         {
             _fixStatus.Text = "Android did not provide an accuracy estimate. Get another fix before sharing.";
@@ -508,10 +514,12 @@ public sealed class LocationPage : ContentPage
 
     private async Task StartTrackingAsync()
     {
-        if (!_location.IsEnabled || !_sharingEnabled || !_hasViewerGrant)
+        if (!_location.IsEnabled || !_sharingEnabled || (!_hasViewerGrant && !_historyEnabled))
             return;
         if (!await DisplayAlertAsync("Start continuous location sharing?",
-            "FamilyOS will update your location about once a minute while this Android foreground service is running. A persistent notification will remain visible, and you can stop tracking at any time. Your location is visible only to household members you explicitly allowed.",
+            _hasViewerGrant
+                ? "FamilyOS will update your location about once a minute while this Android foreground service is running. A persistent notification will remain visible, and you can stop tracking at any time. Your location is visible only to household members you explicitly allowed."
+                : "FamilyOS will record your location history about once a minute while this Android foreground service is running. No household member can see your location unless you separately grant access. A persistent notification will remain visible, and you can stop tracking at any time.",
             "Start tracking", "Cancel")) return;
 
 #if ANDROID
