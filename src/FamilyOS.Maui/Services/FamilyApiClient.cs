@@ -50,6 +50,15 @@ public sealed class FamilyApiClient
     public Task CancelCheckInAsync(Guid id, CancellationToken ct = default)
         => SendNoContentAsync(HttpMethod.Post, $"api/checkins/{id:D}/cancel", null, ct);
 
+    public Task<SosResultDto> SendSosAsync(string? message, double? latitude, double? longitude, CancellationToken ct = default)
+        => SendAsync<SosResultDto>(HttpMethod.Post, "api/location/sos", JsonContent.Create(new
+        {
+            Message = message,
+            IncludeLocation = latitude.HasValue && longitude.HasValue,
+            Latitude = latitude,
+            Longitude = longitude
+        }), ct);
+
     public Task<LocationConsentDto> GetLocationConsentAsync(CancellationToken ct = default)
         => SendAsync<LocationConsentDto>(HttpMethod.Get, "api/location/consent", null, ct);
 
@@ -189,7 +198,7 @@ public sealed class FamilyApiClient
 public sealed record FamilyInviteDto(Guid Id, string Code, string Role, string? EmailHint, DateTime ExpiresAtUtc, bool IsOpen, DateTime? AcceptedAtUtc);
 public sealed record FamilyDto(Guid Id, string Name, string? TimeZone, string? Currency, List<FamilyMemberDto> Members, Guid CurrentMemberId);
 public sealed record FamilyMemberDto(Guid Id, Guid UserId, string DisplayName, string Role, bool IsActive);
-public sealed record LocationConsentDto(bool SharingEnabled, DateTime? ConsentUpdatedAtUtc);
+public sealed record SosResultDto(int AlertsSent, bool LocationIncluded);\npublic sealed record LocationConsentDto(bool SharingEnabled, DateTime? ConsentUpdatedAtUtc);
 public sealed record FamilyLocationDto(Guid MemberId, string DisplayName, double? Latitude, double? Longitude, double? AccuracyMeters, DateTime? UpdatedAtUtc);
 public sealed record LocationViewerDto(Guid MemberId, string DisplayName, bool CanView);
 
