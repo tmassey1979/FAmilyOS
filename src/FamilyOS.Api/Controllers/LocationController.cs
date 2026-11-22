@@ -201,6 +201,60 @@ public sealed class LocationController : ControllerBase
         return Ok(points);
     }
 
+    [HttpGet("trips/{targetMemberId:guid}")]
+    public async Task<IActionResult> GetTrips(Guid targetMemberId,
+        [FromQuery] DateTimeOffset? fromUtc, [FromQuery] DateTimeOffset? toUtc, CancellationToken ct)
+    {
+        var (familyId, viewerMemberId, _) = await _current.RequireFamilyAsync(ct);
+        if (!await IsActiveMemberAsync(familyId, viewerMemberId, ct)) return Forbid();
+        if (!await IsActiveMemberAsync(familyId, targetMemberId, ct)) return NotFound();
+        var source = await _db.MemberLocations.AsNoTracking().SingleOrDefaultAsync(x =>
+            x.FamilyId == familyId && x.MemberId == targetMemberId && x.SharingEnabled && x.HistoryEnabled, ct);
+        if (source is null) return NotFound();
+        if (targetMemberId != viewerMemberId && !await _db.MemberLocationViewerGrants.AnyAsync(x =>
+            x.FamilyId == familyId && x.SharingMemberId == targetMemberId && x.ViewerMemberId == viewerMemberId, ct))
+            return Forbid();
+
+        var now = DateTimeOffset.UtcNow;
+        var end = toUtc ?? now;
+        var start = fromUtc ?? end.AddHours(-24);
+        if (end > now.AddMinutes(5) || start < now.AddDays(-30) || start >= end || end - start > TimeSpan.FromDays(7))
+            return BadRequest(new { error = "Trip range must be within the last 30 days and no longer than 7 days." });
+
+        var points = await _db.MemberLocationHistory.AsNoTracking()
+            .Where(x => x.FamilyId == familyId && x.MemberId == targetMemberId
+                && x.RecordedAtUtc >= start.UtcDateTime && x.RecordedAtUtc <= end.UtcDateTime)
+            .OrderBy(x => x.RecordedAtUtc)
+            .Select(x => new HistoryPointDto(x.Latitude, x.Longitude, x.AccuracyMeters, x.RecordedAtUtc))
+            .ToListAsync(ct);
+
+        var trips = new List<TripDto>();
+        var segment = new List<HistoryPointDto>();
+        void FinishSegment()
+        {
+            if (segment.Count < 2) { segment.Clear(); return; }
+            var distance = 0d;
+            for (var i = 1; i < segment.Count; i++)
+                distance += GeofenceMath.DistanceMeters(segment[i - 1].Latitude, segment[i - 1].Longitude,
+                    segment[i].Latitude, segment[i].Longitude);
+            var duration = segment[^1].RecordedAtUtc - segment[0].RecordedAtUtc;
+            if (distance >= 500 && duration >= TimeSpan.FromMinutes(2))
+                trips.Add(new TripDto(segment[0].RecordedAtUtc, segment[^1].RecordedAtUtc,
+                    segment[0].Latitude, segment[0].Longitude, segment[^1].Latitude,
+                    segment[^1].Longitude, Math.Round(distance), duration.TotalMinutes));
+            segment.Clear();
+        }
+
+        foreach (var point in points)
+        {
+            if (segment.Count > 0 && point.RecordedAtUtc - segment[^1].RecordedAtUtc > TimeSpan.FromMinutes(10))
+                FinishSegment();
+            segment.Add(point);
+        }
+        FinishSegment();
+        return Ok(trips);
+    }
+
     [HttpDelete("history")]
     public async Task<IActionResult> ClearMyLocationHistory(CancellationToken ct)
     {
@@ -456,7 +510,7 @@ public sealed class LocationController : ControllerBase
     private Task<bool> IsActiveMemberAsync(Guid familyId, Guid memberId, CancellationToken ct)
         => _db.FamilyMembers.AnyAsync(x => x.Id == memberId && x.FamilyId == familyId && x.IsActive, ct);
 
-    public sealed record HistoryConsentBody(bool Enabled);\n    public sealed record HistoryPointDto(double Latitude, double Longitude, double AccuracyMeters, DateTime RecordedAtUtc);\n    public sealed record PlaceBody(string Name, double Latitude, double Longitude, double RadiusMeters, bool AlertOnArrival, bool AlertOnDeparture);\n    public sealed record PlaceDto(Guid Id, string Name, double Latitude, double Longitude, double RadiusMeters, bool AlertOnArrival, bool AlertOnDeparture, bool CanEdit);\n    public sealed record ConsentBody(bool Enabled);
+    public sealed record HistoryConsentBody(bool Enabled);\n    public sealed record HistoryPointDto(double Latitude, double Longitude, double AccuracyMeters, DateTime RecordedAtUtc);\n    public sealed record TripDto(DateTime StartedAtUtc, DateTime EndedAtUtc, double StartLatitude, double StartLongitude, double EndLatitude, double EndLongitude, double DistanceMeters, double DurationMinutes);\n    public sealed record PlaceBody(string Name, double Latitude, double Longitude, double RadiusMeters, bool AlertOnArrival, bool AlertOnDeparture);\n    public sealed record PlaceDto(Guid Id, string Name, double Latitude, double Longitude, double RadiusMeters, bool AlertOnArrival, bool AlertOnDeparture, bool CanEdit);\n    public sealed record ConsentBody(bool Enabled);
     public sealed record ViewerGrantBody(bool Enabled);
     public sealed record LocationBody(double Latitude, double Longitude, double AccuracyMeters, DateTimeOffset MeasuredAtUtc);
 }
