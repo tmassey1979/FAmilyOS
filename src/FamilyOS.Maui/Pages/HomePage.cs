@@ -27,6 +27,7 @@ public sealed class HomePage : ContentPage
 
         _content = new VerticalStackLayout { Padding = new Thickness(20, 12), Spacing = 16 };
 
+        // Navy mark + navy wordmark — readable on light BgPage / BgSurface.
         var brand = new HorizontalStackLayout
         {
             Spacing = 10,
@@ -43,7 +44,7 @@ public sealed class HomePage : ContentPage
                 },
                 new Image
                 {
-                    Source = "logo_wordmark_on_dark.png",
+                    Source = "logo_wordmark.png",
                     HeightRequest = 24,
                     Aspect = Aspect.AspectFit,
                     VerticalOptions = LayoutOptions.Center
