@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FamilyOS.Application.Family;
 
-public record FamilyDto(Guid Id, string Name, string? TimeZone, string? Currency, List<MemberDto> Members);
+public record FamilyDto(Guid Id, string Name, string? TimeZone, string? Currency, List<MemberDto> Members, Guid CurrentMemberId);
 public record MemberDto(Guid Id, Guid UserId, string DisplayName, FamilyRole Role, bool IsActive);
 public record DeclineReasonDto(Guid Id, string Text, int SortOrder, bool IsEnabled);
 
@@ -44,7 +44,8 @@ public class FamilyQueryHandlers :
         return new FamilyDto(
             family.Id, family.Name, family.TimeZone, family.Currency,
             family.Members.Where(m => m.IsActive).Select(m =>
-                new MemberDto(m.Id, m.UserId, m.DisplayName, m.Role, m.IsActive)).ToList());
+                new MemberDto(m.Id, m.UserId, m.DisplayName, m.Role, m.IsActive)).ToList(),
+            _current.MemberId ?? throw new ForbiddenException("Not a family member."));
     }
 
     public async Task<List<DeclineReasonDto>> Handle(GetDeclineReasonsQuery query, CancellationToken ct)
