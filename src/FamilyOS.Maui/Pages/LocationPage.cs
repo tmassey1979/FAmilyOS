@@ -9,17 +9,26 @@ namespace FamilyOS.Maui.Pages;
 public sealed class LocationPage : ContentPage
 {
     private readonly DeviceLocationService _location;
+    private readonly FamilyApiClient _api;
+    private readonly Label _sharingStatus;
+    private readonly Label _familyStatus;
+    private bool _sharingEnabled;
     private readonly Label _consentStatus;
     private readonly Label _fixStatus;
     private readonly Button _enable;
     private readonly Button _update;
     private readonly Button _disable;
+    private readonly Button _enableSharing;
+    private readonly Button _shareNow;
+    private readonly Button _stopSharing;
+    private readonly Button _refreshFamily;
     private Location? _lastLocation;
     private bool _busy;
 
-    public LocationPage(DeviceLocationService location)
+    public LocationPage(DeviceLocationService location, FamilyApiClient api)
     {
         _location = location;
+        _api = api;
         Title = "Location";
 
         var heading = new Label
@@ -32,7 +41,7 @@ public sealed class LocationPage : ContentPage
 
         var explanation = new Label
         {
-            Text = "Location access is optional. FamilyOS only checks your location when you ask it to on this screen. This first release does not run background tracking or share coordinates with household members.",
+            Text = "Location access is optional. FamilyOS only checks your location when you ask. Household sharing is a separate opt-in, and coordinates are sent only when you explicitly tap Share this location. There is no background tracking.",
             FontSize = 14,
             LineBreakMode = LineBreakMode.WordWrap
         };
@@ -55,9 +64,22 @@ public sealed class LocationPage : ContentPage
         _disable = new Button { Text = "Turn off device location access", IsEnabled = false };
         _disable.Clicked += async (_, _) => await DisableAsync();
 
+        _sharingStatus = new Label { FontSize = 13 };
+        _sharingStatus.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+        _enableSharing = new Button { Text = "Enable household sharing", IsEnabled = false };
+        _enableSharing.Clicked += async (_, _) => await SetSharingAsync(true);
+        _shareNow = new Button { Text = "Share this location with my household", IsEnabled = false };
+        _shareNow.Clicked += async (_, _) => await ShareCurrentLocationAsync();
+        _stopSharing = new Button { Text = "Stop household sharing", IsEnabled = false };
+        _stopSharing.Clicked += async (_, _) => await SetSharingAsync(false);
+        _familyStatus = new Label { Text = "Household locations have not been loaded.", FontSize = 13, LineBreakMode = LineBreakMode.WordWrap };
+        _familyStatus.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
+        _refreshFamily = new Button { Text = "Refresh household locations", IsEnabled = true };
+        _refreshFamily.Clicked += async (_, _) => await RefreshFamilyLocationsAsync();
+
         var privacy = new Label
         {
-            Text = "Privacy: permission and consent are stored on this device. Coordinates are held in memory only for this screen session; they are not sent to FamilyOS servers.",
+            Text = "Privacy: device permission and household sharing are separate choices. A shared location is visible to active members of your household and is retained as the latest fix until you stop sharing. Stopping sharing immediately removes the saved coordinates.",
             FontSize = 12,
             LineBreakMode = LineBreakMode.WordWrap
         };
@@ -69,7 +91,7 @@ public sealed class LocationPage : ContentPage
             Content = new VerticalStackLayout
             {
                 Spacing = 12,
-                Children = { heading, explanation, _consentStatus, _enable, _update, _disable, _fixStatus, privacy }
+                Children = { heading, explanation, _consentStatus, _enable, _update, _disable, _sharingStatus, _enableSharing, _shareNow, _stopSharing, _familyStatus, _refreshFamily, _fixStatus, privacy }
             }
         };
         card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
@@ -87,10 +109,11 @@ public sealed class LocationPage : ContentPage
         RefreshState();
     }
 
-    protected override void OnAppearing()
+    protected override async void OnAppearing()
     {
         base.OnAppearing();
         RefreshState();
+        await LoadSharingStateAsync();
     }
 
     private void RefreshState()
@@ -102,6 +125,89 @@ public sealed class LocationPage : ContentPage
         _enable.IsVisible = !enabled;
         _update.IsEnabled = enabled && !_busy;
         _disable.IsEnabled = enabled && !_busy;
+        _enableSharing.IsEnabled = !_busy && enabled && !_sharingEnabled;
+        _shareNow.IsEnabled = !_busy && enabled && _sharingEnabled && _lastLocation is not null;
+        _stopSharing.IsEnabled = !_busy && _sharingEnabled;
+    }
+
+    private async Task LoadSharingStateAsync()
+    {
+        try
+        {
+            var consent = await _api.GetLocationConsentAsync();
+            _sharingEnabled = consent.SharingEnabled;
+            _sharingStatus.Text = _sharingEnabled
+                ? "Household sharing is enabled. Only locations you explicitly submit are shared."
+                : "Household sharing is off. Your coordinates are not sent to the server.";
+            await RefreshFamilyLocationsAsync();
+        }
+        catch (Exception ex)
+        {
+            _sharingStatus.Text = $"Could not load household sharing settings: {ex.Message}";
+        }
+        RefreshState();
+    }
+
+    private async Task SetSharingAsync(bool enabled)
+    {
+        if (enabled && !await DisplayAlertAsync("Enable household location sharing?",
+            "Active members of your household will be able to see the latest location you explicitly share. This does not enable background tracking.",
+            "Enable sharing", "Cancel")) return;
+        try
+        {
+            var result = await _api.SetLocationSharingAsync(enabled);
+            _sharingEnabled = result.SharingEnabled;
+            if (!enabled) _lastLocation = null;
+            _sharingStatus.Text = enabled
+                ? "Household sharing is on. Your location is not sent until you explicitly share a reading."
+                : "Household sharing is off. Your saved coordinates have been removed.";
+            RefreshState();
+            await RefreshFamilyLocationsAsync();
+        }
+        catch (Exception ex)
+        {
+            _sharingStatus.Text = $"Could not update household sharing: {ex.Message}";
+        }
+    }
+
+    private async Task ShareCurrentLocationAsync()
+    {
+        if (!_sharingEnabled || _lastLocation is null) return;
+        if (!_lastLocation.Accuracy.HasValue)
+        {
+            _fixStatus.Text = "Android did not provide an accuracy estimate. Get another fix before sharing.";
+            return;
+        }
+        try
+        {
+            await _api.ShareLocationAsync(
+                _lastLocation.Latitude,
+                _lastLocation.Longitude,
+                _lastLocation.Accuracy.Value,
+                _lastLocation.Timestamp.UtcDateTime);
+            _fixStatus.Text = "Your current location was shared with active household members.";
+            await RefreshFamilyLocationsAsync();
+        }
+        catch (Exception ex)
+        {
+            _fixStatus.Text = $"Could not share this location: {ex.Message}";
+        }
+    }
+
+    private async Task RefreshFamilyLocationsAsync()
+    {
+        try
+        {
+            var locations = await _api.GetFamilyLocationsAsync();
+            _familyStatus.Text = locations.Count == 0
+                ? "No household members have shared a recent location."
+                : string.Join("\n", locations.Select(x =>
+                    $"{x.DisplayName}: {x.Latitude:F5}, {x.Longitude:F5} · {x.UpdatedAtUtc?.ToLocalTime():g}"));
+        }
+        catch (Exception ex)
+        {
+            _familyStatus.Text = $"Could not load household locations: {ex.Message}";
+        }
     }
 
     private async Task EnableAsync()
@@ -161,6 +267,7 @@ public sealed class LocationPage : ContentPage
             _fixStatus.Text = $"Could not get a location fix: {ex.Message}";
         }
         finally { SetBusy(false); }
+        RefreshState();
     }
 
     private async Task DisableAsync()
