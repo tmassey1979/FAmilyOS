@@ -19,6 +19,10 @@ public sealed class LocationPage : ContentPage
     private readonly Label _trackingStatus;
     private readonly Button _startTracking;
     private readonly Button _stopTracking;
+    private readonly Switch _historySwitch;
+    private readonly Label _historyStatus;
+    private readonly Button _clearHistory;
+    private bool _loadingHistorySwitch;
     private readonly Label _consentStatus;
     private readonly Label _fixStatus;
     private readonly Button _enable;
@@ -81,6 +85,15 @@ public sealed class LocationPage : ContentPage
         _startTracking.Clicked += async (_, _) => await StartTrackingAsync();
         _stopTracking = new Button { Text = "Stop continuous location sharing", IsEnabled = false };
         _stopTracking.Clicked += (_, _) => StopTracking();
+        _historySwitch = new Switch { IsToggled = false, HorizontalOptions = LayoutOptions.Start };
+        _historySwitch.Toggled += async (_, e) =>
+        {
+            if (!_loadingHistorySwitch) await SetHistoryEnabledAsync(e.Value);
+        };
+        _historyStatus = new Label { Text = "Location history is off. When enabled, uploaded points are retained for up to 30 days.", FontSize = 12, LineBreakMode = LineBreakMode.WordWrap };
+        _historyStatus.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+        _clearHistory = new Button { Text = "Delete my saved location history", FontSize = 12 };
+        _clearHistory.Clicked += async (_, _) => await ClearHistoryAsync();
         _shareNow.Clicked += async (_, _) => await ShareCurrentLocationAsync();
         _stopSharing = new Button { Text = "Stop household sharing", IsEnabled = false };
         _stopSharing.Clicked += async (_, _) => await SetSharingAsync(false);
@@ -106,7 +119,7 @@ public sealed class LocationPage : ContentPage
             Content = new VerticalStackLayout
             {
                 Spacing = 12,
-                Children = { heading, explanation, _consentStatus, _enable, _update, _disable, _sharingStatus, _enableSharing, _viewerStatus, _viewerControls, _shareNow, _trackingStatus, _startTracking, _stopTracking, _stopSharing, _familyStatus, _refreshFamily, _fixStatus, privacy }
+                Children = { heading, explanation, _consentStatus, _enable, _update, _disable, _sharingStatus, _enableSharing, _viewerStatus, _viewerControls, _shareNow, _trackingStatus, _startTracking, _stopTracking, new Label { Text = "Location history (separate opt-in)", FontSize = 15, FontAttributes = FontAttributes.Bold }, _historySwitch, _historyStatus, _clearHistory, _stopSharing, _familyStatus, _refreshFamily, _fixStatus, privacy }
             }
         };
         card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
@@ -166,6 +179,7 @@ public sealed class LocationPage : ContentPage
                 ? "Household sharing is enabled. Only locations you explicitly submit are shared."
                 : "Household sharing is off. Your coordinates are not sent to the server.";
             await LoadViewerGrantsAsync();
+            await LoadHistoryConsentAsync();
             await RefreshFamilyLocationsAsync();
         }
         catch (Exception ex)
@@ -196,6 +210,89 @@ public sealed class LocationPage : ContentPage
         catch (Exception ex)
         {
             _sharingStatus.Text = $"Could not update household sharing: {ex.Message}";
+        }
+    }
+
+    private async Task LoadHistoryConsentAsync()
+    {
+        _loadingHistorySwitch = true;
+        try
+        {
+            var result = await _api.GetLocationHistoryConsentAsync();
+            _historySwitch.IsToggled = result.HistoryEnabled;
+            _historyStatus.Text = result.HistoryEnabled
+                ? "Location history is on. Uploaded points are visible only to people you allowed and are automatically deleted after 30 days."
+                : "Location history is off. No route history is being stored.";
+        }
+        catch (Exception ex)
+        {
+            _historyStatus.Text = $"Could not load history settings: {ex.Message}";
+        }
+        finally
+        {
+            _loadingHistorySwitch = false;
+            _historySwitch.IsEnabled = _sharingEnabled && !_busy;
+            _clearHistory.IsEnabled = _sharingEnabled && !_busy;
+        }
+    }
+
+    private async Task SetHistoryEnabledAsync(bool enabled)
+    {
+        if (enabled && !_sharingEnabled)
+        {
+            _loadingHistorySwitch = true;
+            _historySwitch.IsToggled = false;
+            _loadingHistorySwitch = false;
+            _historyStatus.Text = "Enable household sharing before turning on location history.";
+            return;
+        }
+        var accepted = await DisplayAlertAsync(
+            enabled ? "Enable location history?" : "Turn off and delete location history?",
+            enabled
+                ? "FamilyOS will save future uploaded location points for up to 30 days. Only household members you explicitly allow can view them. You can delete them at any time."
+                : "This immediately deletes your stored location history and stops recording future points.",
+            enabled ? "Enable history" : "Turn off and delete", "Cancel");
+        if (!accepted)
+        {
+            _loadingHistorySwitch = true;
+            _historySwitch.IsToggled = !enabled;
+            _loadingHistorySwitch = false;
+            return;
+        }
+        try
+        {
+            var result = await _api.SetLocationHistoryConsentAsync(enabled);
+            _loadingHistorySwitch = true;
+            _historySwitch.IsToggled = result.HistoryEnabled;
+            _loadingHistorySwitch = false;
+            _historyStatus.Text = result.HistoryEnabled
+                ? "Location history is on. Uploaded points are retained for up to 30 days."
+                : "Location history is off and stored points have been deleted.";
+        }
+        catch (Exception ex)
+        {
+            _loadingHistorySwitch = true;
+            _historySwitch.IsToggled = !enabled;
+            _loadingHistorySwitch = false;
+            _historyStatus.Text = $"Could not update history settings: {ex.Message}";
+        }
+    }
+
+    private async Task ClearHistoryAsync()
+    {
+        if (!await DisplayAlertAsync("Delete location history?",
+            "Permanently delete all location history currently stored for your account? This does not turn off future history recording.",
+            "Delete history", "Cancel")) return;
+        try
+        {
+            await _api.ClearLocationHistoryAsync();
+            _historyStatus.Text = _historySwitch.IsToggled
+                ? "Saved history deleted. New points will be recorded while history remains enabled."
+                : "Saved location history deleted.";
+        }
+        catch (Exception ex)
+        {
+            _historyStatus.Text = $"Could not delete location history: {ex.Message}";
         }
     }
 
