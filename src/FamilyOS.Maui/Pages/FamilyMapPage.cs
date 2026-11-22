@@ -14,6 +14,12 @@ public sealed class FamilyMapPage : ContentPage
     private readonly WebView _map;
     private readonly Label _status;
     private readonly Button _refresh;
+    private readonly Picker _historyMember;
+    private readonly Label _historyStatus;
+    private readonly Button _showHistory;
+    private readonly Button _showTrips;
+    private FamilyDto? _family;
+    private List<FamilyLocationDto> _currentLocations = [];
     private bool _loading;
     private bool _isVisible;
     private bool _timerStarted;
@@ -49,6 +55,13 @@ public sealed class FamilyMapPage : ContentPage
 
         _refresh = new Button { Text = "Refresh household map" };
         _refresh.Clicked += async (_, _) => await RefreshAsync();
+        _historyMember = new Picker { Title = "Choose a household member", ItemDisplayBinding = new Binding(nameof(FamilyMemberDto.DisplayName)) };
+        _historyStatus = new Label { Text = "Choose a member to view permitted location history.", FontSize = 12, LineBreakMode = LineBreakMode.WordWrap };
+        _historyStatus.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+        _showHistory = new Button { Text = "Show last 24 hours", IsEnabled = false, FontSize = 13 };
+        _showHistory.Clicked += async (_, _) => await ShowHistoryAsync();
+        _showTrips = new Button { Text = "Show trip summaries", IsEnabled = false, FontSize = 13 };
+        _showTrips.Clicked += async (_, _) => await ShowTripsAsync();
 
         _map = new WebView
         {
@@ -71,7 +84,7 @@ public sealed class FamilyMapPage : ContentPage
             Content = new VerticalStackLayout
             {
                 Spacing = 10,
-                Children = { heading, explanation, _status, _refresh, _map, attribution }
+                Children = { heading, explanation, _status, _refresh, new Label { Text = "Location history and trips", FontSize = 16, FontAttributes = FontAttributes.Bold }, _historyMember, _showHistory, _showTrips, _historyStatus, _map, attribution }
             }
         };
         card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
@@ -93,6 +106,7 @@ public sealed class FamilyMapPage : ContentPage
     {
         base.OnAppearing();
         _isVisible = true;
+        await LoadFamilyMembersAsync();
         if (!_timerStarted)
         {
             _timerStarted = true;
@@ -116,6 +130,62 @@ public sealed class FamilyMapPage : ContentPage
         base.OnDisappearing();
     }
 
+    private async Task LoadFamilyMembersAsync()
+    {
+        try
+        {
+            _family = await _api.GetFamilyAsync();
+            var visibleIds = _currentLocations.Select(x => x.MemberId).Append(_family.CurrentMemberId).ToHashSet();
+            _historyMember.ItemsSource = _family.Members
+                .Where(x => x.IsActive && visibleIds.Contains(x.Id))
+                .ToList();
+            _historyMember.SelectedItem = _family.Members.FirstOrDefault(x => x.Id == _family.CurrentMemberId);
+            var selected = _historyMember.SelectedItem is FamilyMemberDto;
+            _showHistory.IsEnabled = selected;
+            _showTrips.IsEnabled = selected;
+        }
+        catch (Exception ex)
+        {
+            _historyStatus.Text = $"Could not load household members: {ex.Message}";
+        }
+    }
+
+    private async Task ShowHistoryAsync()
+    {
+        if (_historyMember.SelectedItem is not FamilyMemberDto member) return;
+        try
+        {
+            var from = DateTimeOffset.UtcNow.AddHours(-24);
+            var history = await _api.GetLocationHistoryAsync(member.Id, from);
+            var places = await _api.GetSavedPlacesAsync();
+            _map.Source = new HtmlWebViewSource { Html = BuildMapHtml(_currentLocations, places, history) };
+            _historyStatus.Text = history.Count < 2
+                ? $"{member.DisplayName}: not enough saved points to draw a route in the last 24 hours."
+                : $"{member.DisplayName}: showing {history.Count} history points from the last 24 hours.";
+        }
+        catch (Exception ex)
+        {
+            _historyStatus.Text = $"Location history is unavailable: {ex.Message}";
+        }
+    }
+
+    private async Task ShowTripsAsync()
+    {
+        if (_historyMember.SelectedItem is not FamilyMemberDto member) return;
+        try
+        {
+            var trips = await _api.GetLocationTripsAsync(member.Id, DateTimeOffset.UtcNow.AddHours(-24));
+            _historyStatus.Text = trips.Count == 0
+                ? $"{member.DisplayName}: no trips met the minimum distance and duration thresholds in the last 24 hours."
+                : string.Join("\n", trips.Select((trip, index) =>
+                    $"Trip {index + 1}: {trip.StartedAtUtc.ToLocalTime():t}–{trip.EndedAtUtc.ToLocalTime():t} · {trip.DistanceMeters / 1000:0.0} km · {trip.DurationMinutes:0} min"));
+        }
+        catch (Exception ex)
+        {
+            _historyStatus.Text = $"Trip summaries are unavailable: {ex.Message}";
+        }
+    }
+
     private async Task RefreshAsync()
     {
         if (_loading) return;
@@ -125,6 +195,7 @@ public sealed class FamilyMapPage : ContentPage
         try
         {
             var locations = await _api.GetFamilyLocationsAsync();
+            _currentLocations = locations;
             var places = await _api.GetSavedPlacesAsync();
             var valid = locations
                 .Where(x => x.Latitude is >= -90 and <= 90
@@ -148,7 +219,7 @@ public sealed class FamilyMapPage : ContentPage
         }
     }
 
-    private static string BuildMapHtml(IReadOnlyList<FamilyLocationDto> locations, IReadOnlyList<SavedPlaceDto> places)
+    private static string BuildMapHtml(IReadOnlyList<FamilyLocationDto> locations, IReadOnlyList<SavedPlaceDto> places, IReadOnlyList<LocationHistoryPointDto>? history = null)
     {
         var data = locations.Select(x => new MapPin(
             x.DisplayName,
@@ -158,6 +229,7 @@ public sealed class FamilyMapPage : ContentPage
             x.UpdatedAtUtc!.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)));
         var json = JsonSerializer.Serialize(data, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var placeJson = JsonSerializer.Serialize(places, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var historyJson = JsonSerializer.Serialize(history ?? [], new JsonSerializerOptions(JsonSerializerDefaults.Web));
         return $$"""
             <!doctype html>
             <html lang="en">
@@ -179,6 +251,7 @@ public sealed class FamilyMapPage : ContentPage
               <script>
                 const locations = {{json}};
                 const places = {{placeJson}};
+                const history = {{historyJson}};
                 const map = L.map('map', { zoomControl: true }).setView([39.5, -98.35], 4);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                   maxZoom: 19,
@@ -188,6 +261,11 @@ public sealed class FamilyMapPage : ContentPage
                   document.getElementById('map').innerHTML = '<div class="empty">No shared locations available.</div>';
                 } else {
                   const bounds = [];
+                  if (history.length > 1) {
+                    const routePoints = history.map(point => [point.latitude, point.longitude]);
+                    routePoints.forEach(point => bounds.push(point));
+                    L.polyline(routePoints, { color: '#dc2626', weight: 4, opacity: 0.8 }).addTo(map);
+                  }
                   for (const place of places) {
                     const point = [place.latitude, place.longitude];
                     bounds.push(point);
