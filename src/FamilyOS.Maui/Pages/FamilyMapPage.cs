@@ -56,6 +56,7 @@ public sealed class FamilyMapPage : ContentPage
         _refresh = new Button { Text = "Refresh household map" };
         _refresh.Clicked += async (_, _) => await RefreshAsync();
         _historyMember = new Picker { Title = "Choose a household member", ItemDisplayBinding = new Binding(nameof(FamilyMemberDto.DisplayName)) };
+        _historyMember.SelectedIndexChanged += (_, _) =>\n        {\n            var selected = _historyMember.SelectedItem is FamilyMemberDto;\n            _showHistory.IsEnabled = selected;\n            _showTrips.IsEnabled = selected;\n        };
         _historyStatus = new Label { Text = "Choose a member to view permitted location history.", FontSize = 12, LineBreakMode = LineBreakMode.WordWrap };
         _historyStatus.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
         _showHistory = new Button { Text = "Show last 24 hours", IsEnabled = false, FontSize = 13 };
@@ -106,7 +107,6 @@ public sealed class FamilyMapPage : ContentPage
     {
         base.OnAppearing();
         _isVisible = true;
-        await LoadFamilyMembersAsync();
         if (!_timerStarted)
         {
             _timerStarted = true;
@@ -122,6 +122,7 @@ public sealed class FamilyMapPage : ContentPage
             });
         }
         await RefreshAsync();
+        await LoadFamilyMembersAsync();
     }
 
     protected override void OnDisappearing()
@@ -257,7 +258,7 @@ public sealed class FamilyMapPage : ContentPage
                   maxZoom: 19,
                   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 }).addTo(map);
-                if (locations.length === 0 && places.length === 0) {
+                if (locations.length === 0 && places.length === 0 && history.length === 0) {
                   document.getElementById('map').innerHTML = '<div class="empty">No shared locations available.</div>';
                 } else {
                   const bounds = [];
