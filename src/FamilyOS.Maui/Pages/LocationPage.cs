@@ -3,8 +3,8 @@ using FamilyOS.Maui.Services;
 namespace FamilyOS.Maui.Pages;
 
 /// <summary>
-/// First location milestone: explicit device consent and a user-initiated
-/// foreground fix. Household sharing is intentionally not implied or enabled.
+/// Manages separate device permission and household-sharing consent. Each
+/// shared location requires a user-initiated foreground fix and explicit upload.
 /// </summary>
 public sealed class LocationPage : ContentPage
 {
