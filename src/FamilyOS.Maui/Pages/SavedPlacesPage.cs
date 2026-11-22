@@ -169,6 +169,8 @@ public sealed class SavedPlacesPage : ContentPage
             await _api.CreateSavedPlaceAsync(name.Trim(), fix.Latitude, fix.Longitude,
                 radius, arrival, departure);
             _status.Text = $"Saved {name.Trim()}.";
+            _busy = false;
+            _add.IsEnabled = true;
             await LoadAsync();
         }
         catch (Exception ex)
