@@ -38,19 +38,28 @@ public sealed class LocationController : ControllerBase
     {
         var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
         if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
-        var row = await _db.Set<MemberLocation>().SingleOrDefaultAsync(x => x.MemberId == memberId, ct);
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        var row = await _db.MemberLocations
+            .FromSqlInterpolated($"""
+                SELECT * FROM familyos."MemberLocations"
+                WHERE "FamilyId" = {familyId} AND "MemberId" = {memberId}
+                FOR UPDATE
+                """)
+            .SingleOrDefaultAsync(ct);
         if (row is null)
         {
             row = new MemberLocation { FamilyId = familyId, MemberId = memberId };
-            _db.Add(row);
+            _db.MemberLocations.Add(row);
         }
 
         row.SharingEnabled = body.Enabled;
         row.ConsentUpdatedAtUtc = DateTime.UtcNow;
         if (!body.Enabled)
         {
-            // Revocation immediately removes the last known coordinates and every viewer grant.
-            await _db.MemberLocationViewerGrants.Where(x => x.FamilyId == familyId && x.SharingMemberId == memberId).ExecuteDeleteAsync(ct);
+            // The row lock serializes revocation with viewer-grant changes.
+            await _db.MemberLocationViewerGrants
+                .Where(x => x.FamilyId == familyId && x.SharingMemberId == memberId)
+                .ExecuteDeleteAsync(ct);
             row.Latitude = null;
             row.Longitude = null;
             row.AccuracyMeters = null;
@@ -58,6 +67,7 @@ public sealed class LocationController : ControllerBase
         }
 
         await _db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
         return Ok(new { sharingEnabled = row.SharingEnabled, consentUpdatedAtUtc = row.ConsentUpdatedAtUtc });
     }
 
@@ -86,6 +96,17 @@ public sealed class LocationController : ControllerBase
         if (!await IsActiveMemberAsync(familyId, viewerMemberId, ct))
             return NotFound(new { error = "That viewer is not an active member of your household." });
 
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        var location = await _db.MemberLocations
+            .FromSqlInterpolated($"""
+                SELECT * FROM familyos."MemberLocations"
+                WHERE "FamilyId" = {familyId} AND "MemberId" = {memberId}
+                FOR UPDATE
+                """)
+            .SingleOrDefaultAsync(ct);
+        if (location?.SharingEnabled != true)
+            return Conflict(new { error = "Enable household location sharing before managing viewer access." });
+
         if (body.Enabled)
         {
             // Idempotent under rapid taps or concurrent requests; the unique index is the final guard.
@@ -102,6 +123,7 @@ public sealed class LocationController : ControllerBase
                 .Where(x => x.FamilyId == familyId && x.SharingMemberId == memberId && x.ViewerMemberId == viewerMemberId)
                 .ExecuteDeleteAsync(ct);
         }
+        await transaction.CommitAsync(ct);
         return NoContent();
     }
 
