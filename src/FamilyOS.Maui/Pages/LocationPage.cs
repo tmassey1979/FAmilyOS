@@ -168,6 +168,7 @@ public sealed class LocationPage : ContentPage
                 ? "Household sharing is on. Only people you explicitly allow can see a reading, and nothing is sent until you explicitly share it."
                 : "Household sharing is off. Your saved coordinates have been removed.";
             RefreshState();
+            await LoadViewerGrantsAsync();
             await RefreshFamilyLocationsAsync();
         }
         catch (Exception ex)
@@ -360,6 +361,7 @@ public sealed class LocationPage : ContentPage
                 await _api.SetLocationSharingAsync(false);
                 _sharingEnabled = false;
                 _sharingStatus.Text = "Household sharing is off and saved coordinates have been removed.";
+                await LoadViewerGrantsAsync();
             }
             catch (Exception ex)
             {
