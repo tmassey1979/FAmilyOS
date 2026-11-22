@@ -17,6 +17,8 @@ public sealed class TasksPage : ContentPage
     private readonly Label _status;
     private readonly Button _refresh;
     private readonly Button _create;
+    private readonly Button _scope;
+    private bool _showFamilyTasks;
     private bool _loading;
 
     public TasksPage(TasksApiClient tasks, FamilyApiClient family)
@@ -33,6 +35,15 @@ public sealed class TasksPage : ContentPage
         _create = new Button { Text = "New task" };
         _create.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
         _create.Clicked += async (_, _) => await CreateTaskAsync();
+        _scope = new Button { Text = "Family tasks", FontSize = 12 };
+        _scope.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+        _scope.Clicked += async (_, _) =>
+        {
+            _showFamilyTasks = !_showFamilyTasks;
+            _scope.Text = _showFamilyTasks ? "My tasks" : "Family tasks";
+            heading.Text = _showFamilyTasks ? "Household tasks" : "My tasks";
+            await LoadAsync();
+        };
 
         _items = new VerticalStackLayout { Spacing = 12 };
         _recurrences = new VerticalStackLayout { Spacing = 10 };
@@ -42,7 +53,7 @@ public sealed class TasksPage : ContentPage
         {
             Spacing = 8,
             HorizontalOptions = LayoutOptions.End,
-            Children = { _create, _refresh }
+            Children = { _scope, _create, _refresh }
         };
         var header = new Grid
         {
@@ -91,7 +102,7 @@ public sealed class TasksPage : ContentPage
         _status.Text = "Loading your tasks…";
         try
         {
-            var tasksTask = _tasks.GetMyTasksAsync();
+            var tasksTask = _showFamilyTasks ? _tasks.GetFamilyTasksAsync() : _tasks.GetMyTasksAsync();
             var recurrencesTask = _tasks.GetRecurrencesAsync();
             await Task.WhenAll(tasksTask, recurrencesTask);
             var tasks = await tasksTask;
@@ -104,7 +115,7 @@ public sealed class TasksPage : ContentPage
                 AddCard(_recurrences, "No recurring routines", "Add a daily, weekly, biweekly, monthly, or yearly household routine.");
             if (tasks.Count == 0)
             {
-                AddCard(_items, "No assigned tasks", "Tasks assigned to you will appear here. Use New task to create one.");
+                AddCard(_items, _showFamilyTasks ? "No household tasks" : "No assigned tasks", _showFamilyTasks ? "Create a task and assign it to a household member." : "Tasks assigned to you will appear here. Use New task to create one.");
                 _status.Text = "You're all caught up.";
             }
             else
@@ -112,7 +123,7 @@ public sealed class TasksPage : ContentPage
                 var overdue = tasks.Count(t => t.IsOverdue);
                 _status.Text = overdue > 0
                     ? $"{tasks.Count} task{(tasks.Count == 1 ? "" : "s")} · {overdue} overdue"
-                    : $"{tasks.Count} task{(tasks.Count == 1 ? "" : "s")} assigned to you";
+                    : _showFamilyTasks ? $"{tasks.Count} household task{(tasks.Count == 1 ? "" : "s")}" : $"{tasks.Count} task{(tasks.Count == 1 ? "" : "s")} assigned to you";
                 foreach (var task in tasks.OrderBy(t => t.IsOverdue ? 0 : 1).ThenBy(t => t.DueDate ?? DateTime.MaxValue))
                     AddTask(task);
             }
