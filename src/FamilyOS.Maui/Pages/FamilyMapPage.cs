@@ -11,6 +11,9 @@ namespace FamilyOS.Maui.Pages;
 public sealed class FamilyMapPage : ContentPage
 {
     private readonly FamilyApiClient _api;
+    private readonly DeviceLocationService _deviceLocation;
+    private Location? _ownLocation;
+    private DateTimeOffset _ownLocationReadAtUtc;
     private readonly WebView _map;
     private readonly Label _status;
     private readonly Button _refresh;
@@ -24,9 +27,10 @@ public sealed class FamilyMapPage : ContentPage
     private bool _isVisible;
     private bool _timerStarted;
 
-    public FamilyMapPage(FamilyApiClient api)
+    public FamilyMapPage(FamilyApiClient api, DeviceLocationService deviceLocation)
     {
         _api = api;
+        _deviceLocation = deviceLocation;
         Title = "Family map";
 
         var heading = new Label
@@ -39,7 +43,7 @@ public sealed class FamilyMapPage : ContentPage
 
         var explanation = new Label
         {
-            Text = "Pins show the latest locations shared by household members. This map refreshes automatically while open; location updates still depend on each member's tracking settings and connectivity.",
+            Text = "Your own device location can appear locally when device location is enabled. Other household pins appear only when those members explicitly share with you. Map tiles are provided by OpenStreetMap.",
             FontSize = 13,
             LineBreakMode = LineBreakMode.WordWrap
         };
@@ -126,8 +130,8 @@ public sealed class FamilyMapPage : ContentPage
                 return true;
             });
         }
-        await RefreshAsync();
         await LoadFamilyMembersAsync();
+        await RefreshAsync();
     }
 
     protected override void OnDisappearing()
@@ -209,10 +213,41 @@ public sealed class FamilyMapPage : ContentPage
                     && x.UpdatedAtUtc.HasValue)
                 .ToList();
 
+            // Show this phone's fix locally without uploading it or granting household access.
+            if (_deviceLocation.IsEnabled && (_ownLocation is null ||
+                DateTimeOffset.UtcNow - _ownLocationReadAtUtc > TimeSpan.FromMinutes(2)))
+            {
+                try
+                {
+                    _ownLocation = await _deviceLocation.GetCurrentLocationAsync();
+                    _ownLocationReadAtUtc = DateTimeOffset.UtcNow;
+                }
+                catch
+                {
+                    _ownLocation = null;
+                }
+            }
+
+            if (_ownLocation is not null && _family is not null)
+            {
+                var ownMember = _family.Members.FirstOrDefault(x => x.Id == _family.CurrentMemberId);
+                if (ownMember is not null)
+                {
+                    valid.RemoveAll(x => x.MemberId == ownMember.Id);
+                    valid.Add(new FamilyLocationDto(
+                        ownMember.Id, ownMember.DisplayName,
+                        _ownLocation.Latitude, _ownLocation.Longitude,
+                        _ownLocation.Accuracy, _ownLocation.Timestamp.ToUniversalTime()));
+                }
+            }
+
             _map.Source = new HtmlWebViewSource { Html = BuildMapHtml(valid, places) };
+            var ownVisible = _ownLocation is not null && _family is not null;
             _status.Text = valid.Count == 0
-                ? "No active household members have shared a recent location. Saved places are shown when available."
-                 : $"{valid.Count} shared location(s). Last received update: {valid.Max(x => x.UpdatedAtUtc!.Value).ToLocalTime():g}.";
+                ? "No recent location is available. Enable device location on the Location page to show this phone on the map."
+                : ownVisible
+                    ? $"Your phone and {Math.Max(0, valid.Count - 1)} shared household location(s) are shown. Your own pin stays on this device unless you separately share it."
+                    : $"{valid.Count} shared location(s). Last received update: {valid.Max(x => x.UpdatedAtUtc!.Value).ToLocalTime():g}.";
         }
         catch (Exception ex)
         {
