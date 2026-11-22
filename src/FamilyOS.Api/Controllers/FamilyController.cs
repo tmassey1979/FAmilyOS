@@ -73,6 +73,7 @@ public class FamilyController : ControllerBase
     public async Task<ActionResult<MemberDto>> Deactivate(Guid id, CancellationToken ct)
     {
         var member = await _mediator.Send(new DeactivateMemberCommand(id), ct);
+        await _db.MemberLocationViewerGrants.Where(x => x.SharingMemberId == id || x.ViewerMemberId == id).ExecuteDeleteAsync(ct);
         var location = await _db.MemberLocations.SingleOrDefaultAsync(x => x.MemberId == id, ct);
         if (location is not null)
         {
