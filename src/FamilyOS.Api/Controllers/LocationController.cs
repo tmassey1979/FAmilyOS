@@ -131,6 +131,18 @@ public sealed class LocationController : ControllerBase
             await _db.MemberLocationViewerGrants
                 .Where(x => x.FamilyId == familyId && x.SharingMemberId == memberId && x.ViewerMemberId == viewerMemberId)
                 .ExecuteDeleteAsync(ct);
+
+            var hasRemainingViewers = await _db.MemberLocationViewerGrants.AnyAsync(x =>
+                x.FamilyId == familyId && x.SharingMemberId == memberId, ct);
+            if (!hasRemainingViewers && location is not null && !location.HistoryEnabled)
+            {
+                // With no audience and no personal history opt-in, retain no coordinates.
+                location.Latitude = null;
+                location.Longitude = null;
+                location.AccuracyMeters = null;
+                location.LocationUpdatedAtUtc = null;
+                await _db.SaveChangesAsync(ct);
+            }
         }
         await transaction.CommitAsync(ct);
         return NoContent();
@@ -385,6 +397,10 @@ public sealed class LocationController : ControllerBase
                 .SingleOrDefaultAsync(ct);
             if (location?.SharingEnabled != true)
                 return Conflict(new { error = "Enable location sharing before sending a location." });
+            var hasViewerGrant = await _db.MemberLocationViewerGrants.AnyAsync(x =>
+                x.FamilyId == familyId && x.SharingMemberId == memberId, ct);
+            if (!hasViewerGrant && !location.HistoryEnabled)
+                return Conflict(new { error = "Allow at least one household viewer or enable personal location history before uploading a location." });
             if (location.LocationUpdatedAtUtc.HasValue && measuredAt <= location.LocationUpdatedAtUtc.Value)
                 return NoContent();
 
