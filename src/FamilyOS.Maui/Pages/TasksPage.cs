@@ -351,11 +351,11 @@ public sealed class TasksPage : ContentPage
                 return;
             }
 
-            var choices = members.Select(m => m.DisplayName).ToArray();
+            var choices = members.Select((m, i) => $"{i + 1}. {m.DisplayName} ({m.Role})").ToArray();
             var selected = await DisplayActionSheetAsync("Assign task to", "Cancel", null, choices);
-            if (string.IsNullOrWhiteSpace(selected) || selected == "Cancel") return;
-            var member = members.FirstOrDefault(m => m.DisplayName == selected);
-            if (member is null) return;
+            var selectedIndex = Array.IndexOf(choices, selected);
+            if (selectedIndex < 0) return;
+            var member = members[selectedIndex];
 
             await _tasks.ReassignAsync(task.Id, member.Id);
             _status.Text = $"Task assigned to {member.DisplayName}.";
@@ -460,7 +460,7 @@ public sealed class TasksPage : ContentPage
 
         var description = await DisplayPromptAsync("Task details", "Add instructions or context (optional):", "Next", "Skip", maxLength: 1000);
         var priority = await DisplayActionSheetAsync("Priority", "Cancel", null, "Low", "Normal", "High", "Urgent");
-        if (priority is null or "Cancel") priority = "Normal";
+        if (string.IsNullOrWhiteSpace(priority) || priority == "Cancel") return;
 
         var category = await DisplayPromptAsync("Category", "Optional category (for example: Chores, School, Home):", "Next", "Skip", maxLength: 60);
         var dueText = await DisplayPromptAsync("Due date", "Optional date in YYYY-MM-DD format:", "Next", "Skip", maxLength: 10);
@@ -497,11 +497,13 @@ public sealed class TasksPage : ContentPage
             var members = family.Members.Where(m => m.IsActive).OrderBy(m => m.DisplayName).ToList();
             if (members.Count > 0)
             {
-                var choices = new[] { "Leave unassigned" }.Concat(members.Select(m => m.DisplayName)).ToArray();
+                var memberChoices = members.Select((m, i) => $"{i + 1}. {m.DisplayName} ({m.Role})").ToArray();
+                var choices = new[] { "Leave unassigned" }.Concat(memberChoices).ToArray();
                 var selected = await DisplayActionSheetAsync("Assign to", "Cancel", null, choices);
                 if (selected == "Cancel") return;
-                if (!string.IsNullOrWhiteSpace(selected) && selected != "Leave unassigned")
-                    assigneeId = members.FirstOrDefault(m => m.DisplayName == selected)?.Id;
+                var selectedIndex = Array.IndexOf(memberChoices, selected);
+                if (selectedIndex >= 0)
+                    assigneeId = members[selectedIndex].Id;
             }
 
             await _tasks.CreateTaskAsync(new CreateTaskBody(
