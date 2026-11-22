@@ -41,7 +41,7 @@
         <Tab Title="More"
              Icon="menu_more.png"
              Route="more">
-            <ShellContent Title="More"
+            <ShellContent x:Name="MoreShellContent" Title="More"
                           ContentTemplate="{DataTemplate pages:MorePage}" />
         </Tab>
     </TabBar>
