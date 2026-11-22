@@ -4,6 +4,7 @@ using FamilyOS.Domain.Chat;
 using FamilyOS.Domain.Conditions;
 using FamilyOS.Domain.Execution;
 using FamilyOS.Domain.Family;
+using FamilyOS.Domain.Location;
 using FamilyOS.Domain.Notifications;
 using FamilyOS.Domain.Procurement;
 using FamilyOS.Domain.Requests;
@@ -20,6 +21,7 @@ public partial class FamilyOsDbContext : DbContext, FamilyOS.Application.Interfa
     public DbSet<User> Users => Set<User>();
     public DbSet<Domain.Family.Family> Families => Set<Domain.Family.Family>();
     public DbSet<FamilyMember> FamilyMembers => Set<FamilyMember>();
+    public DbSet<MemberLocation> MemberLocations => Set<MemberLocation>();
     public DbSet<DeclineReason> DeclineReasons => Set<DeclineReason>();
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
     public DbSet<TaskHistoryEntry> TaskHistory => Set<TaskHistoryEntry>();
@@ -80,6 +82,13 @@ public partial class FamilyOsDbContext : DbContext, FamilyOS.Application.Interfa
             e.Property(x => x.Role).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.QuietHoursEnabled).HasDefaultValue(false);
             e.HasQueryFilter(x => !x.IsDeleted);
+        });
+
+        modelBuilder.Entity<MemberLocation>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.MemberId).IsUnique();
+            e.HasIndex(x => new { x.FamilyId, x.SharingEnabled });
         });
 
         modelBuilder.Entity<DeclineReason>(e =>
