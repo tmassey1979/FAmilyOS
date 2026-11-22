@@ -176,7 +176,7 @@ public sealed class LocationPage : ContentPage
             var consent = await _api.GetLocationConsentAsync();
             _sharingEnabled = consent.SharingEnabled;
             _sharingStatus.Text = _sharingEnabled
-                ? "Household sharing is enabled. Only locations you explicitly submit are shared."
+                ? "Household sharing is enabled. Locations are shared while continuous tracking is active or when you manually submit a reading."
                 : "Household sharing is off. Your coordinates are not sent to the server.";
             await LoadViewerGrantsAsync();
             await LoadHistoryConsentAsync();
@@ -201,10 +201,11 @@ public sealed class LocationPage : ContentPage
             _sharingEnabled = result.SharingEnabled;
             if (!enabled) _lastLocation = null;
             _sharingStatus.Text = enabled
-                ? "Household sharing is on. Only people you explicitly allow can see a reading, and nothing is sent until you explicitly share it."
+                ? "Household sharing is on. Only people you explicitly allow can see a reading, and nothing is sent until you start tracking or manually share a reading."
                 : "Household sharing is off. Your saved coordinates have been removed.";
             RefreshState();
             await LoadViewerGrantsAsync();
+            await LoadHistoryConsentAsync();
             await RefreshFamilyLocationsAsync();
         }
         catch (Exception ex)
@@ -368,6 +369,7 @@ public sealed class LocationPage : ContentPage
         {
             await _api.SetLocationViewerAsync(viewerMemberId, enabled);
             await LoadViewerGrantsAsync();
+            await LoadHistoryConsentAsync();
             await RefreshFamilyLocationsAsync();
         }
         catch (Exception ex)
