@@ -176,9 +176,22 @@ public sealed class LocationController : ControllerBase
             return Conflict(new { error = "Enable household location sharing before enabling history." });
         row.HistoryEnabled = body.Enabled;
         if (!body.Enabled)
+        {
             await _db.MemberLocationHistory
                 .Where(x => x.FamilyId == familyId && x.MemberId == memberId)
                 .ExecuteDeleteAsync(ct);
+
+            var hasViewerGrant = await _db.MemberLocationViewerGrants.AnyAsync(x =>
+                x.FamilyId == familyId && x.SharingMemberId == memberId, ct);
+            if (!hasViewerGrant)
+            {
+                // History was the only authorized reason to retain the latest fix.
+                row.Latitude = null;
+                row.Longitude = null;
+                row.AccuracyMeters = null;
+                row.LocationUpdatedAtUtc = null;
+            }
+        }
         await _db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return Ok(new { historyEnabled = row.HistoryEnabled });
