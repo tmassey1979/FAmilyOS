@@ -27,7 +27,7 @@ public sealed class FamilyApiClient
             JsonContent.Create(new { role, emailHint, validDays = 14 }, options: JsonOptions), ct);
 
     public async Task RevokeInviteAsync(Guid inviteId, CancellationToken ct = default)
-        => await SendNoContentAsync(HttpMethod.Post, $"api/invites/{inviteId:D}/revoke", ct);
+        => await SendNoContentAsync(HttpMethod.Post, $"api/invites/{inviteId:D}/revoke", null, ct);
 
     public async Task<FamilyMemberDto> ChangeMemberRoleAsync(Guid memberId, string role, CancellationToken ct = default)
         => await SendAsync<FamilyMemberDto>(HttpMethod.Post, $"api/family/members/{memberId:D}/change-role",
@@ -35,6 +35,20 @@ public sealed class FamilyApiClient
 
     public async Task<FamilyMemberDto> DeactivateMemberAsync(Guid memberId, CancellationToken ct = default)
         => await SendAsync<FamilyMemberDto>(HttpMethod.Post, $"api/family/members/{memberId:D}/deactivate", null, ct);
+
+    public Task<LocationConsentDto> GetLocationConsentAsync(CancellationToken ct = default)
+        => SendAsync<LocationConsentDto>(HttpMethod.Get, "api/location/consent", null, ct);
+
+    public Task<LocationConsentDto> SetLocationSharingAsync(bool enabled, CancellationToken ct = default)
+        => SendAsync<LocationConsentDto>(HttpMethod.Put, "api/location/consent",
+            JsonContent.Create(new { enabled }, options: JsonOptions), ct);
+
+    public Task ShareLocationAsync(double latitude, double longitude, double accuracyMeters, DateTime measuredAtUtc, CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Post, "api/location/current",
+            JsonContent.Create(new { latitude, longitude, accuracyMeters, measuredAtUtc }, options: JsonOptions), ct);
+
+    public Task<List<FamilyLocationDto>> GetFamilyLocationsAsync(CancellationToken ct = default)
+        => SendAsync<List<FamilyLocationDto>>(HttpMethod.Get, "api/location/family", null, ct);
 
     private async Task<T> SendAsync<T>(HttpMethod method, string path, HttpContent? content, CancellationToken ct)
     {
@@ -59,18 +73,18 @@ public sealed class FamilyApiClient
             ?? throw new InvalidOperationException("The FamilyOS API returned an empty response.");
     }
 
-    private async Task SendNoContentAsync(HttpMethod method, string path, CancellationToken ct)
+    private async Task SendNoContentAsync(HttpMethod method, string path, HttpContent? content, CancellationToken ct)
     {
         var token = await _auth.GetAccessTokenAsync(ct);
         if (string.IsNullOrWhiteSpace(token))
             throw new FamilyApiException(HttpStatusCode.Unauthorized, "Sign in to manage family invitations.");
-        using var request = new HttpRequestMessage(method, new Uri(ApiBaseUri, path));
+        using var request = new HttpRequestMessage(method, new Uri(ApiBaseUri, path)) { Content = content };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
         using var response = await _http.SendAsync(request, timeout.Token);
         if (!response.IsSuccessStatusCode)
-            throw new FamilyApiException(response.StatusCode, $"FamilyOS could not revoke that invitation (HTTP {(int)response.StatusCode}).");
+            throw new FamilyApiException(response.StatusCode, $"FamilyOS could not complete that request (HTTP {(int)response.StatusCode}).");
     }
 
     public async Task<FamilyDto> GetFamilyAsync(CancellationToken ct = default)
@@ -106,3 +120,5 @@ public sealed class FamilyApiClient
 public sealed record FamilyInviteDto(Guid Id, string Code, string Role, string? EmailHint, DateTime ExpiresAtUtc, bool IsOpen, DateTime? AcceptedAtUtc);
 public sealed record FamilyDto(Guid Id, string Name, string? TimeZone, string? Currency, List<FamilyMemberDto> Members, Guid CurrentMemberId);
 public sealed record FamilyMemberDto(Guid Id, Guid UserId, string DisplayName, string Role, bool IsActive);
+public sealed record LocationConsentDto(bool SharingEnabled, DateTime? ConsentUpdatedAtUtc);
+public sealed record FamilyLocationDto(Guid MemberId, string DisplayName, double? Latitude, double? Longitude, double? AccuracyMeters, DateTime? UpdatedAtUtc);
