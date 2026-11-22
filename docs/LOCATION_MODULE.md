@@ -52,3 +52,14 @@ The current implementation is not yet validated as a production Life360 replacem
 4. Driving insights based on validated trip data. Crash detection must not be claimed until sensor behavior and false-positive handling are validated on physical devices.
 5. Offline handling, battery-aware sampling, location freshness/status, and operational telemetry.
 6. Physical Android device tests and end-to-end multi-member authorization tests before production rollout.
+
+
+## Household check-ins
+
+- A member can request a check-in from another active household member with a due time up to seven days ahead.
+- The target receives a notification and can explicitly respond "I'm safe". The requester receives a completion notification.
+- The requester can cancel a pending request. Pending requests become "Overdue" in the API response after the due time; the target may still respond.
+- Check-in access is limited to the requester and target, and all actions require active household membership.
+- A check-in does not enable device location, household sharing, or location history, and does not request a location snapshot.
+- This is a lightweight confirmation workflow, not emergency monitoring or emergency services.
+- API: `GET /api/checkins`, `POST /api/checkins`, `POST /api/checkins/{id}/respond`, and `POST /api/checkins/{id}/cancel`.
