@@ -15,6 +15,10 @@ public sealed class LocationPage : ContentPage
     private readonly VerticalStackLayout _viewerControls;
     private readonly Label _viewerStatus;
     private bool _sharingEnabled;
+    private bool _hasViewerGrant;
+    private readonly Label _trackingStatus;
+    private readonly Button _startTracking;
+    private readonly Button _stopTracking;
     private readonly Label _consentStatus;
     private readonly Label _fixStatus;
     private readonly Button _enable;
@@ -71,6 +75,12 @@ public sealed class LocationPage : ContentPage
         _enableSharing = new Button { Text = "Enable household sharing", IsEnabled = false };
         _enableSharing.Clicked += async (_, _) => await SetSharingAsync(true);
         _shareNow = new Button { Text = "Share this location with my household", IsEnabled = false };
+        _trackingStatus = new Label { Text = "Continuous tracking is off.", FontSize = 13, LineBreakMode = LineBreakMode.WordWrap };
+        _trackingStatus.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
+        _startTracking = new Button { Text = "Start continuous location sharing", IsEnabled = false };
+        _startTracking.Clicked += async (_, _) => await StartTrackingAsync();
+        _stopTracking = new Button { Text = "Stop continuous location sharing", IsEnabled = false };
+        _stopTracking.Clicked += (_, _) => StopTracking();
         _shareNow.Clicked += async (_, _) => await ShareCurrentLocationAsync();
         _stopSharing = new Button { Text = "Stop household sharing", IsEnabled = false };
         _stopSharing.Clicked += async (_, _) => await SetSharingAsync(false);
@@ -96,7 +106,7 @@ public sealed class LocationPage : ContentPage
             Content = new VerticalStackLayout
             {
                 Spacing = 12,
-                Children = { heading, explanation, _consentStatus, _enable, _update, _disable, _sharingStatus, _enableSharing, _viewerStatus, _viewerControls, _shareNow, _stopSharing, _familyStatus, _refreshFamily, _fixStatus, privacy }
+                Children = { heading, explanation, _consentStatus, _enable, _update, _disable, _sharingStatus, _enableSharing, _viewerStatus, _viewerControls, _shareNow, _trackingStatus, _startTracking, _stopTracking, _stopSharing, _familyStatus, _refreshFamily, _fixStatus, privacy }
             }
         };
         card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
@@ -133,6 +143,8 @@ public sealed class LocationPage : ContentPage
         _enableSharing.IsEnabled = !_busy && enabled && !_sharingEnabled;
         _shareNow.IsEnabled = !_busy && enabled && _sharingEnabled && _lastLocation is not null;
         _stopSharing.IsEnabled = !_busy && _sharingEnabled;
+        _startTracking.IsEnabled = !_busy && enabled && _sharingEnabled && _hasViewerGrant;
+        _stopTracking.IsEnabled = !_busy;
     }
 
     private async Task LoadSharingStateAsync()
@@ -161,6 +173,7 @@ public sealed class LocationPage : ContentPage
             "Enable sharing", "Cancel")) return;
         try
         {
+            if (!enabled) StopTracking();
             var result = await _api.SetLocationSharingAsync(enabled);
             _sharingEnabled = result.SharingEnabled;
             if (!enabled) _lastLocation = null;
@@ -189,13 +202,16 @@ public sealed class LocationPage : ContentPage
         {
             var viewers = await _api.GetLocationViewersAsync();
             _viewerControls.Children.Clear();
+            _hasViewerGrant = viewers.Any(x => x.CanView);
             if (viewers.Count == 0)
             {
                 _viewerStatus.Text = "There are no other active household members to grant access to.";
+                RefreshState();
                 return;
             }
 
             _viewerStatus.Text = "Location access is private until you explicitly allow a person below.";
+            RefreshState();
             foreach (var viewer in viewers)
             {
                 var row = new HorizontalStackLayout
@@ -226,7 +242,9 @@ public sealed class LocationPage : ContentPage
         }
         catch (Exception ex)
         {
+            _hasViewerGrant = false;
             _viewerStatus.Text = $"Could not load location access list: {ex.Message}";
+            RefreshState();
         }
     }
 
@@ -358,6 +376,7 @@ public sealed class LocationPage : ContentPage
             "FamilyOS will stop requesting your device location. Android permission can also be revoked in app settings.",
             "Turn off", "Cancel")) return;
 
+        StopTracking();
         _location.Disable();
         _lastLocation = null;
         if (_sharingEnabled)
@@ -376,6 +395,46 @@ public sealed class LocationPage : ContentPage
         }
         _fixStatus.Text = "Device location access is off. No new location readings can be requested from this screen.";
         RefreshState();
+    }
+
+    private async Task StartTrackingAsync()
+    {
+        if (!_location.IsEnabled || !_sharingEnabled || !_hasViewerGrant)
+            return;
+        if (!await DisplayAlertAsync("Start continuous location sharing?",
+            "FamilyOS will update your location about once a minute while this Android foreground service is running. A persistent notification will remain visible, and you can stop tracking at any time. Your location is visible only to household members you explicitly allowed.",
+            "Start tracking", "Cancel")) return;
+
+#if ANDROID
+        try
+        {
+            FamilyOS.Maui.Platforms.Android.LocationTrackingController.Start();
+            _trackingStatus.Text = "Tracking start requested. Android will show a persistent notification while updates are active.";
+        }
+        catch (Exception ex)
+        {
+            _trackingStatus.Text = $"Could not start location tracking: {ex.Message}";
+        }
+#else
+        _trackingStatus.Text = "Continuous tracking is currently supported on Android only.";
+#endif
+    }
+
+    private void StopTracking()
+    {
+#if ANDROID
+        try
+        {
+            FamilyOS.Maui.Platforms.Android.LocationTrackingController.Stop();
+            _trackingStatus.Text = "Tracking stop requested. No further updates should be sent.";
+        }
+        catch (Exception ex)
+        {
+            _trackingStatus.Text = $"Could not stop location tracking: {ex.Message}";
+        }
+#else
+        _trackingStatus.Text = "Continuous tracking is currently supported on Android only.";
+#endif
     }
 
     private void SetBusy(bool busy)
