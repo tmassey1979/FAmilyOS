@@ -593,5 +593,6 @@ public sealed class LocationController : ControllerBase
     public sealed record PlaceDto(Guid Id, string Name, double Latitude, double Longitude, double RadiusMeters, bool AlertOnArrival, bool AlertOnDeparture, bool CanEdit);
     public sealed record ConsentBody(bool Enabled);
     public sealed record ViewerGrantBody(bool Enabled);
-    public sealed record LocationBody(double Latitude, double Longitude, double AccuracyMeters, DateTimeOffset MeasuredAtUtc);\n    public sealed record SosBody(string? Message, bool IncludeLocation, double? Latitude, double? Longitude);
+    public sealed record LocationBody(double Latitude, double Longitude, double AccuracyMeters, DateTimeOffset MeasuredAtUtc);
+    public sealed record SosBody(string? Message, bool IncludeLocation, double? Latitude, double? Longitude);
 }
