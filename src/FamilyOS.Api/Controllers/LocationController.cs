@@ -75,16 +75,20 @@ public sealed class LocationController : ControllerBase
 
         var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
         if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
-        var row = await _db.Set<MemberLocation>().SingleOrDefaultAsync(x => x.MemberId == memberId, ct);
-        if (row is null || !row.SharingEnabled)
+        var updated = await _db.MemberLocations
+            .Where(x => x.MemberId == memberId
+                && x.FamilyId == familyId
+                && x.SharingEnabled
+                && _db.FamilyMembers.Any(m => m.Id == memberId && m.FamilyId == familyId && m.IsActive))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(x => x.Latitude, (double?)body.Latitude)
+                .SetProperty(x => x.Longitude, (double?)body.Longitude)
+                .SetProperty(x => x.AccuracyMeters, (double?)body.AccuracyMeters)
+                .SetProperty(x => x.LocationUpdatedAtUtc, (DateTime?)measuredAt), ct);
+
+        if (updated == 0)
             return Conflict(new { error = "Enable location sharing before sending a location." });
 
-        row.FamilyId = familyId;
-        row.Latitude = body.Latitude;
-        row.Longitude = body.Longitude;
-        row.AccuracyMeters = body.AccuracyMeters;
-        row.LocationUpdatedAtUtc = measuredAt;
-        await _db.SaveChangesAsync(ct);
         return NoContent();
     }
 
