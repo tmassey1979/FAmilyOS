@@ -85,6 +85,12 @@ public class FamilyController : ControllerBase
         await _db.MemberLocationViewerGrants
             .Where(x => x.SharingMemberId == id || x.ViewerMemberId == id)
             .ExecuteDeleteAsync(ct);
+        await _db.MemberLocationHistory
+            .Where(x => x.MemberId == id)
+            .ExecuteDeleteAsync(ct);
+        await _db.MemberPlacePresences
+            .Where(x => x.MemberId == id)
+            .ExecuteDeleteAsync(ct);
         if (location is not null)
             _db.MemberLocations.Remove(location);
         await _db.SaveChangesAsync(ct);
