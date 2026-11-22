@@ -10,6 +10,7 @@ The first location-sharing milestone now connects the MAUI app to authenticated 
 - The server stores only the latest shared fix, not a location history.
 - Active members of the same household can see the latest fix from members who opted in.
 - Stopping sharing clears the stored coordinates immediately.
+- Deactivating a household member deletes their stored location record.
 - Disabling device location also attempts to revoke household sharing.
 - The API rejects invalid coordinates, inaccurate values outside its accepted bounds, timestamps more than five minutes in the future, and fixes older than 24 hours.
 - The API checks active household membership on consent, update, and read operations.
@@ -36,7 +37,7 @@ The initial sharing scope is all active members of the same household. Per-viewe
 ## Security and release gates
 
 - Never infer consent from household membership or a parent/guardian role.
-- Stop accepting updates immediately after consent withdrawal or membership removal.
+- Stop accepting updates immediately after consent withdrawal or membership removal; member deactivation also deletes the stored record.
 - Do not show coordinates to anyone outside the active household.
 - Keep location history disabled until retention, deletion, and access auditing are designed.
 - No default-on tracking, silent background collection, or emergency-dispatch claims.
