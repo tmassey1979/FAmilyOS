@@ -1,5 +1,6 @@
 using FamilyOS.Domain.Approvals;
 using FamilyOS.Domain.Calendar;
+using FamilyOS.Domain.CheckIns;
 using FamilyOS.Domain.Chat;
 using FamilyOS.Domain.Conditions;
 using FamilyOS.Domain.Execution;
@@ -26,6 +27,7 @@ public partial class FamilyOsDbContext : DbContext, FamilyOS.Application.Interfa
     public DbSet<SavedPlace> SavedPlaces => Set<SavedPlace>();
     public DbSet<MemberPlacePresence> MemberPlacePresences => Set<MemberPlacePresence>();
     public DbSet<MemberLocationHistory> MemberLocationHistory => Set<MemberLocationHistory>();
+    public DbSet<CheckInRequest> CheckInRequests => Set<CheckInRequest>();
     public DbSet<DeclineReason> DeclineReasons => Set<DeclineReason>();
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
     public DbSet<TaskHistoryEntry> TaskHistory => Set<TaskHistoryEntry>();
@@ -114,6 +116,15 @@ public partial class FamilyOsDbContext : DbContext, FamilyOS.Application.Interfa
             e.HasKey(x => x.Id);
             e.HasIndex(x => new { x.MemberId, x.PlaceId }).IsUnique();
             e.HasIndex(x => new { x.FamilyId, x.PlaceId });
+        });
+
+        modelBuilder.Entity<CheckInRequest>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.FamilyId, x.TargetMemberId, x.Status, x.DueAtUtc });
+            e.HasIndex(x => new { x.FamilyId, x.RequesterMemberId, x.CreatedAtUtc });
+            e.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            e.Property(x => x.ResponseMessage).HasMaxLength(500);
         });
 
         modelBuilder.Entity<MemberLocationHistory>(e =>
