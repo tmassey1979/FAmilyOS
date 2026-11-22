@@ -31,6 +31,7 @@ public static class EnsureRecipeSchema
         catch (Exception ex)
         {
             logger.LogWarning(ex, "EnsureRecipeSchema failed");
+            throw;
         }
     }
 }
