@@ -241,6 +241,7 @@ public sealed class FamilyMapPage : ContentPage
                 }
             }
 
+            _currentLocations = valid;
             _map.Source = new HtmlWebViewSource { Html = BuildMapHtml(valid, places) };
             var ownVisible = _ownLocation is not null && _family is not null;
             _status.Text = valid.Count == 0
