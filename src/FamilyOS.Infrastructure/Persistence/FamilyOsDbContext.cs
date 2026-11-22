@@ -101,6 +101,20 @@ public partial class FamilyOsDbContext : DbContext, FamilyOS.Application.Interfa
             e.HasIndex(x => new { x.FamilyId, x.ViewerMemberId });
         });
 
+        modelBuilder.Entity<SavedPlace>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.FamilyId, x.IsActive });
+            e.Property(x => x.Name).HasMaxLength(120).IsRequired();
+        });
+
+        modelBuilder.Entity<MemberPlacePresence>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.MemberId, x.PlaceId }).IsUnique();
+            e.HasIndex(x => new { x.FamilyId, x.PlaceId });
+        });
+
         modelBuilder.Entity<DeclineReason>(e =>
         {
             e.HasKey(x => x.Id);
