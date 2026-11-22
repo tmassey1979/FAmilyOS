@@ -47,7 +47,7 @@ public sealed class LocationPage : ContentPage
 
         var explanation = new Label
         {
-            Text = "Location access is optional. FamilyOS only checks your location when you ask. Household sharing is a separate opt-in, and coordinates are sent only when you explicitly tap Share this location. There is no background tracking.",
+            Text = "Location access is optional. FamilyOS only checks your location when you ask. Household sharing is a separate opt-in, and coordinates are sent only when you explicitly tap Share this location. Continuous tracking is available only after you explicitly start it; Android keeps a visible foreground-service notification while it runs.",
             FontSize = 14,
             LineBreakMode = LineBreakMode.WordWrap
         };
@@ -144,7 +144,16 @@ public sealed class LocationPage : ContentPage
         _shareNow.IsEnabled = !_busy && enabled && _sharingEnabled && _lastLocation is not null;
         _stopSharing.IsEnabled = !_busy && _sharingEnabled;
         _startTracking.IsEnabled = !_busy && enabled && _sharingEnabled && _hasViewerGrant;
-        _stopTracking.IsEnabled = !_busy;
+#if ANDROID
+        var tracking = FamilyOS.Maui.Platforms.Android.LocationTrackingForegroundService.IsTracking;
+        _trackingStatus.Text = tracking
+            ? "Continuous tracking is active. Android's persistent notification lets you stop it at any time."
+            : "Continuous tracking is off.";
+        _stopTracking.IsEnabled = !_busy && tracking;
+#else
+        _trackingStatus.Text = "Continuous tracking is currently supported on Android only.";
+        _stopTracking.IsEnabled = false;
+#endif
     }
 
     private async Task LoadSharingStateAsync()
@@ -409,8 +418,18 @@ public sealed class LocationPage : ContentPage
 #if ANDROID
         try
         {
+            if (OperatingSystem.IsAndroidVersionAtLeast(33))
+            {
+                var notificationPermission = await Permissions.RequestAsync<Permissions.PostNotifications>();
+                if (notificationPermission != PermissionStatus.Granted)
+                {
+                    _trackingStatus.Text = "Notification permission is required so tracking remains visible. Enable notifications in Android settings and try again.";
+                    return;
+                }
+            }
             FamilyOS.Maui.Platforms.Android.LocationTrackingController.Start();
-            _trackingStatus.Text = "Tracking start requested. Android will show a persistent notification while updates are active.";
+            _trackingStatus.Text = "Starting continuous tracking…";
+            RefreshState();
         }
         catch (Exception ex)
         {
@@ -427,7 +446,8 @@ public sealed class LocationPage : ContentPage
         try
         {
             FamilyOS.Maui.Platforms.Android.LocationTrackingController.Stop();
-            _trackingStatus.Text = "Tracking stop requested. No further updates should be sent.";
+            _trackingStatus.Text = "Tracking stopped. No further updates should be sent.";
+            RefreshState();
         }
         catch (Exception ex)
         {
