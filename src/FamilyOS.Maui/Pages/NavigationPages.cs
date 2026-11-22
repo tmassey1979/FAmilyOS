@@ -109,6 +109,7 @@ public sealed class MorePage() : FeaturePlaceholderPage(
         AddDestination(list, "Notifications", nameof(NotificationsPage), "menu_notifications.png");
         AddDestination(list, "Location", nameof(LocationPage), "menu_family.png");
         AddDestination(list, "Family map", nameof(FamilyMapPage), "menu_family.png");
+        AddDestination(list, "Saved places", nameof(SavedPlacesPage), "menu_family.png");
         AddDestination(list, "Settings", nameof(SettingsPage), "menu_settings.png");
         AddDestination(list, "Design system", nameof(DesignSystemGalleryPage), "menu_gallery.png");
         AddDestination(list, "Startup diagnostics", nameof(StartupDiagnosticsPage), "menu_settings.png");
