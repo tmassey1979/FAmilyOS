@@ -37,6 +37,12 @@ public sealed class TasksApiClient
     public Task<FamilyTaskDto> CreateTaskAsync(CreateTaskBody body, CancellationToken cancellationToken = default)
         => SendAsync<FamilyTaskDto>(HttpMethod.Post, "api/tasks", JsonBody(body), cancellationToken);
 
+    public Task<FamilyTaskDto> AssignAsync(Guid taskId, Guid memberId, CancellationToken cancellationToken = default)
+        => SendAsync<FamilyTaskDto>(HttpMethod.Post, $"api/tasks/{taskId:D}/assign", JsonBody(new AssignTaskBody(memberId)), cancellationToken);
+
+    public Task<FamilyTaskDto> ReassignAsync(Guid taskId, Guid memberId, CancellationToken cancellationToken = default)
+        => SendAsync<FamilyTaskDto>(HttpMethod.Post, $"api/tasks/{taskId:D}/reassign", JsonBody(new AssignTaskBody(memberId)), cancellationToken);
+
     public Task<List<TaskHistoryDto>> GetHistoryAsync(Guid taskId, CancellationToken cancellationToken = default)
         => SendAsync<List<TaskHistoryDto>>(HttpMethod.Get, $"api/tasks/{taskId:D}/history", null, cancellationToken);
 
@@ -167,3 +173,4 @@ public sealed record TaskHistoryDto(
     string? ActorName = null);
 
 internal sealed record NoteBody(string? Note, string? Reason);
+internal sealed record AssignTaskBody(Guid AssignToMemberId);
