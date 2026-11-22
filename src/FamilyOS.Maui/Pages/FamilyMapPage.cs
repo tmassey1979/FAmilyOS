@@ -56,7 +56,10 @@ public sealed class FamilyMapPage : ContentPage
         _refresh = new Button { Text = "Refresh household map" };
         _refresh.Clicked += async (_, _) => await RefreshAsync();
         _historyMember = new Picker { Title = "Choose a household member", ItemDisplayBinding = new Binding(nameof(FamilyMemberDto.DisplayName)) };
-        _historyMember.SelectedIndexChanged += (_, _) =>\n        {\n            var selected = _historyMember.SelectedItem is FamilyMemberDto;\n            _showHistory.IsEnabled = selected;\n            _showTrips.IsEnabled = selected;\n        };
+        _historyMember.SelectedIndexChanged += (_, _) =>
+        {
+            var selected = _historyMember.SelectedItem is FamilyMemberDto;\n            _showHistory.IsEnabled = selected;\n            _showTrips.IsEnabled = selected;
+        };
         _historyStatus = new Label { Text = "Choose a member to view permitted location history.", FontSize = 12, LineBreakMode = LineBreakMode.WordWrap };
         _historyStatus.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
         _showHistory = new Button { Text = "Show last 24 hours", IsEnabled = false, FontSize = 13 };
