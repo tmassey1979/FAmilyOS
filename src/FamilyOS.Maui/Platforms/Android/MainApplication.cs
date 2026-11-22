@@ -7,6 +7,7 @@ using Android.Runtime;
 [assembly: UsesPermission(Android.Manifest.Permission.AccessFineLocation)]
 [assembly: UsesPermission(Android.Manifest.Permission.ForegroundService)]
 [assembly: UsesPermission(Android.Manifest.Permission.ForegroundServiceLocation)]
+[assembly: UsesPermission(Android.Manifest.Permission.PostNotifications)]
 
 namespace FamilyOS.Maui;
 
