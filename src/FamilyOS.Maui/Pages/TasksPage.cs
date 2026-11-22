@@ -11,6 +11,7 @@ namespace FamilyOS.Maui.Pages;
 public sealed class TasksPage : ContentPage
 {
     private readonly TasksApiClient _tasks;
+    private readonly FamilyApiClient _family;
     private readonly VerticalStackLayout _items;
     private readonly VerticalStackLayout _recurrences;
     private readonly Label _status;
@@ -18,9 +19,10 @@ public sealed class TasksPage : ContentPage
     private readonly Button _create;
     private bool _loading;
 
-    public TasksPage(TasksApiClient tasks)
+    public TasksPage(TasksApiClient tasks, FamilyApiClient family)
     {
         _tasks = tasks;
+        _family = family;
         Title = "Tasks";
 
         _status = new Label { Text = "Loading your tasks…", FontSize = 14 };
@@ -179,6 +181,8 @@ public sealed class TasksPage : ContentPage
         foreach (var (action, label, primary) in ActionsFor(task.Status))
             actions.Children.Add(MakeActionButton(task.Id, action, label, primary));
 
+        actions.Children.Add(MakeDetailsButton(task));
+        actions.Children.Add(MakeAssignButton(task));
         actions.Children.Add(MakeHistoryButton(task.Id, task.Title));
         stack.Children.Add(actions);
 
@@ -231,6 +235,84 @@ public sealed class TasksPage : ContentPage
         button.SetDynamicResource(VisualElement.StyleProperty, primary ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle");
         button.Clicked += async (_, _) => await ExecuteAsync(taskId, action);
         return button;
+    }
+
+    private Button MakeDetailsButton(FamilyTaskDto task)
+    {
+        var button = new Button { Text = "Edit details", FontSize = 12, Margin = new Thickness(0, 4, 8, 0) };
+        button.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+        button.Clicked += async (_, _) => await EditTaskAsync(task);
+        return button;
+    }
+
+    private Button MakeAssignButton(FamilyTaskDto task)
+    {
+        var button = new Button { Text = "Assign", FontSize = 12, Margin = new Thickness(0, 4, 8, 0) };
+        button.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+        button.Clicked += async (_, _) => await ReassignTaskAsync(task);
+        return button;
+    }
+
+    private async Task EditTaskAsync(FamilyTaskDto task)
+    {
+        var title = await DisplayPromptAsync("Edit task", "Task title", initialValue: task.Title, maxLength: 120);
+        if (string.IsNullOrWhiteSpace(title)) return;
+        var description = await DisplayPromptAsync("Description", "Task details (optional)", initialValue: task.Description ?? "", maxLength: 1000);
+        var category = await DisplayPromptAsync("Category", "Category (optional)", initialValue: task.Category ?? "", maxLength: 60);
+        var dueText = await DisplayPromptAsync("Due date", "YYYY-MM-DD, or leave blank to clear the due date",
+            initialValue: task.DueDate?.ToLocalTime().ToString("yyyy-MM-dd") ?? "", maxLength: 10);
+        DateTime? dueDate = null;
+        var clearDueDate = string.IsNullOrWhiteSpace(dueText);
+        if (!clearDueDate)
+        {
+            if (!DateTime.TryParseExact(dueText.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                    DateTimeStyles.None, out var parsedDate))
+            {
+                await DisplayAlertAsync("Invalid date", "Enter the due date as YYYY-MM-DD.", "OK");
+                return;
+            }
+            dueDate = DateTime.SpecifyKind(parsedDate.Date.AddHours(23).AddMinutes(59), DateTimeKind.Local).ToUniversalTime();
+        }
+
+        try
+        {
+            await _tasks.UpdateDetailsAsync(task.Id, new UpdateTaskDetailsBody(
+                Title: title.Trim(),
+                Description: string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+                Category: string.IsNullOrWhiteSpace(category) ? null : category.Trim(),
+                DueDate: dueDate,
+                ClearDueDate: clearDueDate));
+            _status.Text = "Task details updated.";
+            await LoadAsync();
+        }
+        catch (FamilyApiException ex) { _status.Text = ex.Message; }
+        catch (Exception) { _status.Text = "Could not update this task."; }
+    }
+
+    private async Task ReassignTaskAsync(FamilyTaskDto task)
+    {
+        try
+        {
+            var family = await _family.GetFamilyAsync();
+            var members = family.Members.Where(m => m.IsActive).OrderBy(m => m.DisplayName).ToList();
+            if (members.Count == 0)
+            {
+                await DisplayAlertAsync("Assign task", "There are no active household members to assign this task to.", "OK");
+                return;
+            }
+
+            var choices = members.Select(m => m.DisplayName).ToArray();
+            var selected = await DisplayActionSheetAsync("Assign task to", "Cancel", null, choices);
+            if (string.IsNullOrWhiteSpace(selected) || selected == "Cancel") return;
+            var member = members.FirstOrDefault(m => m.DisplayName == selected);
+            if (member is null) return;
+
+            await _tasks.ReassignAsync(task.Id, member.Id);
+            _status.Text = $"Task assigned to {member.DisplayName}.";
+            await LoadAsync();
+        }
+        catch (FamilyApiException ex) { _status.Text = ex.Message; }
+        catch (Exception) { _status.Text = "Could not reassign this task."; }
     }
 
     private Button MakeHistoryButton(Guid taskId, string title)
@@ -358,15 +440,28 @@ public sealed class TasksPage : ContentPage
             estimate = minutes;
         }
 
+        Guid? assigneeId = null;
         try
         {
+            var family = await _family.GetFamilyAsync();
+            var members = family.Members.Where(m => m.IsActive).OrderBy(m => m.DisplayName).ToList();
+            if (members.Count > 0)
+            {
+                var choices = new[] { "Leave unassigned" }.Concat(members.Select(m => m.DisplayName)).ToArray();
+                var selected = await DisplayActionSheetAsync("Assign to", "Cancel", null, choices);
+                if (selected == "Cancel") return;
+                if (!string.IsNullOrWhiteSpace(selected) && selected != "Leave unassigned")
+                    assigneeId = members.FirstOrDefault(m => m.DisplayName == selected)?.Id;
+            }
+
             await _tasks.CreateTaskAsync(new CreateTaskBody(
                 title.Trim(),
                 Description: string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
                 Priority: priority,
                 Category: string.IsNullOrWhiteSpace(category) ? null : category.Trim(),
                 DueDate: dueDate,
-                EstimatedDurationMinutes: estimate));
+                EstimatedDurationMinutes: estimate,
+                AssignToMemberId: assigneeId));
             _status.Text = "Task created.";
             await LoadAsync();
         }
