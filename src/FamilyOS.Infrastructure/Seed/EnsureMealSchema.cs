@@ -46,6 +46,7 @@ public static class EnsureMealSchema
         catch (Exception ex)
         {
             logger.LogWarning(ex, "EnsureMealSchema failed");
+            throw;
         }
     }
 }
