@@ -26,6 +26,17 @@ public sealed class FamilyContextMiddleware
             "Request pipeline: family context entered. Method={Method} Path={Path} Authenticated={Authenticated} TraceId={TraceId}",
             context.Request.Method, context.Request.Path, authenticated, context.TraceIdentifier);
 
+        // ExceptionHandlingMiddleware wraps this middleware and may set the final
+        // response status only after this middleware unwinds. Log from OnStarting so
+        // the recorded status reflects the actual HTTP response (for example, 500).
+        context.Response.OnStarting(() =>
+        {
+            _logger.LogInformation(
+                "Request pipeline: family context completed in {ElapsedMs}ms. StatusCode={StatusCode} TraceId={TraceId}",
+                elapsed.Elapsed.TotalMilliseconds, context.Response.StatusCode, context.TraceIdentifier);
+            return Task.CompletedTask;
+        });
+
         try
         {
             if (authenticated)
@@ -45,12 +56,6 @@ public sealed class FamilyContextMiddleware
                 "Request pipeline: family context/downstream failed after {ElapsedMs}ms. TraceId={TraceId}",
                 elapsed.Elapsed.TotalMilliseconds, context.TraceIdentifier);
             throw;
-        }
-        finally
-        {
-            _logger.LogInformation(
-                "Request pipeline: family context completed in {ElapsedMs}ms. StatusCode={StatusCode} TraceId={TraceId}",
-                elapsed.Elapsed.TotalMilliseconds, context.Response.StatusCode, context.TraceIdentifier);
         }
     }
 }
