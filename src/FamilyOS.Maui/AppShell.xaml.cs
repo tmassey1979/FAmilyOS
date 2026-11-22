@@ -15,6 +15,7 @@ public partial class AppShell : Shell
         TasksShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<TasksPage>());
         CalendarShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<CalendarPage>());
         FamilyShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<FamilyPage>());
+        MoreShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<MorePage>());
 
         Routing.RegisterRoute(nameof(OnboardingPage), typeof(OnboardingPage));
         Routing.RegisterRoute(nameof(RequestsPage), typeof(RequestsPage));
