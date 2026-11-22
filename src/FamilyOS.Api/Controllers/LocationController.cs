@@ -49,7 +49,8 @@ public sealed class LocationController : ControllerBase
         row.ConsentUpdatedAtUtc = DateTime.UtcNow;
         if (!body.Enabled)
         {
-            // Revocation immediately removes the last known coordinates.
+            // Revocation immediately removes the last known coordinates and every viewer grant.
+            await _db.MemberLocationViewerGrants.Where(x => x.FamilyId == familyId && x.SharingMemberId == memberId).ExecuteDeleteAsync(ct);
             row.Latitude = null;
             row.Longitude = null;
             row.AccuracyMeters = null;
@@ -58,6 +59,50 @@ public sealed class LocationController : ControllerBase
 
         await _db.SaveChangesAsync(ct);
         return Ok(new { sharingEnabled = row.SharingEnabled, consentUpdatedAtUtc = row.ConsentUpdatedAtUtc });
+    }
+
+    [HttpGet("viewers")]
+    public async Task<IActionResult> GetViewerGrants(CancellationToken ct)
+    {
+        var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
+        if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
+        var granted = await _db.MemberLocationViewerGrants.AsNoTracking()
+            .Where(x => x.FamilyId == familyId && x.SharingMemberId == memberId)
+            .Select(x => x.ViewerMemberId).ToListAsync(ct);
+        var members = await _db.FamilyMembers.AsNoTracking()
+            .Where(x => x.FamilyId == familyId && x.IsActive && x.Id != memberId)
+            .OrderBy(x => x.DisplayName)
+            .Select(x => new { memberId = x.Id, displayName = x.DisplayName, canView = granted.Contains(x.Id) })
+            .ToListAsync(ct);
+        return Ok(members);
+    }
+
+    [HttpPut("viewers/{viewerMemberId:guid}")]
+    public async Task<IActionResult> SetViewerGrant(Guid viewerMemberId, [FromBody] ViewerGrantBody body, CancellationToken ct)
+    {
+        var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
+        if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
+        if (viewerMemberId == memberId) return BadRequest(new { error = "You cannot grant location access to yourself." });
+        if (!await IsActiveMemberAsync(familyId, viewerMemberId, ct))
+            return NotFound(new { error = "That viewer is not an active member of your household." });
+
+        var existing = await _db.MemberLocationViewerGrants.SingleOrDefaultAsync(
+            x => x.FamilyId == familyId && x.SharingMemberId == memberId && x.ViewerMemberId == viewerMemberId, ct);
+        if (body.Enabled && existing is null)
+        {
+            _db.MemberLocationViewerGrants.Add(new MemberLocationViewerGrant
+            {
+                FamilyId = familyId, SharingMemberId = memberId, ViewerMemberId = viewerMemberId,
+                GrantedAtUtc = DateTime.UtcNow
+            });
+            await _db.SaveChangesAsync(ct);
+        }
+        else if (!body.Enabled && existing is not null)
+        {
+            _db.MemberLocationViewerGrants.Remove(existing);
+            await _db.SaveChangesAsync(ct);
+        }
+        return NoContent();
     }
 
     [HttpPost("current")]
@@ -105,6 +150,8 @@ public sealed class LocationController : ControllerBase
                 && member.FamilyId == familyId
                 && member.IsActive
                 && location.SharingEnabled
+                && _db.MemberLocationViewerGrants.Any(grant => grant.FamilyId == familyId
+                    && grant.SharingMemberId == member.Id && grant.ViewerMemberId == viewerMemberId)
                 && location.LocationUpdatedAtUtc != null
                 && location.LocationUpdatedAtUtc >= cutoff
             orderby location.LocationUpdatedAtUtc descending
@@ -125,5 +172,6 @@ public sealed class LocationController : ControllerBase
         => _db.FamilyMembers.AnyAsync(x => x.Id == memberId && x.FamilyId == familyId && x.IsActive, ct);
 
     public sealed record ConsentBody(bool Enabled);
+    public sealed record ViewerGrantBody(bool Enabled);
     public sealed record LocationBody(double Latitude, double Longitude, double AccuracyMeters, DateTimeOffset MeasuredAtUtc);
 }
