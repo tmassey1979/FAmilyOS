@@ -227,6 +227,18 @@ try
 
     var app = builder.Build();
 
+    // Apply and verify schema migrations before accepting traffic. Fail startup on
+    // migration errors rather than serving endpoints against a partially updated DB.
+    using (var migrationScope = app.Services.CreateScope())
+    {
+        var migrationDb = migrationScope.ServiceProvider.GetRequiredService<FamilyOsDbContext>();
+        var migrationLogger = migrationScope.ServiceProvider.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("DatabaseStartup");
+        var applyMigrations = app.Configuration.GetValue("Database:MigrateOnStartup", true);
+        await DatabaseStartup.RunAsync(migrationDb, migrationLogger, applyMigrations);
+    }
+
+
     var fwd = new ForwardedHeadersOptions
     {
         ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
