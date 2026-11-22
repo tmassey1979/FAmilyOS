@@ -5,6 +5,7 @@
 The first location-sharing milestone now connects the MAUI app to authenticated FamilyOS APIs:
 
 - Android device permission is while-in-use only and off by default.
+- An explicitly started Android location foreground service now attempts periodic updates (about once per minute), shows an ongoing notification with a Stop action, checks server sharing consent before each update, and does not request background location permission or restart itself after process death.
 - Household sharing is a separate server-side opt-in, also off by default.
 - The user must explicitly request a location fix and separately tap to share it. Future continuous sharing must be started from a visible screen and run as an Android location foreground service with a persistent notification; the app will not silently restart tracking after process death or reboot.
 - The server stores only the latest shared fix, not a location history.
@@ -19,7 +20,7 @@ The first location-sharing milestone now connects the MAUI app to authenticated 
 
 The MAUI app now includes a household map that plots the latest explicitly shared fixes, with last-shared time and reported accuracy. Map tiles are loaded from OpenStreetMap and include attribution. The map is refreshed on demand; it is not a live feed.
 
-This is deliberately **not yet Life360-style continuous tracking**. There is no background service, location history, saved places, geofences, check-ins, or SOS delivery.
+The Android foreground service is the first continuous-tracking implementation, not yet a production-validated Life360 equivalent. It must pass Android APK CI and physical-device testing for Android-version behavior, notification actions, permission denial, process death, battery restrictions, offline behavior, and immediate consent revocation. It currently has no bounded offline queue, adaptive movement/distance thresholds, or cross-device status heartbeat. Location history, saved places, geofences, check-ins, SOS delivery, and driving safety are still unimplemented.
 
 ## API
 
@@ -35,10 +36,12 @@ Per-viewer grants are enforced by the API. A location owner can grant or revoke 
 ## Required next milestones
 
 1. Guardian/child consent rules and independent, age-appropriate consent review.
-2. Android location foreground service with persistent notification, explicit start/stop from a visible app screen, bounded offline queue, and battery controls. Start only while the activity is visible and retain the while-in-use location permission; do not request `ACCESS_BACKGROUND_LOCATION` unless a separately justified background-start use case is added.
-3. Add map refresh automation only after explicit background-sharing consent, plus clear stale/offline states and member-level controls.
-4. Saved places and deduplicated geofence transitions.
-5. User-initiated check-ins and household SOS notifications with explicit delivery limitations.
+2. Validate and harden the Android location foreground service: confirm visible-activity start restrictions, stop action behavior, bounded offline queue, battery-aware sampling, tracking heartbeat/status, and immediate consent revocation. Retain while-in-use location permission; do not request `ACCESS_BACKGROUND_LOCATION` unless a separately justified background-start use case is added.
+3. Add authenticated location freshness/status metadata and map refresh automation while the viewer is active, with stale/offline states and member-level controls.
+4. Saved places, configurable geofence radii, and deduplicated arrival/departure transitions with notification preferences.
+5. Location history and trip summaries with explicit opt-in, retention limits, export, and deletion controls.
+6. User-initiated check-ins, household SOS workflows, device push delivery, delivery receipts, and clear emergency-service limitations.
+7. Driving trip detection and driving insights; crash detection only after sensor validation and false-positive handling.
 
 ## Security and release gates
 
