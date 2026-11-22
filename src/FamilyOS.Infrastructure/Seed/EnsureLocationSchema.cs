@@ -38,6 +38,39 @@ public static class EnsureLocationSchema
                     ON familyos."MemberLocationViewerGrants" ("SharingMemberId", "ViewerMemberId");
                 CREATE INDEX IF NOT EXISTS "IX_MemberLocationViewerGrants_FamilyId_ViewerMemberId"
                     ON familyos."MemberLocationViewerGrants" ("FamilyId", "ViewerMemberId");
+                CREATE TABLE IF NOT EXISTS familyos."SavedPlaces" (
+                    "Id" uuid NOT NULL PRIMARY KEY,
+                    "FamilyId" uuid NOT NULL,
+                    "CreatedByMemberId" uuid NOT NULL,
+                    "Name" character varying(120) NOT NULL,
+                    "Latitude" double precision NOT NULL,
+                    "Longitude" double precision NOT NULL,
+                    "RadiusMeters" double precision NOT NULL DEFAULT 150,
+                    "AlertOnArrival" boolean NOT NULL DEFAULT true,
+                    "AlertOnDeparture" boolean NOT NULL DEFAULT true,
+                    "IsActive" boolean NOT NULL DEFAULT true,
+                    "CreatedAtUtc" timestamp with time zone NOT NULL DEFAULT now(),
+                    "UpdatedAtUtc" timestamp with time zone NULL,
+                    "IsDeleted" boolean NOT NULL DEFAULT false
+                );
+                CREATE INDEX IF NOT EXISTS "IX_SavedPlaces_FamilyId_IsActive"
+                    ON familyos."SavedPlaces" ("FamilyId", "IsActive");
+                CREATE TABLE IF NOT EXISTS familyos."MemberPlacePresences" (
+                    "Id" uuid NOT NULL PRIMARY KEY,
+                    "FamilyId" uuid NOT NULL,
+                    "PlaceId" uuid NOT NULL,
+                    "MemberId" uuid NOT NULL,
+                    "IsInside" boolean NOT NULL,
+                    "LastLocationUpdatedAtUtc" timestamp with time zone NOT NULL,
+                    "LastTransitionAtUtc" timestamp with time zone NULL,
+                    "CreatedAtUtc" timestamp with time zone NOT NULL DEFAULT now(),
+                    "UpdatedAtUtc" timestamp with time zone NULL,
+                    "IsDeleted" boolean NOT NULL DEFAULT false
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS "IX_MemberPlacePresences_MemberId_PlaceId"
+                    ON familyos."MemberPlacePresences" ("MemberId", "PlaceId");
+                CREATE INDEX IF NOT EXISTS "IX_MemberPlacePresences_FamilyId_PlaceId"
+                    ON familyos."MemberPlacePresences" ("FamilyId", "PlaceId");
                 """);
             logger.LogInformation("Member location schema ensured");
         }
