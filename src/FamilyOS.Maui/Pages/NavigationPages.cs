@@ -110,6 +110,7 @@ public sealed class MorePage() : FeaturePlaceholderPage(
         AddDestination(list, "Settings", nameof(SettingsPage), "menu_settings.png");
         AddDestination(list, "Design system", nameof(DesignSystemGalleryPage), "menu_gallery.png");
         AddDestination(list, "Startup diagnostics", nameof(StartupDiagnosticsPage), "menu_settings.png");
+        AddDestination(list, "Access token", nameof(AccessTokenPage), "menu_settings.png");
         root.Children.Add(list);
     }
 
