@@ -6,7 +6,7 @@ The first location-sharing milestone now connects the MAUI app to authenticated 
 
 - Android device permission is while-in-use only and off by default.
 - Household sharing is a separate server-side opt-in, also off by default.
-- The user must explicitly request a location fix and separately tap to share it.
+- The user must explicitly request a location fix and separately tap to share it. Future continuous sharing must be started from a visible screen and run as an Android location foreground service with a persistent notification; the app will not silently restart tracking after process death or reboot.
 - The server stores only the latest shared fix, not a location history.
 - A member's location is private by default; only individually granted active household members can see the latest fix.
 - Each member manages their own viewer list; household membership or guardian role never grants location access automatically.
@@ -35,7 +35,7 @@ Per-viewer grants are enforced by the API. A location owner can grant or revoke 
 ## Required next milestones
 
 1. Guardian/child consent rules and independent, age-appropriate consent review.
-2. Android foreground location service with persistent notification, explicit start/stop, offline queue limits, battery controls, and a separate background permission flow.
+2. Android location foreground service with persistent notification, explicit start/stop from a visible app screen, bounded offline queue, and battery controls. Start only while the activity is visible and retain the while-in-use location permission; do not request `ACCESS_BACKGROUND_LOCATION` unless a separately justified background-start use case is added.
 3. Add map refresh automation only after explicit background-sharing consent, plus clear stale/offline states and member-level controls.
 4. Saved places and deduplicated geofence transitions.
 5. User-initiated check-ins and household SOS notifications with explicit delivery limitations.
