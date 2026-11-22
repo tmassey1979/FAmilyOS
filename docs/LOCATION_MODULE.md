@@ -15,7 +15,9 @@ The first location-sharing milestone now connects the MAUI app to authenticated 
 - The API rejects invalid coordinates, inaccurate values outside its accepted bounds, timestamps more than five minutes in the future, and fixes older than 24 hours.
 - The API checks active household membership on consent, update, and read operations.
 
-This is deliberately **not yet Life360-style continuous tracking**. There is no background service, live map, location history, saved places, geofences, check-ins, or SOS delivery.
+The MAUI app now includes a household map that plots the latest explicitly shared fixes, with last-shared time and reported accuracy. Map tiles are loaded from OpenStreetMap and include attribution. The map is refreshed on demand; it is not a live feed.
+
+This is deliberately **not yet Life360-style continuous tracking**. There is no background service, location history, saved places, geofences, check-ins, or SOS delivery.
 
 ## API
 
@@ -30,7 +32,7 @@ The initial sharing scope is all active members of the same household. Per-viewe
 
 1. Per-viewer sharing grants, member-level privacy controls, and guardian/child consent rules.
 2. Android foreground location service with persistent notification, explicit start/stop, offline queue limits, battery controls, and a separate background permission flow.
-3. A map UI with freshness/accuracy indicators and clear stale/offline states.
+3. Add map refresh automation only after explicit background-sharing consent, plus clear stale/offline states and member-level controls.
 4. Saved places and deduplicated geofence transitions.
 5. User-initiated check-ins and household SOS notifications with explicit delivery limitations.
 
