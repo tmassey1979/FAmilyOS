@@ -450,7 +450,6 @@ public sealed class LocationPage : ContentPage
     {
         if (_busy || !_location.IsEnabled) return;
         SetBusy(true);
-        SetBusy(true);
         _fixStatus.Text = "Checking location permission and getting a fix…";
         try
         {
