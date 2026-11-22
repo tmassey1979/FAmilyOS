@@ -25,6 +25,7 @@ public partial class FamilyOsDbContext : DbContext, FamilyOS.Application.Interfa
     public DbSet<MemberLocationViewerGrant> MemberLocationViewerGrants => Set<MemberLocationViewerGrant>();
     public DbSet<SavedPlace> SavedPlaces => Set<SavedPlace>();
     public DbSet<MemberPlacePresence> MemberPlacePresences => Set<MemberPlacePresence>();
+    public DbSet<MemberLocationHistory> MemberLocationHistory => Set<MemberLocationHistory>();
     public DbSet<DeclineReason> DeclineReasons => Set<DeclineReason>();
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
     public DbSet<TaskHistoryEntry> TaskHistory => Set<TaskHistoryEntry>();
@@ -113,6 +114,13 @@ public partial class FamilyOsDbContext : DbContext, FamilyOS.Application.Interfa
             e.HasKey(x => x.Id);
             e.HasIndex(x => new { x.MemberId, x.PlaceId }).IsUnique();
             e.HasIndex(x => new { x.FamilyId, x.PlaceId });
+        });
+
+        modelBuilder.Entity<MemberLocationHistory>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.MemberId, x.RecordedAtUtc });
+            e.HasIndex(x => new { x.FamilyId, x.MemberId, x.RecordedAtUtc });
         });
 
         modelBuilder.Entity<DeclineReason>(e =>
