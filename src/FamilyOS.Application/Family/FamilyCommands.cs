@@ -88,12 +88,11 @@ public class FamilyCommandHandlers :
             throw new DomainException("This account is already linked to a family.");
         }
 
+        // Build the family, owner membership, and user-family link in one unit of work.
+        // A single SaveChanges call lets EF Core/PostgreSQL commit all inserts and updates
+        // atomically; the previous two-save sequence could leave an orphaned family behind.
         var family = FamilyOS.Domain.Family.Family.Create(cmd.Name, cmd.TimeZone ?? "America/Chicago", cmd.Currency ?? "USD");
         _db.Families.Add(family);
-        var familySave = Stopwatch.StartNew();
-        _logger.LogInformation("Create-family family save started.");
-        await _db.SaveChangesAsync(ct);
-        _logger.LogInformation("Create-family family save completed in {ElapsedMs}ms.", familySave.Elapsed.TotalMilliseconds);
 
         var displayName = string.IsNullOrWhiteSpace(cmd.OwnerDisplayName)
             ? user.DisplayName
@@ -101,10 +100,32 @@ public class FamilyCommandHandlers :
 
         var owner = family.AddMember(user, FamilyRole.Owner, displayName);
         user.AssignToFamily(family.Id, owner.Id);
-        var membershipSave = Stopwatch.StartNew();
-        _logger.LogInformation("Create-family membership save started.");
-        await _db.SaveChangesAsync(ct);
-        _logger.LogInformation("Create-family membership save completed in {ElapsedMs}ms.", membershipSave.Elapsed.TotalMilliseconds);
+
+        var save = Stopwatch.StartNew();
+        _logger.LogInformation("Create-family atomic save started.");
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            // EF's exception identifies the entity entries whose UPDATE/DELETE affected
+            // zero rows. Log only entity types and states, never user data or token claims.
+            var failedEntries = ex.Entries
+                .Select(entry => new
+                {
+                    Entity = entry.Metadata.ClrType.Name,
+                    State = entry.State.ToString()
+                })
+                .ToArray();
+            _logger.LogError(ex,
+                "Create-family concurrency conflict. FailedEntries={@FailedEntries}",
+                failedEntries);
+            throw;
+        }
+
+        _logger.LogInformation("Create-family atomic save completed in {ElapsedMs}ms.",
+            save.Elapsed.TotalMilliseconds);
 
         _logger.LogInformation("Create-family handler completed in {ElapsedMs}ms.", total.Elapsed.TotalMilliseconds);
         return new FamilyDto(
