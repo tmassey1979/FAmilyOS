@@ -8,7 +8,9 @@ The first location-sharing milestone now connects the MAUI app to authenticated 
 - Household sharing is a separate server-side opt-in, also off by default.
 - The user must explicitly request a location fix and separately tap to share it.
 - The server stores only the latest shared fix, not a location history.
-- Active members of the same household can see the latest fix from members who opted in.
+- A member's location is private by default; only individually granted active household members can see the latest fix.
+- Each member manages their own viewer list; household membership or guardian role never grants location access automatically.
+- Revoking one viewer removes their access immediately. Revoking sharing clears coordinates and all grants.
 - Stopping sharing clears the stored coordinates immediately.
 - Deactivating a household member deletes their stored location record.
 - Disabling device location also attempts to revoke household sharing.
@@ -24,13 +26,15 @@ This is deliberately **not yet Life360-style continuous tracking**. There is no 
 - `GET /api/location/consent` — current member's sharing state.
 - `PUT /api/location/consent` — explicit opt-in/out. Opt-out deletes the saved fix.
 - `POST /api/location/current` — submit one user-initiated location fix after consent.
-- `GET /api/location/family` — latest fixes shared by active members of the caller's household, limited to the last 24 hours.
+- `GET /api/location/family` — latest fixes explicitly shared with the caller by active household members, limited to the last 24 hours.
+- `GET /api/location/viewers` — active household members and whether the current member has granted them location visibility.
+- `PUT /api/location/viewers/{viewerMemberId}` — explicitly grant or revoke one active household member's access.
 
-The initial sharing scope is all active members of the same household. Per-viewer grants and more granular sharing controls are not implemented yet.
+Per-viewer grants are enforced by the API. A location owner can grant or revoke access to each active household member. Grants are separate from the owner's location-sharing consent and do not submit or collect coordinates. New members receive no grants. Member deactivation deletes grants in either direction. Sharing revocation deletes all grants owned by that member and erases the saved fix. The location-grant table is provisioned by the existing idempotent location schema ensure step; it does not require an EF migration.
 
 ## Required next milestones
 
-1. Per-viewer sharing grants, member-level privacy controls, and guardian/child consent rules.
+1. Guardian/child consent rules and independent, age-appropriate consent review.
 2. Android foreground location service with persistent notification, explicit start/stop, offline queue limits, battery controls, and a separate background permission flow.
 3. Add map refresh automation only after explicit background-sharing consent, plus clear stale/offline states and member-level controls.
 4. Saved places and deduplicated geofence transitions.
