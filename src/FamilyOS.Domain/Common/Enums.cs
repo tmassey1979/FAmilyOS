@@ -113,7 +113,9 @@ public enum NotificationType
     RequestQuestionAsked = 9,
     LocationArrived = 10,
     LocationDeparted = 11,
-    EmergencySos = 12
+    EmergencySos = 12,
+    CheckInRequested = 13,
+    CheckInResponded = 14
 }
 
 public enum CalendarEventStatus
