@@ -27,6 +27,24 @@ public static class EnsureLocationSchema
                     ON familyos."MemberLocations" ("MemberId");
                 CREATE INDEX IF NOT EXISTS "IX_MemberLocations_FamilyId_SharingEnabled"
                     ON familyos."MemberLocations" ("FamilyId", "SharingEnabled");
+                ALTER TABLE familyos."MemberLocations"
+                    ADD COLUMN IF NOT EXISTS "HistoryEnabled" boolean NOT NULL DEFAULT false;
+                CREATE TABLE IF NOT EXISTS familyos."MemberLocationHistory" (
+                    "Id" uuid NOT NULL PRIMARY KEY,
+                    "FamilyId" uuid NOT NULL,
+                    "MemberId" uuid NOT NULL,
+                    "Latitude" double precision NOT NULL,
+                    "Longitude" double precision NOT NULL,
+                    "AccuracyMeters" double precision NOT NULL,
+                    "RecordedAtUtc" timestamp with time zone NOT NULL,
+                    "CreatedAtUtc" timestamp with time zone NOT NULL DEFAULT now(),
+                    "UpdatedAtUtc" timestamp with time zone NULL,
+                    "IsDeleted" boolean NOT NULL DEFAULT false
+                );
+                CREATE INDEX IF NOT EXISTS "IX_MemberLocationHistory_MemberId_RecordedAtUtc"
+                    ON familyos."MemberLocationHistory" ("MemberId", "RecordedAtUtc");
+                CREATE INDEX IF NOT EXISTS "IX_MemberLocationHistory_FamilyId_MemberId_RecordedAtUtc"
+                    ON familyos."MemberLocationHistory" ("FamilyId", "MemberId", "RecordedAtUtc");
                 CREATE TABLE IF NOT EXISTS familyos."MemberLocationViewerGrants" (
                     "Id" uuid NOT NULL PRIMARY KEY,
                     "FamilyId" uuid NOT NULL,
