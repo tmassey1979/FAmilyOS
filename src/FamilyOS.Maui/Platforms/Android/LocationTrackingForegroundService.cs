@@ -119,6 +119,16 @@ public sealed class LocationTrackingForegroundService : Service
                 {
                     break;
                 }
+                catch (UnauthorizedAccessException)
+                {
+                    UpdateNotification("Location permission was revoked; tracking stopped.");
+                    break;
+                }
+                catch (PermissionException)
+                {
+                    UpdateNotification("Location permission was revoked; tracking stopped.");
+                    break;
+                }
                 catch (Exception)
                 {
                     // Keep the foreground service alive and retry on the next interval.
