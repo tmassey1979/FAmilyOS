@@ -123,6 +123,7 @@ services:
       Keycloak__MetadataAddress: "http://keycloak:8080/realms/familyos/.well-known/openid-configuration"
       Keycloak__Audience: familyos-mobile
       Seed__Enabled: ${SEED_ENABLED:-true}
+      Database__MigrateOnStartup: ${DATABASE_MIGRATE_ON_STARTUP:-true}
       Auth__UseDevBypass: ${AUTH_USE_DEV_BYPASS:-false}
     depends_on:
       postgres:
