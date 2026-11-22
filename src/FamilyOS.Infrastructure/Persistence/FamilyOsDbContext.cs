@@ -94,6 +94,8 @@ public partial class FamilyOsDbContext : DbContext, FamilyOS.Application.Interfa
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.FamilyId);
             e.HasIndex(x => new { x.FamilyId, x.AssigneeMemberId, x.Status });
+            // Existing production schema uses AssignedToMemberId; keep the domain name internal.
+            e.Property(x => x.AssigneeMemberId).HasColumnName("AssignedToMemberId");
             e.Property(x => x.Title).HasMaxLength(300).IsRequired();
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
             e.Property(x => x.Priority).HasConversion<string>().HasMaxLength(20);
