@@ -450,9 +450,15 @@ public sealed class LocationPage : ContentPage
     {
         if (_busy || !_location.IsEnabled) return;
         SetBusy(true);
-        _fixStatus.Text = "Getting a location fix…";
+        SetBusy(true);
+        _fixStatus.Text = "Checking location permission and getting a fix…";
         try
         {
+            if (!await _location.EnableAsync())
+            {
+                _fixStatus.Text = "Location permission was not granted. You can still use FamilyOS without location access.";
+                return;
+            }
             _lastLocation = await _location.GetCurrentLocationAsync();
             if (_lastLocation is null)
             {
@@ -526,6 +532,11 @@ public sealed class LocationPage : ContentPage
 #if ANDROID
         try
         {
+            if (!await _location.EnableAsync())
+            {
+                _trackingStatus.Text = "Location permission is required to start tracking. No location is being collected.";
+                return;
+            }
             if (OperatingSystem.IsAndroidVersionAtLeast(33))
             {
                 var notificationPermission = await Permissions.RequestAsync<Permissions.PostNotifications>();
