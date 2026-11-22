@@ -63,3 +63,21 @@ The current implementation is not yet validated as a production Life360 replacem
 - A check-in does not enable device location, household sharing, or location history, and does not request a location snapshot.
 - This is a lightweight confirmation workflow, not emergency monitoring or emergency services.
 - API: `GET /api/checkins`, `POST /api/checkins`, `POST /api/checkins/{id}/respond`, and `POST /api/checkins/{id}/cancel`.
+
+
+## Emergency SOS
+
+- A household member can manually send an emergency SOS notification to every other active household member.
+- SOS requires a final confirmation before the API sends notifications; it does not contact 911 or emergency services.
+- Location is excluded by default. The sender can choose a one-time location link, which triggers an explanatory prompt and Android foreground location permission request only if needed.
+- A one-time SOS location is included only in the SOS notification body as an OpenStreetMap link. It does not enable continuous location sharing, create location history, or change viewer grants.
+- If location permission is denied or a fix is unavailable, the sender can still send the alert without location.
+- The notification pipeline uses the existing notification persistence/push interceptor; the controller does not send duplicate push notifications.
+
+## Permission prompting rules
+
+- Do not request location permission merely because a map or page opens.
+- Request foreground location only after the user chooses an action that needs their current position, and explain whether the fix stays local or is attached to a one-time SOS.
+- Household sharing, individual viewer grants, continuous tracking, and location history remain separate, explicit choices.
+- Continuous tracking requires an explicit start action and a visible Android foreground-service notification with a Stop action.
+- Request notification permission only when the user starts a feature that needs its persistent notification.
