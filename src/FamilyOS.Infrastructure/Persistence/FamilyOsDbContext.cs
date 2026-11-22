@@ -22,6 +22,7 @@ public partial class FamilyOsDbContext : DbContext, FamilyOS.Application.Interfa
     public DbSet<Domain.Family.Family> Families => Set<Domain.Family.Family>();
     public DbSet<FamilyMember> FamilyMembers => Set<FamilyMember>();
     public DbSet<MemberLocation> MemberLocations => Set<MemberLocation>();
+    public DbSet<MemberLocationViewerGrant> MemberLocationViewerGrants => Set<MemberLocationViewerGrant>();
     public DbSet<DeclineReason> DeclineReasons => Set<DeclineReason>();
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
     public DbSet<TaskHistoryEntry> TaskHistory => Set<TaskHistoryEntry>();
@@ -89,6 +90,13 @@ public partial class FamilyOsDbContext : DbContext, FamilyOS.Application.Interfa
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.MemberId).IsUnique();
             e.HasIndex(x => new { x.FamilyId, x.SharingEnabled });
+        });
+
+        modelBuilder.Entity<MemberLocationViewerGrant>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.SharingMemberId, x.ViewerMemberId }).IsUnique();
+            e.HasIndex(x => new { x.FamilyId, x.ViewerMemberId });
         });
 
         modelBuilder.Entity<DeclineReason>(e =>
