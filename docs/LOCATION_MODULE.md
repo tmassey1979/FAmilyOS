@@ -30,7 +30,7 @@ This is deliberately **not yet Life360-style continuous tracking**. There is no 
 - `GET /api/location/viewers` — active household members and whether the current member has granted them location visibility.
 - `PUT /api/location/viewers/{viewerMemberId}` — explicitly grant or revoke one active household member's access.
 
-Per-viewer grants are enforced by the API. A location owner can grant or revoke access to each active household member. Grants are separate from the owner's location-sharing consent and do not submit or collect coordinates. New members receive no grants. Member deactivation deletes grants in either direction. Sharing revocation deletes all grants owned by that member and erases the saved fix. The location-grant table is provisioned by the existing idempotent location schema ensure step; it does not require an EF migration.
+Per-viewer grants are enforced by the API. A location owner can grant or revoke access to each active household member. Existing opt-in sharers from before this privacy change have no viewer grants by default and must explicitly re-allow each person. Grants are separate from the owner's location-sharing consent and do not submit or collect coordinates. New members receive no grants. Member deactivation deletes grants in either direction. Sharing revocation deletes all grants owned by that member and erases the saved fix. The location-grant table is provisioned by the existing idempotent location schema ensure step; it does not require an EF migration.
 
 ## Required next milestones
 
