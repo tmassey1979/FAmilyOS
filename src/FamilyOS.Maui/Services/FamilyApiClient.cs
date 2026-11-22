@@ -18,6 +18,53 @@ public sealed class FamilyApiClient
         _auth = auth;
     }
 
+    public async Task<List<FamilyInviteDto>> GetInvitesAsync(CancellationToken ct = default)
+        => await SendAsync<List<FamilyInviteDto>>(HttpMethod.Get, "api/invites", null, ct);
+
+    public async Task<FamilyInviteDto> CreateInviteAsync(string role, string? emailHint, CancellationToken ct = default)
+        => await SendAsync<FamilyInviteDto>(HttpMethod.Post, "api/invites",
+            JsonContent.Create(new { role, emailHint, validDays = 14 }, options: JsonOptions), ct);
+
+    public async Task RevokeInviteAsync(Guid inviteId, CancellationToken ct = default)
+        => await SendNoContentAsync(HttpMethod.Post, $"api/invites/{inviteId:D}/revoke", ct);
+
+    private async Task<T> SendAsync<T>(HttpMethod method, string path, HttpContent? content, CancellationToken ct)
+    {
+        var token = await _auth.GetAccessTokenAsync(ct);
+        if (string.IsNullOrWhiteSpace(token))
+            throw new FamilyApiException(HttpStatusCode.Unauthorized, "Sign in to manage family invitations.");
+        using var request = new HttpRequestMessage(method, new Uri(ApiBaseUri, path)) { Content = content };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Headers.Accept.ParseAdd("application/json");
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+        if (!response.IsSuccessStatusCode)
+            throw new FamilyApiException(response.StatusCode, response.StatusCode switch
+            {
+                HttpStatusCode.Unauthorized => "Your session has expired. Sign in again.",
+                HttpStatusCode.Forbidden => "Only household adults can manage invitations.",
+                _ => $"FamilyOS could not complete that action (HTTP {(int)response.StatusCode})."
+            });
+        await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
+        return await JsonSerializer.DeserializeAsync<T>(stream, JsonOptions, timeout.Token)
+            ?? throw new InvalidOperationException("The FamilyOS API returned an empty response.");
+    }
+
+    private async Task SendNoContentAsync(HttpMethod method, string path, CancellationToken ct)
+    {
+        var token = await _auth.GetAccessTokenAsync(ct);
+        if (string.IsNullOrWhiteSpace(token))
+            throw new FamilyApiException(HttpStatusCode.Unauthorized, "Sign in to manage family invitations.");
+        using var request = new HttpRequestMessage(method, new Uri(ApiBaseUri, path));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        using var response = await _http.SendAsync(request, timeout.Token);
+        if (!response.IsSuccessStatusCode)
+            throw new FamilyApiException(response.StatusCode, $"FamilyOS could not revoke that invitation (HTTP {(int)response.StatusCode}).");
+    }
+
     public async Task<FamilyDto> GetFamilyAsync(CancellationToken ct = default)
     {
         var token = await _auth.GetAccessTokenAsync(ct);
@@ -48,5 +95,5 @@ public sealed class FamilyApiClient
     }
 }
 
-public sealed record FamilyDto(Guid Id, string Name, string? TimeZone, string? Currency, List<FamilyMemberDto> Members);
+public sealed record FamilyInviteDto(Guid Id, string Code, string Role, string? EmailHint, DateTime ExpiresAtUtc, bool IsOpen, DateTime? AcceptedAtUtc);\npublic sealed record FamilyDto(Guid Id, string Name, string? TimeZone, string? Currency, List<FamilyMemberDto> Members);
 public sealed record FamilyMemberDto(Guid Id, Guid UserId, string DisplayName, string Role, bool IsActive);
