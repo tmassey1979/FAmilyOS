@@ -381,10 +381,7 @@ try
     var seedEnabled = app.Environment.IsDevelopment()
         || string.Equals(app.Configuration["Seed:Enabled"], "true", StringComparison.OrdinalIgnoreCase);
     if (seedEnabled)
-    {
-        try { await SeedData.InitializeAsync(app.Services); }
-        catch (Exception ex) { Log.Warning(ex, "Seed failed — ensure Postgres is up."); }
-    }
+        await SeedData.InitializeAsync(app.Services);
 
     using (var schemaScope = app.Services.CreateScope())
     {
