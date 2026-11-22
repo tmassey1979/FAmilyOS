@@ -241,21 +241,125 @@ public sealed class LocationController : ControllerBase
 
         var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
         if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
-        var updated = await _db.MemberLocations
-            .Where(x => x.MemberId == memberId
-                && x.FamilyId == familyId
-                && x.SharingEnabled
-                && _db.FamilyMembers.Any(m => m.Id == memberId && m.FamilyId == familyId && m.IsActive))
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(x => x.Latitude, (double?)body.Latitude)
-                .SetProperty(x => x.Longitude, (double?)body.Longitude)
-                .SetProperty(x => x.AccuracyMeters, (double?)body.AccuracyMeters)
-                .SetProperty(x => x.LocationUpdatedAtUtc, (DateTime?)measuredAt), ct);
 
-        if (updated == 0)
-            return Conflict(new { error = "Enable location sharing before sending a location." });
+        var pushEvents = new List<(Guid[] Recipients, string Title, string Body, string EventType, Guid PlaceId)>();
+        await using (var transaction = await _db.Database.BeginTransactionAsync(ct))
+        {
+            // Serialize updates from this device so stale fixes cannot reverse geofence state.
+            var location = await _db.MemberLocations
+                .FromSqlInterpolated($"""
+                    SELECT * FROM familyos."MemberLocations"
+                    WHERE "FamilyId" = {familyId} AND "MemberId" = {memberId}
+                    FOR UPDATE
+                    """)
+                .SingleOrDefaultAsync(ct);
+            if (location?.SharingEnabled != true)
+                return Conflict(new { error = "Enable location sharing before sending a location." });
+            if (location.LocationUpdatedAtUtc.HasValue && measuredAt <= location.LocationUpdatedAtUtc.Value)
+                return NoContent();
+
+            location.Latitude = body.Latitude;
+            location.Longitude = body.Longitude;
+            location.AccuracyMeters = body.AccuracyMeters;
+            location.LocationUpdatedAtUtc = measuredAt;
+
+            var places = await _db.SavedPlaces
+                .Where(x => x.FamilyId == familyId && x.IsActive && !x.IsDeleted)
+                .ToListAsync(ct);
+            var member = await _db.FamilyMembers.AsNoTracking()
+                .SingleAsync(x => x.Id == memberId && x.FamilyId == familyId && x.IsActive, ct);
+
+            foreach (var place in places)
+            {
+                var distance = DistanceMeters(body.Latitude, body.Longitude, place.Latitude, place.Longitude);
+                var presence = await _db.MemberPlacePresences.SingleOrDefaultAsync(x =>
+                    x.FamilyId == familyId && x.PlaceId == place.Id && x.MemberId == memberId && !x.IsDeleted, ct);
+                if (presence is null)
+                {
+                    // First fix establishes a baseline; it must not create a misleading arrival alert.
+                    _db.MemberPlacePresences.Add(new MemberPlacePresence
+                    {
+                        FamilyId = familyId,
+                        PlaceId = place.Id,
+                        MemberId = memberId,
+                        IsInside = distance <= place.RadiusMeters,
+                        LastLocationUpdatedAtUtc = measuredAt
+                    });
+                    continue;
+                }
+
+                if (measuredAt <= presence.LastLocationUpdatedAtUtc)
+                    continue;
+
+                // A 25m exit buffer prevents GPS drift at the boundary from spamming alerts.
+                var isInside = presence.IsInside
+                    ? distance <= place.RadiusMeters + 25
+                    : distance <= place.RadiusMeters;
+                var changed = isInside != presence.IsInside;
+                presence.LastLocationUpdatedAtUtc = measuredAt;
+                if (!changed)
+                    continue;
+
+                presence.IsInside = isInside;
+                presence.LastTransitionAtUtc = measuredAt;
+                var shouldAlert = isInside ? place.AlertOnArrival : place.AlertOnDeparture;
+                if (!shouldAlert)
+                    continue;
+
+                var recipients = await (
+                    from grant in _db.MemberLocationViewerGrants.AsNoTracking()
+                    join viewer in _db.FamilyMembers.AsNoTracking() on grant.ViewerMemberId equals viewer.Id
+                    where grant.FamilyId == familyId && grant.SharingMemberId == memberId
+                        && viewer.FamilyId == familyId && viewer.IsActive && viewer.Id != memberId
+                    select viewer.Id).Distinct().ToArrayAsync(ct);
+                if (recipients.Length == 0)
+                    continue;
+
+                var title = isInside ? $"Arrived at {place.Name}" : $"Left {place.Name}";
+                var bodyText = isInside
+                    ? $"{member.DisplayName} arrived at {place.Name}."
+                    : $"{member.DisplayName} left {place.Name}.";
+                var notificationType = isInside ? NotificationType.LocationArrived : NotificationType.LocationDeparted;
+                foreach (var recipientId in recipients)
+                    _db.Notifications.Add(Notification.Create(familyId, recipientId, notificationType,
+                        title, bodyText, place.Id, "SavedPlace"));
+                pushEvents.Add((recipients, title, bodyText, isInside ? "location-arrived" : "location-departed", place.Id));
+            }
+
+            await _db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+        }
+
+        foreach (var pushEvent in pushEvents)
+        {
+            try
+            {
+                await _push.SendToMembersAsync(pushEvent.Recipients, pushEvent.Title, pushEvent.Body,
+                    new Dictionary<string, string>
+                    {
+                        ["type"] = pushEvent.EventType,
+                        ["placeId"] = pushEvent.PlaceId.ToString("D"),
+                        ["memberId"] = memberId.ToString("D")
+                    }, ct);
+            }
+            catch
+            {
+                // Persisted in-app notifications remain available if push delivery is unavailable.
+            }
+        }
 
         return NoContent();
+    }
+
+    private static double DistanceMeters(double latitude1, double longitude1, double latitude2, double longitude2)
+    {
+        const double earthRadiusMeters = 6_371_000;
+        var dLat = (latitude2 - latitude1) * Math.PI / 180;
+        var dLon = (longitude2 - longitude1) * Math.PI / 180;
+        var a = Math.Pow(Math.Sin(dLat / 2), 2)
+            + Math.Cos(latitude1 * Math.PI / 180) * Math.Cos(latitude2 * Math.PI / 180)
+            * Math.Pow(Math.Sin(dLon / 2), 2);
+        return earthRadiusMeters * 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
     }
 
     [HttpGet("family")]
