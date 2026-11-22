@@ -24,17 +24,6 @@ function tryClipboardSet(text: string): boolean {
   return false;
 }
 
-/** Copy arbitrary text when the platform clipboard API is available; otherwise open the share sheet with the exact text. */
-export async function copyText(text: string): Promise<boolean> {
-  if (tryClipboardSet(text)) return true;
-  try {
-    await Share.share({ message: text });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /** Copy code (+ deep link) to the clipboard when possible. */
 export async function copyInviteCode(code: string): Promise<boolean> {
   const text = `${code}\n${inviteDeepLink(code)}`;
