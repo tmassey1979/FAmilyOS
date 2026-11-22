@@ -179,6 +179,12 @@ public sealed class LocationPage : ContentPage
 
     private async Task LoadViewerGrantsAsync()
     {
+        _viewerControls.Children.Clear();
+        if (!_sharingEnabled)
+        {
+            _viewerStatus.Text = "Enable household sharing before granting anyone access to your location.";
+            return;
+        }
         try
         {
             var viewers = await _api.GetLocationViewersAsync();
