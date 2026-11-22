@@ -386,18 +386,13 @@ try
         catch (Exception ex) { Log.Warning(ex, "Seed failed — ensure Postgres is up."); }
     }
 
-    try
+    using (var schemaScope = app.Services.CreateScope())
     {
-        using var schemaScope = app.Services.CreateScope();
         var db = schemaScope.ServiceProvider.GetRequiredService<FamilyOsDbContext>();
         var schemaLog = schemaScope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("SchemaEnsure");
         await EnsureFamilyInvitesSchema.RunAsync(db, schemaLog);
         await EnsureMealSchema.RunAsync(db, schemaLog);
         await EnsureRecipeSchema.RunAsync(db, schemaLog);
-    }
-    catch (Exception ex)
-    {
-        Log.Warning(ex, "Schema ensure failed");
     }
 
     app.Run();
