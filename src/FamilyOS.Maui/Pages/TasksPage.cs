@@ -182,6 +182,7 @@ public sealed class TasksPage : ContentPage
             actions.Children.Add(MakeActionButton(task.Id, action, label, primary));
 
         actions.Children.Add(MakeDetailsButton(task));
+        actions.Children.Add(MakeScheduleButton(task));
         actions.Children.Add(MakeAssignButton(task));
         actions.Children.Add(MakeHistoryButton(task.Id, task.Title));
         stack.Children.Add(actions);
@@ -243,6 +244,55 @@ public sealed class TasksPage : ContentPage
         button.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         button.Clicked += async (_, _) => await EditTaskAsync(task);
         return button;
+    }
+
+    private Button MakeScheduleButton(FamilyTaskDto task)
+    {
+        var button = new Button { Text = "Plan time", FontSize = 12, Margin = new Thickness(0, 4, 8, 0) };
+        button.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+        button.Clicked += async (_, _) => await SetPlannedTimesAsync(task);
+        return button;
+    }
+
+    private async Task SetPlannedTimesAsync(FamilyTaskDto task)
+    {
+        var start = await DisplayPromptAsync("Plan task", "Planned start (24-hour HH:mm, optional)",
+            initialValue: task.PlannedStartTime ?? "", maxLength: 5, keyboard: Keyboard.Text);
+        if (start is null) return;
+        var end = await DisplayPromptAsync("Plan task", "Planned end (24-hour HH:mm, optional)",
+            initialValue: task.PlannedEndTime ?? "", maxLength: 5, keyboard: Keyboard.Text);
+        if (end is null) return;
+
+        start = start.Trim();
+        end = end.Trim();
+        if (start.Length > 0 && !TimeOnly.TryParseExact(start, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+        {
+            await DisplayAlertAsync("Invalid time", "Use 24-hour time such as 09:30.", "OK");
+            return;
+        }
+        if (end.Length > 0 && !TimeOnly.TryParseExact(end, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+        {
+            await DisplayAlertAsync("Invalid time", "Use 24-hour time such as 17:00.", "OK");
+            return;
+        }
+        if (start.Length > 0 && end.Length > 0
+            && TimeOnly.ParseExact(end, "HH:mm", CultureInfo.InvariantCulture) <= TimeOnly.ParseExact(start, "HH:mm", CultureInfo.InvariantCulture))
+        {
+            await DisplayAlertAsync("Invalid schedule", "The planned end must be later than the planned start.", "OK");
+            return;
+        }
+
+        try
+        {
+            await _tasks.SetPlannedTimesAsync(task.Id, new PlannedTimesBody(
+                string.IsNullOrEmpty(start) ? null : start,
+                string.IsNullOrEmpty(end) ? null : end,
+                task.EstimatedDurationMinutes));
+            _status.Text = "Task schedule updated.";
+            await LoadAsync();
+        }
+        catch (FamilyApiException ex) { _status.Text = ex.Message; }
+        catch (Exception) { _status.Text = "Could not update the task schedule."; }
     }
 
     private Button MakeAssignButton(FamilyTaskDto task)
