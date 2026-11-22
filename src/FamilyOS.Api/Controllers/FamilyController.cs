@@ -4,6 +4,8 @@ using FamilyOS.Infrastructure.Identity;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using FamilyOS.Infrastructure.Persistence;
 
 namespace FamilyOS.Api.Controllers;
 
@@ -12,8 +14,13 @@ namespace FamilyOS.Api.Controllers;
 public class FamilyController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly FamilyOsDbContext _db;
 
-    public FamilyController(IMediator mediator) => _mediator = mediator;
+    public FamilyController(IMediator mediator, FamilyOsDbContext db)
+    {
+        _mediator = mediator;
+        _db = db;
+    }
 
     /// <summary>Onboarding: create a new household. Requires auth but not existing family membership.</summary>
     [HttpPost]
@@ -64,7 +71,16 @@ public class FamilyController : ControllerBase
     [HttpPost("members/{id:guid}/deactivate")]
     [Authorize(Policy = FamilyAuthPolicies.OwnerOnly)]
     public async Task<ActionResult<MemberDto>> Deactivate(Guid id, CancellationToken ct)
-        => Ok(await _mediator.Send(new DeactivateMemberCommand(id), ct));
+    {
+        var member = await _mediator.Send(new DeactivateMemberCommand(id), ct);
+        var location = await _db.MemberLocations.SingleOrDefaultAsync(x => x.MemberId == id, ct);
+        if (location is not null)
+        {
+            _db.MemberLocations.Remove(location);
+            await _db.SaveChangesAsync(ct);
+        }
+        return Ok(member);
+    }
 
     [HttpGet("decline-reasons")]
     [Authorize(Policy = FamilyAuthPolicies.FamilyMember)]
