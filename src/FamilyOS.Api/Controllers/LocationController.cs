@@ -117,6 +117,9 @@ public sealed class LocationController : ControllerBase
         return Ok(locations);
     }
 
+    private Task<bool> IsActiveMemberAsync(Guid familyId, Guid memberId, CancellationToken ct)
+        => _db.FamilyMembers.AnyAsync(x => x.Id == memberId && x.FamilyId == familyId && x.IsActive, ct);
+
     public sealed record ConsentBody(bool Enabled);
-    public sealed record LocationBody(double Latitude, double Longitude, double AccuracyMeters, DateTime MeasuredAtUtc);
+    public sealed record LocationBody(double Latitude, double Longitude, double AccuracyMeters, DateTimeOffset MeasuredAtUtc);
 }
