@@ -279,6 +279,19 @@ public sealed class LocationPage : ContentPage
 
         _location.Disable();
         _lastLocation = null;
+        if (_sharingEnabled)
+        {
+            try
+            {
+                await _api.SetLocationSharingAsync(false);
+                _sharingEnabled = false;
+                _sharingStatus.Text = "Household sharing is off and saved coordinates have been removed.";
+            }
+            catch (Exception ex)
+            {
+                _sharingStatus.Text = $"Device location is off, but server sharing could not be revoked. Reconnect and tap Stop household sharing. {ex.Message}";
+            }
+        }
         _fixStatus.Text = "Device location access is off. No new location readings can be requested from this screen.";
         RefreshState();
     }
