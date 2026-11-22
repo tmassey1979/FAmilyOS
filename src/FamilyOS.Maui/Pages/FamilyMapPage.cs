@@ -58,7 +58,9 @@ public sealed class FamilyMapPage : ContentPage
         _historyMember = new Picker { Title = "Choose a household member", ItemDisplayBinding = new Binding(nameof(FamilyMemberDto.DisplayName)) };
         _historyMember.SelectedIndexChanged += (_, _) =>
         {
-            var selected = _historyMember.SelectedItem is FamilyMemberDto;\n            _showHistory.IsEnabled = selected;\n            _showTrips.IsEnabled = selected;
+            var selected = _historyMember.SelectedItem is FamilyMemberDto;
+            _showHistory.IsEnabled = selected;
+            _showTrips.IsEnabled = selected;
         };
         _historyStatus = new Label { Text = "Choose a member to view permitted location history.", FontSize = 12, LineBreakMode = LineBreakMode.WordWrap };
         _historyStatus.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
