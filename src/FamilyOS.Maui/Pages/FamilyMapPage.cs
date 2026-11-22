@@ -17,6 +17,7 @@ public sealed class FamilyMapPage : ContentPage
     private readonly WebView _map;
     private readonly Label _status;
     private readonly Button _refresh;
+    private readonly Button _showMyLocation;
     private readonly Picker _historyMember;
     private readonly Label _historyStatus;
     private readonly Button _showHistory;
@@ -59,6 +60,8 @@ public sealed class FamilyMapPage : ContentPage
 
         _refresh = new Button { Text = "Refresh household map" };
         _refresh.Clicked += async (_, _) => await RefreshAsync();
+        _showMyLocation = new Button { Text = "Show my location on this map" };
+        _showMyLocation.Clicked += async (_, _) => await EnableAndShowOwnLocationAsync();
         _historyMember = new Picker { Title = "Choose a household member", ItemDisplayBinding = new Binding(nameof(FamilyMemberDto.DisplayName)) };
         _historyMember.SelectedIndexChanged += (_, _) =>
         {
@@ -94,7 +97,7 @@ public sealed class FamilyMapPage : ContentPage
             Content = new VerticalStackLayout
             {
                 Spacing = 10,
-                Children = { heading, explanation, _status, _refresh, new Label { Text = "Location history and trips", FontSize = 16, FontAttributes = FontAttributes.Bold }, _historyMember, _showHistory, _showTrips, _historyStatus, _map, attribution }
+                Children = { heading, explanation, _status, _showMyLocation, _refresh, new Label { Text = "Location history and trips", FontSize = 16, FontAttributes = FontAttributes.Bold }, _historyMember, _showHistory, _showTrips, _historyStatus, _map, attribution }
             }
         };
         card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
@@ -116,6 +119,9 @@ public sealed class FamilyMapPage : ContentPage
     {
         base.OnAppearing();
         _isVisible = true;
+        _showMyLocation.Text = _deviceLocation.IsEnabled
+            ? "Update my location on this map"
+            : "Show my location on this map";
         if (!_timerStarted)
         {
             _timerStarted = true;
@@ -138,6 +144,37 @@ public sealed class FamilyMapPage : ContentPage
     {
         _isVisible = false;
         base.OnDisappearing();
+    }
+
+    private async Task EnableAndShowOwnLocationAsync()
+    {
+        if (!await DisplayAlertAsync(
+            "Use your device location?",
+            "FamilyOS will ask Android for foreground location permission so it can place your current position on this map. Your position stays on this device; this action does not share it with your household or save location history.",
+            "Continue", "Not now"))
+            return;
+
+        try
+        {
+            _showMyLocation.IsEnabled = false;
+            if (!await _deviceLocation.EnableAsync())
+            {
+                _status.Text = "Location permission was not granted. You can still view locations household members have shared with you.";
+                return;
+            }
+
+            _ownLocation = null;
+            _status.Text = "Getting your current device location…";
+            await RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            _status.Text = $"Could not access your device location: {ex.Message}";
+        }
+        finally
+        {
+            _showMyLocation.IsEnabled = true;
+        }
     }
 
     private async Task LoadFamilyMembersAsync()
