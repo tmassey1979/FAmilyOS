@@ -35,6 +35,8 @@ public sealed class TasksPage : ContentPage
         _create = new Button { Text = "New task" };
         _create.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
         _create.Clicked += async (_, _) => await CreateTaskAsync();
+        var heading = new Label { Text = "My tasks", FontSize = 26, FontAttributes = FontAttributes.Bold };
+        heading.SetDynamicResource(VisualElement.StyleProperty, "TextDisplay");
         _scope = new Button { Text = "Family tasks", FontSize = 12 };
         _scope.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         _scope.Clicked += async (_, _) =>
@@ -47,8 +49,6 @@ public sealed class TasksPage : ContentPage
 
         _items = new VerticalStackLayout { Spacing = 12 };
         _recurrences = new VerticalStackLayout { Spacing = 10 };
-        var heading = new Label { Text = "My tasks", FontSize = 26, FontAttributes = FontAttributes.Bold };
-        heading.SetDynamicResource(VisualElement.StyleProperty, "TextDisplay");
         var toolbar = new HorizontalStackLayout
         {
             Spacing = 8,
