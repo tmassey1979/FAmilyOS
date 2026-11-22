@@ -132,7 +132,7 @@ public sealed class FamilyMapPage : ContentPage
             x.Longitude!.Value,
             x.AccuracyMeters,
             x.UpdatedAtUtc!.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)));
-        var json = JsonSerializer.Serialize(data);
+        var json = JsonSerializer.Serialize(data, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         return $$"""
             <!doctype html>
             <html lang="en">
