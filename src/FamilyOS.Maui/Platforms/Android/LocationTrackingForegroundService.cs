@@ -15,6 +15,8 @@ public sealed class LocationTrackingForegroundService : Service
 {
     public const string StopAction = "com.familyos.app.location.STOP";
     private const string ChannelId = "familyos_location_tracking";
+    private const string TrackingPreferenceKey = "familyos.location.continuous-tracking";
+    public static bool IsTracking => Microsoft.Maui.Storage.Preferences.Default.Get(TrackingPreferenceKey, false);
     private const int NotificationId = 4107;
     private static readonly TimeSpan UpdateInterval = TimeSpan.FromMinutes(1);
     private CancellationTokenSource? _cancellation;
@@ -44,6 +46,7 @@ public sealed class LocationTrackingForegroundService : Service
         else
             StartForeground(NotificationId, notification);
 
+        Microsoft.Maui.Storage.Preferences.Default.Set(TrackingPreferenceKey, true);
         _cancellation = new CancellationTokenSource();
         _trackingTask = TrackAsync(_cancellation.Token);
         return StartCommandResult.NotSticky;
@@ -110,6 +113,7 @@ public sealed class LocationTrackingForegroundService : Service
 
     private void StopTracking()
     {
+        Microsoft.Maui.Storage.Preferences.Default.Set(TrackingPreferenceKey, false);
         _cancellation?.Cancel();
         _cancellation?.Dispose();
         _cancellation = null;
