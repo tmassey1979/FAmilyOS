@@ -104,6 +104,9 @@ public sealed class LocationController : ControllerBase
                 FOR UPDATE
                 """)
             .SingleOrDefaultAsync(ct);
+        if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
+        if (!await IsActiveMemberAsync(familyId, viewerMemberId, ct))
+            return NotFound(new { error = "That viewer is not an active member of your household." });
         if (location?.SharingEnabled != true)
             return Conflict(new { error = "Enable household location sharing before managing viewer access." });
 
