@@ -20,8 +20,6 @@ public static class SeedData
         var db = scope.ServiceProvider.GetRequiredService<FamilyOsDbContext>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<FamilyOsDbContext>>();
 
-        await db.Database.MigrateAsync();
-
         await EnsureQuietHoursColumnsAsync(db, logger);
         await EnsureDeviceRegistrationsTableAsync(db, logger);
         await EnsureGoogleCalendarSchemaAsync(db, logger);
