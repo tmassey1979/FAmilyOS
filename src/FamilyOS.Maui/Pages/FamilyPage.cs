@@ -15,6 +15,8 @@ public sealed class FamilyPage : ContentPage
     private readonly Label _status;
     private readonly Button _refresh;
     private bool _loading;
+    private Guid _currentMemberId;
+    private bool _isOwner;
 
     public FamilyPage(FamilyApiClient family)
     {
@@ -75,6 +77,8 @@ public sealed class FamilyPage : ContentPage
         {
             var family = await _family.GetFamilyAsync();
             _name.Text = family.Name;
+            _currentMemberId = family.CurrentMemberId;
+            _isOwner = family.Members.FirstOrDefault(m => m.Id == _currentMemberId)?.Role == "Owner";
             var meta = new List<string>();
             if (!string.IsNullOrWhiteSpace(family.TimeZone)) meta.Add(family.TimeZone);
             if (!string.IsNullOrWhiteSpace(family.Currency)) meta.Add(family.Currency);
@@ -140,12 +144,56 @@ public sealed class FamilyPage : ContentPage
         identity.Children.Add(name);
         identity.Children.Add(role);
 
-        var row = new HorizontalStackLayout { Spacing = 12, Children = { avatar, identity } };
-        var card = new Border { Padding = 12, Content = row };
+        var memberContent = new VerticalStackLayout { Spacing = 10 };
+        memberContent.Children.Add(new HorizontalStackLayout { Spacing = 12, Children = { avatar, identity } });
+        if (_isOwner && member.Id != _currentMemberId)
+        {
+            var actions = new HorizontalStackLayout { Spacing = 8 };
+            var roleButton = new Button { Text = "Change role", FontSize = 12 };
+            roleButton.Clicked += async (_, _) => await ChangeMemberRoleAsync(member);
+            var deactivateButton = new Button { Text = "Remove", FontSize = 12 };
+            deactivateButton.Clicked += async (_, _) => await DeactivateMemberAsync(member);
+            actions.Children.Add(roleButton);
+            actions.Children.Add(deactivateButton);
+            memberContent.Children.Add(actions);
+        }
+        var card = new Border { Padding = 12, Content = memberContent };
         card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
         _members.Children.Add(card);
     }
 
+
+    private async Task ChangeMemberRoleAsync(FamilyMemberDto member)
+    {
+        var choices = new[] { "Adult", "Teen", "Child", "Owner" };
+        var selected = await DisplayActionSheetAsync($"Change {member.DisplayName}'s role", "Cancel", null, choices);
+        if (string.IsNullOrWhiteSpace(selected) || selected == "Cancel" || selected == member.Role) return;
+        var warning = selected == "Owner"
+            ? "This transfers ownership to this member and changes your role to Adult. Continue?"
+            : $"Change {member.DisplayName}'s role to {selected}?";
+        if (!await DisplayAlertAsync("Confirm role change", warning, "Change role", "Cancel")) return;
+        try
+        {
+            await _family.ChangeMemberRoleAsync(member.Id, selected);
+            await LoadAsync();
+        }
+        catch (FamilyApiException ex) { await DisplayAlertAsync("Could not change role", ex.Message, "OK"); }
+        catch { await DisplayAlertAsync("Could not change role", "Try again.", "OK"); }
+    }
+
+    private async Task DeactivateMemberAsync(FamilyMemberDto member)
+    {
+        if (!await DisplayAlertAsync("Remove family member?",
+            $"{member.DisplayName} will lose access to this household. This does not delete their account.",
+            "Remove", "Cancel")) return;
+        try
+        {
+            await _family.DeactivateMemberAsync(member.Id);
+            await LoadAsync();
+        }
+        catch (FamilyApiException ex) { await DisplayAlertAsync("Could not remove member", ex.Message, "OK"); }
+        catch { await DisplayAlertAsync("Could not remove member", "Try again.", "OK"); }
+    }
 
     private async Task LoadInvitesAsync()
     {
