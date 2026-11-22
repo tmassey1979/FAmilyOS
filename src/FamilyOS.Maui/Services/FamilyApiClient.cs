@@ -36,6 +36,20 @@ public sealed class FamilyApiClient
     public async Task<FamilyMemberDto> DeactivateMemberAsync(Guid memberId, CancellationToken ct = default)
         => await SendAsync<FamilyMemberDto>(HttpMethod.Post, $"api/family/members/{memberId:D}/deactivate", null, ct);
 
+    public Task<List<CheckInDto>> GetCheckInsAsync(bool includeCompleted = true, CancellationToken ct = default)
+        => SendAsync<List<CheckInDto>>(HttpMethod.Get, $"api/checkins?includeCompleted={includeCompleted.ToString().ToLowerInvariant()}", null, ct);
+
+    public Task<CheckInDto> CreateCheckInAsync(Guid targetMemberId, DateTimeOffset dueAtUtc, CancellationToken ct = default)
+        => SendAsync<CheckInDto>(HttpMethod.Post, "api/checkins",
+            JsonContent.Create(new { targetMemberId, dueAtUtc }, options: JsonOptions), ct);
+
+    public Task RespondToCheckInAsync(Guid id, string? message = null, CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Post, $"api/checkins/{id:D}/respond",
+            JsonContent.Create(new { message }, options: JsonOptions), ct);
+
+    public Task CancelCheckInAsync(Guid id, CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Post, $"api/checkins/{id:D}/cancel", null, ct);
+
     public Task<LocationConsentDto> GetLocationConsentAsync(CancellationToken ct = default)
         => SendAsync<LocationConsentDto>(HttpMethod.Get, "api/location/consent", null, ct);
 
@@ -183,3 +197,5 @@ public sealed record SavedPlaceDto(Guid Id, string Name, double Latitude, double
 public sealed record LocationHistoryConsentDto(bool HistoryEnabled);
 public sealed record LocationHistoryPointDto(double Latitude, double Longitude, double AccuracyMeters, DateTime RecordedAtUtc);
 public sealed record LocationTripDto(DateTime StartedAtUtc, DateTime EndedAtUtc, double StartLatitude, double StartLongitude, double EndLatitude, double EndLongitude, double DistanceMeters, double DurationMinutes);
+
+public sealed record CheckInDto(Guid Id, Guid RequesterMemberId, string RequesterName, Guid TargetMemberId, string TargetName, DateTime CreatedAtUtc, DateTime DueAtUtc, string Status, DateTime? RespondedAtUtc, string? ResponseMessage, bool CanRespond);
