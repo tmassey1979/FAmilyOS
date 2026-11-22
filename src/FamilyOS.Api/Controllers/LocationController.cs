@@ -18,13 +18,11 @@ public sealed class LocationController : ControllerBase
     private static readonly TimeSpan MaximumAge = TimeSpan.FromHours(24);
     private readonly FamilyOsDbContext _db;
     private readonly ICurrentUserService _current;
-    private readonly IPushNotificationSender _push;
 
-    public LocationController(FamilyOsDbContext db, ICurrentUserService current, IPushNotificationSender push)
+    public LocationController(FamilyOsDbContext db, ICurrentUserService current)
     {
         _db = db;
         _current = current;
-        _push = push;
     }
 
     [HttpGet("consent")]
@@ -242,7 +240,6 @@ public sealed class LocationController : ControllerBase
         var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
         if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
 
-        var pushEvents = new List<(Guid[] Recipients, string Title, string Body, string EventType, Guid PlaceId)>();
         await using (var transaction = await _db.Database.BeginTransactionAsync(ct))
         {
             // Serialize updates from this device so stale fixes cannot reverse geofence state.
@@ -323,29 +320,10 @@ public sealed class LocationController : ControllerBase
                 foreach (var recipientId in recipients)
                     _db.Notifications.Add(Notification.Create(familyId, recipientId, notificationType,
                         title, bodyText, place.Id, "SavedPlace"));
-                pushEvents.Add((recipients, title, bodyText, isInside ? "location-arrived" : "location-departed", place.Id));
             }
 
             await _db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
-        }
-
-        foreach (var pushEvent in pushEvents)
-        {
-            try
-            {
-                await _push.SendToMembersAsync(pushEvent.Recipients, pushEvent.Title, pushEvent.Body,
-                    new Dictionary<string, string>
-                    {
-                        ["type"] = pushEvent.EventType,
-                        ["placeId"] = pushEvent.PlaceId.ToString("D"),
-                        ["memberId"] = memberId.ToString("D")
-                    }, ct);
-            }
-            catch
-            {
-                // Persisted in-app notifications remain available if push delivery is unavailable.
-            }
         }
 
         return NoContent();
