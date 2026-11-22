@@ -86,21 +86,21 @@ public sealed class LocationController : ControllerBase
         if (!await IsActiveMemberAsync(familyId, viewerMemberId, ct))
             return NotFound(new { error = "That viewer is not an active member of your household." });
 
-        var existing = await _db.MemberLocationViewerGrants.SingleOrDefaultAsync(
-            x => x.FamilyId == familyId && x.SharingMemberId == memberId && x.ViewerMemberId == viewerMemberId, ct);
-        if (body.Enabled && existing is null)
+        if (body.Enabled)
         {
-            _db.MemberLocationViewerGrants.Add(new MemberLocationViewerGrant
-            {
-                FamilyId = familyId, SharingMemberId = memberId, ViewerMemberId = viewerMemberId,
-                GrantedAtUtc = DateTime.UtcNow
-            });
-            await _db.SaveChangesAsync(ct);
+            // Idempotent under rapid taps or concurrent requests; the unique index is the final guard.
+            await _db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO familyos."MemberLocationViewerGrants"
+                    ("Id", "FamilyId", "SharingMemberId", "ViewerMemberId", "GrantedAtUtc")
+                VALUES ({Guid.NewGuid()}, {familyId}, {memberId}, {viewerMemberId}, {DateTime.UtcNow})
+                ON CONFLICT ("SharingMemberId", "ViewerMemberId") DO NOTHING
+                """, ct);
         }
-        else if (!body.Enabled && existing is not null)
+        else
         {
-            _db.MemberLocationViewerGrants.Remove(existing);
-            await _db.SaveChangesAsync(ct);
+            await _db.MemberLocationViewerGrants
+                .Where(x => x.FamilyId == familyId && x.SharingMemberId == memberId && x.ViewerMemberId == viewerMemberId)
+                .ExecuteDeleteAsync(ct);
         }
         return NoContent();
     }
