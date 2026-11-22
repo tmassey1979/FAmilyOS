@@ -114,7 +114,7 @@ public sealed class EmergencySosPage : ContentPage
 
             try
             {
-                if (!_deviceLocation.IsEnabled && !await _deviceLocation.EnableAsync())
+                if (!await _deviceLocation.EnableAsync())
                 {
                     var sendWithout = await DisplayAlertAsync(
                         "Location permission not granted",
