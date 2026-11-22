@@ -26,7 +26,8 @@ public sealed class LocationController : ControllerBase
     [HttpGet("consent")]
     public async Task<IActionResult> GetConsent(CancellationToken ct)
     {
-        var (_, memberId, _) = await _current.RequireFamilyAsync(ct);
+        var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
+        if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
         var row = await _db.Set<MemberLocation>().AsNoTracking()
             .SingleOrDefaultAsync(x => x.MemberId == memberId, ct);
         return Ok(new { sharingEnabled = row?.SharingEnabled ?? false, consentUpdatedAtUtc = row?.ConsentUpdatedAtUtc });
@@ -36,6 +37,7 @@ public sealed class LocationController : ControllerBase
     public async Task<IActionResult> SetConsent([FromBody] ConsentBody body, CancellationToken ct)
     {
         var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
+        if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
         var row = await _db.Set<MemberLocation>().SingleOrDefaultAsync(x => x.MemberId == memberId, ct);
         if (row is null)
         {
@@ -67,13 +69,12 @@ public sealed class LocationController : ControllerBase
             return BadRequest(new { error = "Coordinates or accuracy are outside valid bounds." });
 
         var now = DateTime.UtcNow;
-        var measuredAt = body.MeasuredAtUtc.Kind == DateTimeKind.Utc
-            ? body.MeasuredAtUtc
-            : body.MeasuredAtUtc.ToUniversalTime();
+        var measuredAt = body.MeasuredAtUtc.UtcDateTime;
         if (measuredAt > now.AddMinutes(5) || measuredAt < now.Subtract(MaximumAge))
             return BadRequest(new { error = "Location timestamp must be within the last 24 hours and not in the future." });
 
         var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
+        if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
         var row = await _db.Set<MemberLocation>().SingleOrDefaultAsync(x => x.MemberId == memberId, ct);
         if (row is null || !row.SharingEnabled)
             return Conflict(new { error = "Enable location sharing before sending a location." });
@@ -90,7 +91,8 @@ public sealed class LocationController : ControllerBase
     [HttpGet("family")]
     public async Task<IActionResult> GetFamilyLocations(CancellationToken ct)
     {
-        var (familyId, _, _) = await _current.RequireFamilyAsync(ct);
+        var (familyId, viewerMemberId, _) = await _current.RequireFamilyAsync(ct);
+        if (!await IsActiveMemberAsync(familyId, viewerMemberId, ct)) return Forbid();
         var cutoff = DateTime.UtcNow.Subtract(MaximumAge);
         var locations = await (
             from location in _db.Set<MemberLocation>().AsNoTracking()
