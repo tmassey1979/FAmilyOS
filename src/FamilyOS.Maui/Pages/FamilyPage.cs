@@ -7,6 +7,8 @@ public sealed class FamilyPage : ContentPage
 {
     private readonly FamilyApiClient _family;
     private readonly VerticalStackLayout _members;
+    private readonly VerticalStackLayout _invites;
+    private readonly Button _createInvite;
     private readonly Label _name;
     private readonly Label _details;
     private readonly Label _status;
@@ -35,12 +37,18 @@ public sealed class FamilyPage : ContentPage
         };
         Grid.SetColumn(_refresh, 1);
         _members = new VerticalStackLayout { Spacing = 10 };
+        _invites = new VerticalStackLayout { Spacing = 8 };
+        _createInvite = new Button { Text = "Create invitation" };
+        _createInvite.Clicked += async (_, _) => await CreateInviteAsync();
+        var inviteHeading = new Label { Text = "Invitations", FontSize = 20, FontAttributes = FontAttributes.Bold };
+        inviteHeading.SetDynamicResource(VisualElement.StyleProperty, "TextDisplay");
+        var inviteSection = new VerticalStackLayout { Spacing = 10, Children = { inviteHeading, _createInvite, _invites } };
 
         var content = new VerticalStackLayout
         {
             Padding = new Thickness(20, 12),
             Spacing = 14,
-            Children = { header, _details, _status, _members }
+            Children = { header, _details, _status, _members, inviteSection }
         };
         Content = new RefreshView
         {
@@ -77,6 +85,7 @@ public sealed class FamilyPage : ContentPage
             if (members.Count == 0)
                 AddInfoCard("No active members", "Family members will appear here when they join the household.");
             foreach (var member in members) AddMember(member);
+            await LoadInvitesAsync();
         }
         catch (OperationCanceledException)
         {
@@ -134,6 +143,93 @@ public sealed class FamilyPage : ContentPage
         var card = new Border { Padding = 12, Content = row };
         card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
         _members.Children.Add(card);
+    }
+
+
+    private async Task LoadInvitesAsync()
+    {
+        _invites.Children.Clear();
+        try
+        {
+            var invites = await _family.GetInvitesAsync();
+            _createInvite.IsVisible = true;
+            foreach (var invite in invites.OrderByDescending(x => x.IsOpen))
+            {
+                var state = invite.IsOpen ? $"Open · expires {invite.ExpiresAtUtc.ToLocalTime():g}"
+                    : invite.AcceptedAtUtc.HasValue ? "Accepted" : "Closed or expired";
+                var stack = new VerticalStackLayout { Spacing = 4 };
+                stack.Children.Add(new Label { Text = $"{invite.Role} invitation", FontAttributes = FontAttributes.Bold });
+                stack.Children.Add(new Label { Text = $"{invite.EmailHint ?? "No email restriction"} · {state}", FontSize = 12 });
+                if (invite.IsOpen)
+                {
+                    var actions = new HorizontalStackLayout { Spacing = 8 };
+                    var copy = new Button { Text = "Copy code", FontSize = 12 };
+                    copy.Clicked += async (_, _) =>
+                    {
+                        await Microsoft.Maui.ApplicationModel.Clipboard.Default.SetTextAsync(invite.Code);
+                        await DisplayAlertAsync("Invitation code copied", invite.Code, "Done");
+                    };
+                    var revoke = new Button { Text = "Revoke", FontSize = 12 };
+                    revoke.Clicked += async (_, _) => await RevokeInviteAsync(invite);
+                    actions.Children.Add(copy);
+                    actions.Children.Add(revoke);
+                    stack.Children.Add(actions);
+                }
+                var card = new Border { Padding = 12, Content = stack };
+                card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
+                _invites.Children.Add(card);
+            }
+            if (invites.Count == 0) AddInviteInfo("No invitations yet", "Create an invitation to add someone to this household.");
+        }
+        catch (FamilyApiException ex) when (ex.StatusCode == HttpStatusCode.Forbidden)
+        {
+            _createInvite.IsVisible = false;
+            AddInviteInfo("Invitations are managed by adults", "Household members are listed above.");
+        }
+        catch
+        {
+            _createInvite.IsVisible = false;
+            AddInviteInfo("Invitations unavailable", "Pull to refresh and try again.");
+        }
+    }
+
+    private async Task CreateInviteAsync()
+    {
+        var role = await DisplayActionSheetAsync("Invite someone as", "Cancel", null, "Adult", "Teen", "Child");
+        if (string.IsNullOrWhiteSpace(role) || role == "Cancel") return;
+        var email = await DisplayPromptAsync("Optional email", "Restrict this invitation with an email hint, or leave blank.", "Continue", "Skip", keyboard: Keyboard.Email);
+        if (email is null) return;
+        _createInvite.IsEnabled = false;
+        try
+        {
+            var invite = await _family.CreateInviteAsync(role, string.IsNullOrWhiteSpace(email) ? null : email.Trim());
+            await Microsoft.Maui.ApplicationModel.Clipboard.Default.SetTextAsync(invite.Code);
+            await DisplayAlertAsync("Invitation created", $"Code: {invite.Code}
+
+Copied to clipboard. Expires {invite.ExpiresAtUtc.ToLocalTime():g}.", "Done");
+            await LoadInvitesAsync();
+        }
+        catch (FamilyApiException ex) { await DisplayAlertAsync("Could not create invitation", ex.Message, "OK"); }
+        catch { await DisplayAlertAsync("Could not create invitation", "FamilyOS could not complete that request. Try again.", "OK"); }
+        finally { _createInvite.IsEnabled = true; }
+    }
+
+    private async Task RevokeInviteAsync(FamilyInviteDto invite)
+    {
+        if (!await DisplayAlertAsync("Revoke invitation?", $"Code {invite.Code} will stop working.", "Revoke", "Keep")) return;
+        try { await _family.RevokeInviteAsync(invite.Id); await LoadInvitesAsync(); }
+        catch (FamilyApiException ex) { await DisplayAlertAsync("Could not revoke invitation", ex.Message, "OK"); }
+        catch { await DisplayAlertAsync("Could not revoke invitation", "Try again.", "OK"); }
+    }
+
+    private void AddInviteInfo(string title, string detail)
+    {
+        var stack = new VerticalStackLayout { Spacing = 4 };
+        stack.Children.Add(new Label { Text = title, FontAttributes = FontAttributes.Bold });
+        stack.Children.Add(new Label { Text = detail, FontSize = 13 });
+        var card = new Border { Padding = 12, Content = stack };
+        card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
+        _invites.Children.Add(card);
     }
 
     private static int RoleOrder(FamilyMemberDto member) => member.Role switch
