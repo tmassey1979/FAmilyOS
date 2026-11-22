@@ -22,7 +22,6 @@ public static class EnsureLocationSchema
                     "Status" character varying(20) NOT NULL,
                     "RespondedAtUtc" timestamp with time zone NULL,
                     "ResponseMessage" character varying(500) NULL,
-                    "CreatedAtUtc_Entity" timestamp with time zone NULL,
                     "UpdatedAtUtc" timestamp with time zone NULL,
                     "IsDeleted" boolean NOT NULL DEFAULT false
                 );
