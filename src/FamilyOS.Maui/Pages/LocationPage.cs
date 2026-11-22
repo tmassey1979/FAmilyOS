@@ -157,7 +157,7 @@ public sealed class LocationPage : ContentPage
     private async Task SetSharingAsync(bool enabled)
     {
         if (enabled && !await DisplayAlertAsync("Enable household location sharing?",
-            "Active members of your household will be able to see the latest location you explicitly share. This does not enable background tracking.",
+            "Only household members you explicitly allow in the access list below can see the latest location you share. This does not enable background tracking.",
             "Enable sharing", "Cancel")) return;
         try
         {
@@ -165,7 +165,7 @@ public sealed class LocationPage : ContentPage
             _sharingEnabled = result.SharingEnabled;
             if (!enabled) _lastLocation = null;
             _sharingStatus.Text = enabled
-                ? "Household sharing is on. Your location is not sent until you explicitly share a reading."
+                ? "Household sharing is on. Only people you explicitly allow can see a reading, and nothing is sent until you explicitly share it."
                 : "Household sharing is off. Your saved coordinates have been removed.";
             RefreshState();
             await RefreshFamilyLocationsAsync();
@@ -259,7 +259,7 @@ public sealed class LocationPage : ContentPage
                 _lastLocation.Longitude,
                 _lastLocation.Accuracy.Value,
                 _lastLocation.Timestamp.UtcDateTime);
-            _fixStatus.Text = "Your current location was shared with active household members.";
+            _fixStatus.Text = "Your current location was shared with the household members you explicitly allowed.";
             await RefreshFamilyLocationsAsync();
         }
         catch (Exception ex)
