@@ -91,6 +91,14 @@ public sealed class LocationTrackingForegroundService : Service
                     if (!consent.SharingEnabled)
                         break;
 
+                    // Tracking requires a continuing purpose: at least one authorized viewer
+                    // or the owner's separate personal-history opt-in. A revoked final grant
+                    // must stop collection instead of retrying uploads indefinitely.
+                    var viewers = await api.GetLocationViewersAsync(cancellationToken);
+                    var history = await api.GetLocationHistoryConsentAsync(cancellationToken);
+                    if (!viewers.Any(x => x.CanView) && !history.HistoryEnabled)
+                        break;
+
                     var location = await deviceLocation.GetCurrentLocationAsync(cancellationToken);
                     if (location?.Accuracy is double accuracy)
                     {
