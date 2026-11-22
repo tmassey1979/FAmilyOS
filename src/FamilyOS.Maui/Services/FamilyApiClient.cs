@@ -75,6 +75,17 @@ public sealed class FamilyApiClient
         return SendAsync<List<LocationHistoryPointDto>>(HttpMethod.Get, path, null, ct);
     }
 
+    public Task<List<LocationTripDto>> GetLocationTripsAsync(Guid memberId,
+        DateTimeOffset? fromUtc = null, DateTimeOffset? toUtc = null, CancellationToken ct = default)
+    {
+        var path = $"api/location/trips/{memberId:D}";
+        var query = new List<string>();
+        if (fromUtc.HasValue) query.Add($"fromUtc={Uri.EscapeDataString(fromUtc.Value.ToString("O"))}");
+        if (toUtc.HasValue) query.Add($"toUtc={Uri.EscapeDataString(toUtc.Value.ToString("O"))}");
+        if (query.Count > 0) path += "?" + string.Join("&", query);
+        return SendAsync<List<LocationTripDto>>(HttpMethod.Get, path, null, ct);
+    }
+
     public Task ClearLocationHistoryAsync(CancellationToken ct = default)
         => SendNoContentAsync(HttpMethod.Delete, "api/location/history", null, ct);
 
@@ -171,3 +182,4 @@ public sealed record LocationViewerDto(Guid MemberId, string DisplayName, bool C
 public sealed record SavedPlaceDto(Guid Id, string Name, double Latitude, double Longitude, double RadiusMeters, bool AlertOnArrival, bool AlertOnDeparture, bool CanEdit);
 public sealed record LocationHistoryConsentDto(bool HistoryEnabled);
 public sealed record LocationHistoryPointDto(double Latitude, double Longitude, double AccuracyMeters, DateTime RecordedAtUtc);
+public sealed record LocationTripDto(DateTime StartedAtUtc, DateTime EndedAtUtc, double StartLatitude, double StartLongitude, double EndLatitude, double EndLongitude, double DistanceMeters, double DurationMinutes);
