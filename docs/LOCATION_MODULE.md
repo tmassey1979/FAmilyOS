@@ -1,31 +1,43 @@
 # FamilyOS location module
 
-## Current MAUI milestone
+## Current milestone
 
-The MAUI client currently provides a foreground-only, user-initiated location reading:
+The first location-sharing milestone now connects the MAUI app to authenticated FamilyOS APIs:
 
-- Location access is off by default.
-- The user must explicitly enable access on the device.
-- Android requests only the while-in-use location permission.
-- A location fix is requested only after the user taps the action.
-- Coordinates are held in memory by the page and are not uploaded or persisted.
-- The user can turn off the local consent setting at any time.
+- Android device permission is while-in-use only and off by default.
+- Household sharing is a separate server-side opt-in, also off by default.
+- The user must explicitly request a location fix and separately tap to share it.
+- The server stores only the latest shared fix, not a location history.
+- Active members of the same household can see the latest fix from members who opted in.
+- Stopping sharing clears the stored coordinates immediately.
+- Disabling device location also attempts to revoke household sharing.
+- The API rejects invalid coordinates, inaccurate values outside its accepted bounds, timestamps more than five minutes in the future, and fixes older than 24 hours.
+- The API checks active household membership on consent, update, and read operations.
 
-This is a device-location foundation, **not Life360-style household sharing**. There is no live family map, background tracking, location history, saved places, geofences, check-ins, or SOS delivery in this milestone.
+This is deliberately **not yet Life360-style continuous tracking**. There is no background service, live map, location history, saved places, geofences, check-ins, or SOS delivery.
+
+## API
+
+- `GET /api/location/consent` — current member's sharing state.
+- `PUT /api/location/consent` — explicit opt-in/out. Opt-out deletes the saved fix.
+- `POST /api/location/current` — submit one user-initiated location fix after consent.
+- `GET /api/location/family` — latest fixes shared by active members of the caller's household, limited to the last 24 hours.
+
+The initial sharing scope is all active members of the same household. Per-viewer grants and more granular sharing controls are not implemented yet.
 
 ## Required next milestones
 
-1. Server-side member consent and sharing grants, including immediate revocation and recipient scoping.
-2. Authenticated location ingestion and household map query APIs with freshness and accuracy metadata.
-3. Android foreground location service with a persistent notification, explicit start/stop, offline queue limits, and battery controls. Background permission must be requested separately with an explanation and only after the user enables a feature that needs it.
+1. Per-viewer sharing grants, member-level privacy controls, and guardian/child consent rules.
+2. Android foreground location service with persistent notification, explicit start/stop, offline queue limits, battery controls, and a separate background permission flow.
+3. A map UI with freshness/accuracy indicators and clear stale/offline states.
 4. Saved places and deduplicated geofence transitions.
 5. User-initiated check-ins and household SOS notifications with explicit delivery limitations.
 
 ## Security and release gates
 
-- The server must verify module entitlement, active household membership, member consent, and the specific viewer grant on every read/write.
 - Never infer consent from household membership or a parent/guardian role.
 - Stop accepting updates immediately after consent withdrawal or membership removal.
-- Minimize retention, provide deletion, and audit access.
+- Do not show coordinates to anyone outside the active household.
+- Keep location history disabled until retention, deletion, and access auditing are designed.
 - No default-on tracking, silent background collection, or emergency-dispatch claims.
-- Physical Android tests must cover permission denial, approximate location, app process death, reboot, battery restrictions, offline delivery, and consent revocation before background sharing is enabled in production.
+- Physical Android tests must cover permission denial, approximate location, app process death, reboot, battery restrictions, offline delivery, membership removal, and consent revocation before background sharing is enabled in production.
