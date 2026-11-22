@@ -16,7 +16,23 @@ public sealed class LocationTrackingForegroundService : Service
     public const string StopAction = "com.familyos.app.location.STOP";
     private const string ChannelId = "familyos_location_tracking";
     private const string TrackingPreferenceKey = "familyos.location.continuous-tracking";
-    public static bool IsTracking => Microsoft.Maui.Storage.Preferences.Default.Get(TrackingPreferenceKey, false);
+    private const string TrackingHeartbeatKey = "familyos.location.tracking-heartbeat";
+    public static bool IsTracking
+    {
+        get
+        {
+            var preferences = Microsoft.Maui.Storage.Preferences.Default;
+            if (!preferences.Get(TrackingPreferenceKey, false)) return false;
+            var raw = preferences.Get(TrackingHeartbeatKey, string.Empty);
+            if (!DateTime.TryParse(raw, null, System.Globalization.DateTimeStyles.RoundtripKind, out var heartbeat)
+                || DateTime.UtcNow - heartbeat.ToUniversalTime() > TimeSpan.FromMinutes(2))
+            {
+                preferences.Set(TrackingPreferenceKey, false);
+                return false;
+            }
+            return true;
+        }
+    }
     private const int NotificationId = 4107;
     private static readonly TimeSpan UpdateInterval = TimeSpan.FromMinutes(1);
     private CancellationTokenSource? _cancellation;
@@ -47,6 +63,7 @@ public sealed class LocationTrackingForegroundService : Service
             StartForeground(NotificationId, notification);
 
         Microsoft.Maui.Storage.Preferences.Default.Set(TrackingPreferenceKey, true);
+        Microsoft.Maui.Storage.Preferences.Default.Set(TrackingHeartbeatKey, DateTime.UtcNow.ToString("O"));
         _cancellation = new CancellationTokenSource();
         _trackingTask = TrackAsync(_cancellation.Token);
         return StartCommandResult.NotSticky;
@@ -69,6 +86,7 @@ public sealed class LocationTrackingForegroundService : Service
             {
                 try
                 {
+                    Microsoft.Maui.Storage.Preferences.Default.Set(TrackingHeartbeatKey, DateTime.UtcNow.ToString("O"));
                     var consent = await api.GetLocationConsentAsync(cancellationToken);
                     if (!consent.SharingEnabled)
                         break;
@@ -114,6 +132,7 @@ public sealed class LocationTrackingForegroundService : Service
     private void StopTracking()
     {
         Microsoft.Maui.Storage.Preferences.Default.Set(TrackingPreferenceKey, false);
+        Microsoft.Maui.Storage.Preferences.Default.Remove(TrackingHeartbeatKey);
         _cancellation?.Cancel();
         _cancellation?.Dispose();
         _cancellation = null;
