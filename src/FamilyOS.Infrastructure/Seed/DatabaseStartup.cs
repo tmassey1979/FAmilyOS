@@ -37,7 +37,7 @@ public static class DatabaseStartup
                 "Apply migrations explicitly before starting the API.");
         }
 
-        // An empty migration history plus existing application tables indicates a
+        // An empty migration history plus any existing application table indicates a
         // legacy/unbaselined database. Applying InitialCreate there could destroy or
         // collide with live schema, so require an intentional baseline operation.
         if (applied.Length == 0 && await HasExistingApplicationSchemaAsync(db, cancellationToken))
@@ -76,7 +76,7 @@ public static class DatabaseStartup
         try
         {
             await using var command = connection.CreateCommand();
-            command.CommandText = "SELECT to_regclass(format('%I.%I', 'familyos', 'Users')) IS NOT NULL;";
+            command.CommandText = "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'familyos' AND table_type = 'BASE TABLE' AND table_name <> '__EFMigrationsHistory');";
             var result = await command.ExecuteScalarAsync(cancellationToken);
             return result is bool exists && exists;
         }
