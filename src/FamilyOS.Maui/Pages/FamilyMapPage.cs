@@ -86,7 +86,7 @@ public sealed class FamilyMapPage : ContentPage
             }
         };
 
-        _map.Source = new HtmlWebViewSource { Html = BuildMapHtml([]) };
+        _map.Source = new HtmlWebViewSource { Html = BuildMapHtml([], []) };
     }
 
     protected override async void OnAppearing()
@@ -125,15 +125,16 @@ public sealed class FamilyMapPage : ContentPage
         try
         {
             var locations = await _api.GetFamilyLocationsAsync();
+            var places = await _api.GetSavedPlacesAsync();
             var valid = locations
                 .Where(x => x.Latitude is >= -90 and <= 90
                     && x.Longitude is >= -180 and <= 180
                     && x.UpdatedAtUtc.HasValue)
                 .ToList();
 
-            _map.Source = new HtmlWebViewSource { Html = BuildMapHtml(valid) };
+            _map.Source = new HtmlWebViewSource { Html = BuildMapHtml(valid, places) };
             _status.Text = valid.Count == 0
-                ? "No active household members have shared a location in the last 24 hours."
+                ? "No active household members have shared a recent location. Saved places are shown when available."
                  : $"{valid.Count} shared location(s). Last received update: {valid.Max(x => x.UpdatedAtUtc!.Value).ToLocalTime():g}.";
         }
         catch (Exception ex)
@@ -147,7 +148,7 @@ public sealed class FamilyMapPage : ContentPage
         }
     }
 
-    private static string BuildMapHtml(IReadOnlyList<FamilyLocationDto> locations)
+    private static string BuildMapHtml(IReadOnlyList<FamilyLocationDto> locations, IReadOnlyList<SavedPlaceDto> places)
     {
         var data = locations.Select(x => new MapPin(
             x.DisplayName,
@@ -156,6 +157,7 @@ public sealed class FamilyMapPage : ContentPage
             x.AccuracyMeters,
             x.UpdatedAtUtc!.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)));
         var json = JsonSerializer.Serialize(data, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var placeJson = JsonSerializer.Serialize(places, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         return $$"""
             <!doctype html>
             <html lang="en">
@@ -176,15 +178,27 @@ public sealed class FamilyMapPage : ContentPage
                 integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
               <script>
                 const locations = {{json}};
+                const places = {{placeJson}};
                 const map = L.map('map', { zoomControl: true }).setView([39.5, -98.35], 4);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                   maxZoom: 19,
                   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 }).addTo(map);
-                if (locations.length === 0) {
+                if (locations.length === 0 && places.length === 0) {
                   document.getElementById('map').innerHTML = '<div class="empty">No shared locations available.</div>';
                 } else {
                   const bounds = [];
+                  for (const place of places) {
+                    const point = [place.latitude, place.longitude];
+                    bounds.push(point);
+                    const popup = document.createElement('div');
+                    const name = document.createElement('strong');
+                    name.textContent = place.name || 'Saved place';
+                    const detail = document.createElement('div');
+                    detail.textContent = 'Geofence radius: ' + Math.round(place.radiusMeters) + ' m';
+                    popup.append(name, detail);
+                    L.circle(point, { radius: place.radiusMeters, color: '#2563eb', weight: 2, fillOpacity: 0.08 }).addTo(map).bindPopup(popup);
+                  }
                   for (const item of locations) {
                     const point = [item.latitude, item.longitude];
                     bounds.push(point);
