@@ -1,3 +1,4 @@
+using System.Net;
 using Android.App;
 using Android.Content;
 using Android.OS;
@@ -131,6 +132,15 @@ public sealed class LocationTrackingForegroundService : Service
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
+                    break;
+                }
+                catch (FamilyOS.Maui.Services.FamilyApiException ex)
+                    when (ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+                {
+                    // Authentication or household authorization cannot recover by
+                    // retrying location uploads. Stop collection and require the user
+                    // to reopen the app and resolve their session/access.
+                    UpdateNotification("FamilyOS access expired or was revoked; tracking stopped.");
                     break;
                 }
                 catch (UnauthorizedAccessException)
