@@ -82,9 +82,27 @@ public class FamilyController : ControllerBase
                 FOR UPDATE
                 """)
             .SingleOrDefaultAsync(ct);
+        var affectedSharers = await _db.MemberLocationViewerGrants.AsNoTracking()
+            .Where(x => x.ViewerMemberId == id)
+            .Select(x => x.SharingMemberId)
+            .Distinct()
+            .ToListAsync(ct);
         await _db.MemberLocationViewerGrants
             .Where(x => x.SharingMemberId == id || x.ViewerMemberId == id)
             .ExecuteDeleteAsync(ct);
+        foreach (var sharerId in affectedSharers)
+        {
+            var stillHasViewer = await _db.MemberLocationViewerGrants.AnyAsync(
+                x => x.SharingMemberId == sharerId, ct);
+            if (stillHasViewer) continue;
+            var sharerLocation = await _db.MemberLocations.SingleOrDefaultAsync(
+                x => x.MemberId == sharerId, ct);
+            if (sharerLocation is null) continue;
+            sharerLocation.BatterySharingEnabled = false;
+            sharerLocation.BatteryPercent = null;
+            sharerLocation.IsCharging = null;
+            sharerLocation.BatteryUpdatedAtUtc = null;
+        }
         await _db.MemberLocationHistory
             .Where(x => x.MemberId == id)
             .ExecuteDeleteAsync(ct);
