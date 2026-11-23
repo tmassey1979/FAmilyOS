@@ -130,7 +130,7 @@ public sealed class LocationTrackingForegroundService : Service
                         UpdateNotification("Waiting for an accurate location fix…");
                     }
                 }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                catch (System.OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
                     break;
                 }
@@ -144,11 +144,6 @@ public sealed class LocationTrackingForegroundService : Service
                     break;
                 }
                 catch (UnauthorizedAccessException)
-                {
-                    UpdateNotification("Location permission was revoked; tracking stopped.");
-                    break;
-                }
-                catch (PermissionException)
                 {
                     UpdateNotification("Location permission was revoked; tracking stopped.");
                     break;
@@ -248,7 +243,7 @@ public sealed class LocationTrackingForegroundService : Service
         return builder
             .SetContentTitle("FamilyOS location sharing is active")
             .SetContentText(status)
-            .SetSmallIcon(Android.Resource.Drawable.IcMenuMyLocation)
+            .SetSmallIcon(global::Android.Resource.Drawable.IcMenuMyLocation)
             .SetOngoing(true)
             .SetCategory(Notification.CategoryService)
             .AddAction(new Notification.Action.Builder(null, "Stop", stopPendingIntent).Build())
