@@ -171,7 +171,7 @@ public sealed class LocationTrackingForegroundService : Service
                 await Task.Delay(interval, cancellationToken);
             }
         }
-        catch (OperationCanceledException)
+        catch (System.OperationCanceledException)
         {
         }
         finally
