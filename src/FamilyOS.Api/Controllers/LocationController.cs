@@ -70,6 +70,7 @@ public sealed class LocationController : ControllerBase
             row.Longitude = null;
             row.AccuracyMeters = null;
             row.LocationUpdatedAtUtc = null;
+            row.BatterySharingEnabled = false;
             row.BatteryPercent = null;
             row.IsCharging = null;
             row.BatteryUpdatedAtUtc = null;
