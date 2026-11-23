@@ -7,8 +7,8 @@ public sealed class CheckInsPage : ContentPage
 {
     private readonly FamilyApiClient _api;
     private readonly Picker _memberPicker = new() { Title = "Choose a household member" };
-    private readonly DatePicker _dueDate = new() { Date = DateTime.Today };
-    private readonly TimePicker _dueTime = new() { Time = DateTime.Now.AddHours(2).TimeOfDay };
+    private readonly DatePicker _dueDate = new();
+    private readonly TimePicker _dueTime = new();
     private readonly Button _send = new() { Text = "Request check-in" };
     private readonly Button _refresh = new() { Text = "Refresh" };
     private readonly Label _status = new() { FontSize = 13 };
@@ -21,6 +21,8 @@ public sealed class CheckInsPage : ContentPage
     {
         _api = api;
         Title = "Check-ins";
+        _dueDate.Date = DateTime.Today;
+        _dueTime.Time = DateTime.Now.AddHours(2).TimeOfDay;
         _status.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
         _send.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
         _refresh.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
@@ -106,9 +108,13 @@ public sealed class CheckInsPage : ContentPage
     {
         if (_busy || _memberPicker.SelectedIndex < 0 || _memberPicker.SelectedIndex >= _members.Count)
             return;
-        // DatePicker.Date is DateTime? on some MAUI TFMs; normalize before combining with TimePicker.
-        DateTime dueDate = _dueDate.Date ?? DateTime.Today;
-        DateTime due = dueDate.Date + _dueTime.Time;
+
+        // MAUI DatePicker.Date is DateTime? on net11.0-android — never assign it directly to DateTime.
+        DateTime dueDate = DateTime.Today;
+        if (_dueDate.Date is DateTime picked)
+            dueDate = picked.Date;
+
+        DateTime due = dueDate + _dueTime.Time;
         var dueLocal = new DateTimeOffset(DateTime.SpecifyKind(due, DateTimeKind.Local));
         if (dueLocal <= DateTimeOffset.Now || dueLocal > DateTimeOffset.Now.AddDays(7))
         {
