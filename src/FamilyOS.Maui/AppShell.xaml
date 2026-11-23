@@ -4,7 +4,7 @@
        xmlns:pages="clr-namespace:FamilyOS.Maui.Pages"
        x:Class="FamilyOS.Maui.AppShell"
        FlyoutBehavior="Disabled"
-       Shell.NavBarIsVisible="True"
+       Shell.NavBarIsVisible="False"
        Shell.BackgroundColor="{StaticResource BgPage}"
        Shell.ForegroundColor="{StaticResource TextPrimary}"
        Shell.TitleColor="{StaticResource TextPrimary}"
@@ -17,32 +17,14 @@
         <Tab Title="Home"
              Icon="menu_home.png"
              Route="home">
-            <ShellContent x:Name="HomeShellContent" Title="Pulse"
+            <ShellContent x:Name="HomeShellContent" Title="Home"
                           ContentTemplate="{DataTemplate pages:HomePage}" />
         </Tab>
-        <Tab Title="Tasks"
-             Icon="menu_tasks.png"
-             Route="tasks">
-            <ShellContent x:Name="TasksShellContent" Title="Tasks"
-                          ContentTemplate="{DataTemplate pages:TasksPage}" />
-        </Tab>
-        <Tab Title="Calendar"
-             Icon="menu_calendar.png"
-             Route="calendar">
-            <ShellContent x:Name="CalendarShellContent" Title="Calendar"
-                          ContentTemplate="{DataTemplate pages:CalendarPage}" />
-        </Tab>
-        <Tab Title="Family"
+        <Tab Title="Map"
              Icon="menu_family.png"
-             Route="family">
-            <ShellContent x:Name="FamilyShellContent" Title="Family"
-                          ContentTemplate="{DataTemplate pages:FamilyPage}" />
-        </Tab>
-        <Tab Title="More"
-             Icon="menu_more.png"
-             Route="more">
-            <ShellContent Title="More"
-                          ContentTemplate="{DataTemplate pages:MorePage}" />
+             Route="map">
+            <ShellContent x:Name="MapShellContent" Title="Map"
+                          ContentTemplate="{DataTemplate pages:FamilyMapPage}" />
         </Tab>
     </TabBar>
 </Shell>
