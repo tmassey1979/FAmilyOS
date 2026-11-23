@@ -244,6 +244,7 @@ public sealed class LocationController : ControllerBase
                 await _db.SaveChangesAsync(ct);
             }
         }
+        await _db.SaveChangesAsync(ct);
         await transaction.CommitAsync(ct);
         return NoContent();
     }
