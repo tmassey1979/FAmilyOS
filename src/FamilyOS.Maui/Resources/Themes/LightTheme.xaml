@@ -3,17 +3,22 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
-    <Color x:Key="BgPage">#F8F5F0</Color>
+    <!-- Cream / navy FamilyOS light theme -->
+    <Color x:Key="BgPage">#F4F0E8</Color>
     <Color x:Key="BgSurface">#FFFFFF</Color>
-    <Color x:Key="BgSurfaceAlt">#F1EDE6</Color>
-    <Color x:Key="BorderSubtle">#E2E8F0</Color>
+    <Color x:Key="BgSurfaceAlt">#EFE9DF</Color>
+    <Color x:Key="BorderSubtle">#E2D9CC</Color>
     <Color x:Key="TextPrimary">#0F172A</Color>
     <Color x:Key="TextMuted">#64748B</Color>
-    <Color x:Key="TextOnAccent">#0F172A</Color>
-    <Color x:Key="AccentPrimary">#38BDF8</Color>
-    <Color x:Key="AccentDanger">#F87171</Color>
-    <Color x:Key="AccentSuccess">#4ADE80</Color>
-    <Color x:Key="AccentWarning">#FBBF24</Color>
-    <Color x:Key="OverlayScrim">#00000066</Color>
+    <Color x:Key="TextInverse">#F8FAFC</Color>
+    <Color x:Key="TextOnAccent">#FFFFFF</Color>
+    <Color x:Key="AccentPrimary">#0F172A</Color>
+    <Color x:Key="AccentBrand">#0F172A</Color>
+    <Color x:Key="AccentSoft">#E0F2FE</Color>
+    <Color x:Key="AccentSky">#0EA5E9</Color>
+    <Color x:Key="AccentDanger">#EF4444</Color>
+    <Color x:Key="AccentSuccess">#16A34A</Color>
+    <Color x:Key="AccentWarning">#D97706</Color>
+    <Color x:Key="OverlayScrim">#0F172A99</Color>
 
 </ResourceDictionary>
