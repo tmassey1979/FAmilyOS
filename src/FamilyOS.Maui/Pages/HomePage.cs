@@ -1,95 +1,91 @@
 using FamilyOS.Maui.Services;
-using Microsoft.Maui.ApplicationModel;
 
 namespace FamilyOS.Maui.Pages;
 
-/// <summary>API-backed Family Pulse dashboard. All household data is server-authorized.</summary>
+/// <summary>
+/// Household home shell: member strip, Pulse command center, and rearrangeable module grid.
+/// </summary>
 public sealed class HomePage : ContentPage
 {
-    private readonly PulseApiClient _pulseClient;
-    private readonly VerticalStackLayout _content;
-    private readonly Label _status;
-    private readonly Button _refresh;
-    private PulseDto? _snapshot;
-    private bool _loading;
-
-    public HomePage(PulseApiClient pulseClient)
+    private readonly PulseApiClient _pulse;
+    private readonly FamilyApiClient _family;
+    private readonly HorizontalStackLayout _members = new() { Spacing = 14 };
+    private readonly Label _greeting = new() { FontSize = 28, FontAttributes = FontAttributes.Bold };
+    private readonly Label _status = new() { FontSize = 14 };
+    private readonly VerticalStackLayout _pulseSection = new() { Spacing = 10 };
+    private readonly FlexLayout _moduleGrid = new()
     {
-        _pulseClient = pulseClient;
-        Title = "Pulse";
+        Wrap = FlexWrap.Wrap,
+        JustifyContent = FlexJustify.Start,
+        AlignItems = FlexAlignItems.Start
+    };
+    private readonly Button _editToggle = new() { Text = "Edit" };
+    private List<HomeModule> _modules = [];
+    private bool _editMode;
+    private bool _loading;
+    private Guid? _selectedMemberId;
 
-        _status = new Label { Text = "Loading your family dashboard…", FontSize = 14 };
-        _status.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+    public HomePage(PulseApiClient pulse, FamilyApiClient family)
+    {
+        _pulse = pulse;
+        _family = family;
+        Title = "Home";
 
-        _refresh = new Button { Text = "Refresh", HorizontalOptions = LayoutOptions.End };
-        _refresh.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
-        _refresh.Clicked += async (_, _) => await LoadAsync();
+        _greeting.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
+        _status.SetDynamicResource(Label.TextColorProperty, "TextMuted");
+        _editToggle.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+        _editToggle.Clicked += (_, _) => ToggleEditMode();
 
-        _content = new VerticalStackLayout { Padding = new Thickness(20, 12), Spacing = 16 };
-
-        // Navy mark + navy wordmark — readable on light BgPage / BgSurface.
-        var brand = new HorizontalStackLayout
+        var membersScroll = new ScrollView
         {
-            Spacing = 10,
-            VerticalOptions = LayoutOptions.Center,
-            Children =
-            {
-                new Image
-                {
-                    Source = "logo_mark.png",
-                    WidthRequest = 32,
-                    HeightRequest = 32,
-                    Aspect = Aspect.AspectFit,
-                    VerticalOptions = LayoutOptions.Center
-                },
-                new Image
-                {
-                    Source = "logo_wordmark.png",
-                    HeightRequest = 24,
-                    Aspect = Aspect.AspectFit,
-                    VerticalOptions = LayoutOptions.Center
-                }
-            }
+            Orientation = ScrollOrientation.Horizontal,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Never,
+            Content = _members
         };
 
-        var header = new Grid
+        var topRow = new Grid
         {
             ColumnDefinitions =
             {
                 new ColumnDefinition(GridLength.Star),
                 new ColumnDefinition(GridLength.Auto)
-            },
-            RowDefinitions =
-            {
-                new RowDefinition(GridLength.Auto),
-                new RowDefinition(GridLength.Auto)
             }
         };
-        header.Add(brand, 0, 0);
-        header.Add(_refresh, 1, 0);
-        var heading = new Label
-        {
-            Text = "Family Pulse",
-            FontSize = 26,
-            FontAttributes = FontAttributes.Bold,
-            VerticalOptions = LayoutOptions.Center,
-            Margin = new Thickness(0, 8, 0, 0)
-        }.WithStyle("TextDisplay");
-        header.Add(heading, 0, 1);
-        Grid.SetColumnSpan(heading, 2);
+        var brand = new Label { Text = "FamilyOS", FontSize = 13, FontAttributes = FontAttributes.Bold };
+        brand.SetDynamicResource(Label.TextColorProperty, "TextMuted");
+        topRow.Add(brand, 0, 0);
+        topRow.Add(_editToggle, 1, 0);
 
-        var layout = new VerticalStackLayout { Spacing = 8, Children = { header, _status, _content } };
+        var page = new VerticalStackLayout
+        {
+            Padding = new Thickness(20, 12, 20, 28),
+            Spacing = 14,
+            Children =
+            {
+                topRow,
+                membersScroll,
+                _greeting,
+                _status,
+                _pulseSection,
+                SectionLabel("Modules"),
+                _moduleGrid
+            }
+        };
+
         Content = new RefreshView
         {
-            Content = new ScrollView { Content = layout },
+            Content = new ScrollView { Content = page },
             Command = new Command(async () => await LoadAsync())
         };
+
+        _modules = HomeModuleCatalog.GetOrdered();
+        RebuildModuleGrid();
     }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (_snapshot is null && !_loading)
+        if (!_loading)
             await LoadAsync();
     }
 
@@ -97,223 +93,296 @@ public sealed class HomePage : ContentPage
     {
         if (_loading) return;
         _loading = true;
-        _refresh.IsEnabled = false;
-        _status.Text = _snapshot is null ? "Loading your family dashboard…" : "Refreshing…";
         try
         {
-            _snapshot = await _pulseClient.GetPulseAsync();
-            Render(_snapshot);
+            await Task.WhenAll(LoadMembersAsync(), LoadPulseAsync());
         }
-        catch (OperationCanceledException)
+        finally
         {
-            _status.Text = "The request timed out. Check your connection and try again.";
+            _loading = false;
+        }
+    }
+
+    private async Task LoadMembersAsync()
+    {
+        try
+        {
+            var family = await _family.GetFamilyAsync();
+            _members.Children.Clear();
+            foreach (var member in family.Members.Where(m => m.IsActive).OrderBy(m => m.DisplayName))
+                _members.Children.Add(BuildMemberChip(member, member.Id == family.CurrentMemberId));
+        }
+        catch
+        {
+            // Member strip is best-effort; Pulse still loads.
+        }
+    }
+
+    private View BuildMemberChip(FamilyMemberDto member, bool isSelf)
+    {
+        var initials = string.Join("", member.DisplayName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Take(2).Select(p => char.ToUpperInvariant(p[0])));
+        if (string.IsNullOrEmpty(initials)) initials = "?";
+
+        var avatar = new Border
+        {
+            WidthRequest = 52,
+            HeightRequest = 52,
+            StrokeThickness = _selectedMemberId == member.Id ? 3 : 0,
+            BackgroundColor = Color.FromArgb("#E0F2FE"),
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 26 },
+            Content = new Label
+            {
+                Text = initials,
+                FontAttributes = FontAttributes.Bold,
+                FontSize = 16,
+                HorizontalTextAlignment = TextAlignment.Center,
+                VerticalTextAlignment = TextAlignment.Center,
+                TextColor = Color.FromArgb("#0F172A")
+            }
+        };
+        avatar.SetDynamicResource(Border.StrokeProperty, "AccentSky");
+
+        var name = new Label
+        {
+            Text = isSelf ? "You" : FirstName(member.DisplayName),
+            FontSize = 11,
+            HorizontalTextAlignment = TextAlignment.Center
+        };
+        name.SetDynamicResource(Label.TextColorProperty, "TextMuted");
+
+        var stack = new VerticalStackLayout { Spacing = 4, WidthRequest = 64, Children = { avatar, name } };
+        var tap = new TapGestureRecognizer();
+        tap.Tapped += async (_, _) =>
+        {
+            _selectedMemberId = member.Id;
+            await LoadMembersAsync();
+            _status.Text = $"Focused on {member.DisplayName}";
+            if (member.Id != default)
+                await Shell.Current.GoToAsync("//map");
+        };
+        stack.GestureRecognizers.Add(tap);
+        return stack;
+    }
+
+    private async Task LoadPulseAsync()
+    {
+        _status.Text = "Loading household…";
+        _pulseSection.Children.Clear();
+        try
+        {
+            var pulse = await _pulse.GetPulseAsync();
+            _greeting.Text = string.IsNullOrWhiteSpace(pulse.Greeting) ? "Welcome home" : pulse.Greeting;
+            _status.Text = pulse.RoleHint ?? "Your household at a glance.";
+
+            if (pulse.NextAction is not null)
+            {
+                var next = pulse.NextAction;
+                var btn = new Button
+                {
+                    Text = string.IsNullOrWhiteSpace(next.PrimaryAction)
+                        ? next.Title
+                        : $"{next.PrimaryAction}: {next.Title}"
+                };
+                btn.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
+                btn.Clicked += async (_, _) => await OpenKindAsync(next.Kind);
+                _pulseSection.Children.Add(PulseCard("Next up", next.Subtitle ?? next.Title, next.DueLabel, btn));
+            }
+            else
+            {
+                _pulseSection.Children.Add(PulseCard("Pulse", "You’re caught up — nothing urgent right now.", null, null));
+            }
+
+            var stats = new Grid
+            {
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(GridLength.Star),
+                    new ColumnDefinition(GridLength.Star),
+                    new ColumnDefinition(GridLength.Star)
+                },
+                ColumnSpacing = 8
+            };
+            stats.Add(MiniStat(pulse.Household.TasksDueToday, "Due"), 0, 0);
+            stats.Add(MiniStat(pulse.Household.RequestsAwaitingApproval, "Approvals"), 1, 0);
+            stats.Add(MiniStat(pulse.Household.TasksNeedingAcceptance, "Accept"), 2, 0);
+            _pulseSection.Children.Add(stats);
         }
         catch (FamilyApiException ex)
         {
             _status.Text = ex.Message;
             if (ex.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
-                AddSignInHint();
-        }
-        catch (HttpRequestException)
-        {
-            _status.Text = "FamilyOS could not be reached. Check your connection and try again.";
-        }
-        catch (Exception)
-        {
-            _status.Text = "Something went wrong while loading Family Pulse.";
-        }
-        finally
-        {
-            _loading = false;
-            _refresh.IsEnabled = true;
-        }
-    }
-
-    private void Render(PulseDto pulse)
-    {
-        _content.Children.Clear();
-        _status.Text = pulse.RoleHint ?? "Your household at a glance.";
-        AddText(pulse.Greeting, "TextTitle");
-        AddText($"Your role: {pulse.Role}", "TextCaption");
-
-        if (pulse.NextAction is not null)
-        {
-            var next = pulse.NextAction;
-            var action = new Button { Text = $"{next.PrimaryAction}: {next.Title}", HorizontalOptions = LayoutOptions.Fill };
-            action.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
-            action.Clicked += async (_, _) => await NavigateForAsync(next.Kind);
-            AddCard("Your next action", next.Subtitle, action, next.DueLabel);
-        }
-
-        AddSummary(pulse.Household);
-
-        if (pulse.NeedsAttention.Count > 0)
-            AddAttentionSection("Needs attention", pulse.NeedsAttention);
-
-        if (pulse.WaitingBlockers.Count > 0)
-            AddAttentionSection("Waiting and blockers", pulse.WaitingBlockers);
-
-        if (pulse.ComingUp.Count > 0)
-        {
-            AddSectionTitle("Coming up");
-            foreach (var item in pulse.ComingUp)
             {
-                var when = item.WhenUtc.ToLocalTime().ToString("ddd, MMM d · h:mm tt");
-                AddCard(item.Title, $"{when}{(string.IsNullOrWhiteSpace(item.Location) ? "" : $" · {item.Location}")}", null, item.Kind);
+                var signIn = new Button { Text = "Sign in / set up household" };
+                signIn.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
+                signIn.Clicked += async (_, _) => await Shell.Current.GoToAsync(nameof(OnboardingPage));
+                _pulseSection.Children.Add(signIn);
             }
         }
-
-        if (pulse.Procurement is not null)
+        catch
         {
-            AddSectionTitle("Shopping");
-            AddCard($"{pulse.Procurement.ApprovedItems} items approved",
-                $"{pulse.Procurement.ReadyForStore} ready for a store trip",
-                null, pulse.Procurement.PrimaryStore);
-        }
-
-        if (pulse.Conditions.Count > 0)
-        {
-            AddSectionTitle("Open conditions");
-            foreach (var condition in pulse.Conditions)
-                AddCard(condition.Name, condition.RelatedTitle, null, condition.Status);
-        }
-
-        if (pulse.NeedsAttention.Count == 0 && pulse.WaitingBlockers.Count == 0
-            && pulse.ComingUp.Count == 0 && pulse.NextAction is null)
-        {
-            AddCard("You’re all caught up", "There are no urgent actions or upcoming items in this snapshot.", null, "All clear");
+            _status.Text = "Could not load Pulse. Pull to refresh.";
         }
     }
 
-    private void AddSummary(PulseHouseholdSummaryDto household)
+    private void ToggleEditMode()
     {
-        AddSectionTitle("Household at a glance");
-        var grid = new Grid
+        _editMode = !_editMode;
+        _editToggle.Text = _editMode ? "Done" : "Edit";
+        RebuildModuleGrid();
+    }
+
+    private void RebuildModuleGrid()
+    {
+        _moduleGrid.Children.Clear();
+        for (var i = 0; i < _modules.Count; i++)
         {
-            ColumnDefinitions =
-            {
-                new ColumnDefinition(GridLength.Star),
-                new ColumnDefinition(GridLength.Star),
-                new ColumnDefinition(GridLength.Star)
-            },
-            ColumnSpacing = 8
+            var index = i;
+            var module = _modules[i];
+            _moduleGrid.Children.Add(BuildModuleTile(module, index));
+        }
+    }
+
+    private View BuildModuleTile(HomeModule module, int index)
+    {
+        var icon = new Image
+        {
+            Source = module.Icon,
+            WidthRequest = 28,
+            HeightRequest = 28,
+            HorizontalOptions = LayoutOptions.Center
         };
-        grid.Add(StatCard(household.TasksDueToday, "Due today"), 0, 0);
-        grid.Add(StatCard(household.RequestsAwaitingApproval, "Approvals"), 1, 0);
-        grid.Add(StatCard(household.TasksNeedingAcceptance, "To accept"), 2, 0);
-        _content.Children.Add(grid);
+        var title = new Label
+        {
+            Text = module.Title,
+            FontSize = 13,
+            FontAttributes = FontAttributes.Bold,
+            HorizontalTextAlignment = TextAlignment.Center
+        };
+        title.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
+
+        var body = new VerticalStackLayout
+        {
+            Spacing = 8,
+            Padding = new Thickness(10, 14),
+            Children = { icon, title }
+        };
+
+        if (_editMode)
+        {
+            var left = new Button { Text = "←", WidthRequest = 40, FontSize = 14 };
+            var right = new Button { Text = "→", WidthRequest = 40, FontSize = 14 };
+            left.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+            right.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+            left.Clicked += (_, _) =>
+            {
+                HomeModuleCatalog.Move(_modules, index, -1);
+                RebuildModuleGrid();
+            };
+            right.Clicked += (_, _) =>
+            {
+                HomeModuleCatalog.Move(_modules, index, +1);
+                RebuildModuleGrid();
+            };
+            body.Children.Add(new HorizontalStackLayout
+            {
+                Spacing = 4,
+                HorizontalOptions = LayoutOptions.Center,
+                Children = { left, right }
+            });
+        }
+
+        var border = new Border
+        {
+            WidthRequest = 100,
+            Margin = new Thickness(4),
+            Padding = 0,
+            Content = body
+        };
+        border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
+
+        if (!_editMode)
+        {
+            var tap = new TapGestureRecognizer();
+            tap.Tapped += async (_, _) =>
+            {
+                try { await Shell.Current.GoToAsync(module.Route); }
+                catch { _status.Text = $"Could not open {module.Title}."; }
+            };
+            border.GestureRecognizers.Add(tap);
+        }
+
+        return border;
     }
 
-    private void AddAttentionSection(string title, IEnumerable<PulseAttentionItemDto> items)
+    private static View PulseCard(string eyebrow, string body, string? meta, View? action)
     {
-        AddSectionTitle(title);
-        foreach (var item in items)
-        {
-            var button = new Button { Text = item.ActionLabel, FontSize = 13, HorizontalOptions = LayoutOptions.End };
-            button.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
-            button.Clicked += async (_, _) => await NavigateForAsync(item.Kind);
-            AddCard(item.Title, item.Reason, button, item.Kind);
-        }
-    }
-
-    private void AddCard(string title, string? subtitle, View? action, string? meta)
-    {
-        var stack = new VerticalStackLayout { Spacing = 6 };
-        var heading = new Label { Text = title, FontSize = 16, FontAttributes = FontAttributes.Bold };
-        heading.SetDynamicResource(VisualElement.StyleProperty, "TextBodyStrong");
-        stack.Children.Add(heading);
-        if (!string.IsNullOrWhiteSpace(subtitle))
-        {
-            var detail = new Label { Text = subtitle, FontSize = 14, LineBreakMode = LineBreakMode.WordWrap };
-            detail.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
-            stack.Children.Add(detail);
-        }
+        var stack = new VerticalStackLayout { Spacing = 8 };
+        var eye = new Label { Text = eyebrow.ToUpperInvariant(), FontSize = 11, FontAttributes = FontAttributes.Bold };
+        eye.SetDynamicResource(Label.TextColorProperty, "AccentSky");
+        stack.Children.Add(eye);
+        var main = new Label { Text = body, FontSize = 16, LineBreakMode = LineBreakMode.WordWrap };
+        main.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
+        stack.Children.Add(main);
         if (!string.IsNullOrWhiteSpace(meta))
         {
-            var caption = new Label { Text = meta, FontSize = 12 };
-            caption.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
-            stack.Children.Add(caption);
+            var m = new Label { Text = meta, FontSize = 12 };
+            m.SetDynamicResource(Label.TextColorProperty, "TextMuted");
+            stack.Children.Add(m);
         }
         if (action is not null) stack.Children.Add(action);
-
-        var border = new Border { Padding = 14, Content = stack };
-        border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
-        _content.Children.Add(border);
-    }
-
-    private View StatCard(int value, string label)
-    {
-        var valueLabel = new Label { Text = value.ToString(), FontSize = 24, FontAttributes = FontAttributes.Bold,
-            HorizontalTextAlignment = TextAlignment.Center };
-        valueLabel.SetDynamicResource(VisualElement.StyleProperty, "TextTitle");
-        var caption = new Label { Text = label, FontSize = 12, HorizontalTextAlignment = TextAlignment.Center };
-        caption.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
-        var stack = new VerticalStackLayout { Spacing = 4, Children = { valueLabel, caption } };
-        var border = new Border { Padding = 10, Content = stack };
+        var border = new Border { Padding = 18, Content = stack };
         border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
         return border;
     }
 
-    private void AddSectionTitle(string title)
+    private static View MiniStat(int value, string label)
     {
-        var label = new Label { Text = title, FontSize = 18, FontAttributes = FontAttributes.Bold };
-        label.SetDynamicResource(VisualElement.StyleProperty, "TextHeading");
-        _content.Children.Add(label);
-    }
-
-    private void AddText(string value, string style)
-    {
-        var label = new Label { Text = value, FontSize = 15, LineBreakMode = LineBreakMode.WordWrap };
-        label.SetDynamicResource(VisualElement.StyleProperty, style);
-        _content.Children.Add(label);
-    }
-
-    private void AddSignInHint()
-    {
-        if (_content.Children.OfType<Button>().Any(b => b.Text == "Sign in / set up household"))
-            return;
-
-        var hint = new Label
+        var v = new Label
         {
-            Text = "Sign in or finish setting up your household to use FamilyOS.",
-            FontSize = 13,
-            LineBreakMode = LineBreakMode.WordWrap
+            Text = value.ToString(),
+            FontSize = 22,
+            FontAttributes = FontAttributes.Bold,
+            HorizontalTextAlignment = TextAlignment.Center
         };
-        hint.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
-        var button = new Button { Text = "Sign in / set up household" };
-        button.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
-        button.Clicked += async (_, _) =>
+        v.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
+        var l = new Label { Text = label, FontSize = 11, HorizontalTextAlignment = TextAlignment.Center };
+        l.SetDynamicResource(Label.TextColorProperty, "TextMuted");
+        var border = new Border
         {
-            await Shell.Current.GoToAsync(nameof(OnboardingPage));
+            Padding = new Thickness(6, 12),
+            Content = new VerticalStackLayout { Spacing = 2, Children = { v, l } }
         };
-        _content.Children.Add(hint);
-        _content.Children.Add(button);
+        border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
+        return border;
     }
 
-    private static async Task NavigateForAsync(string kind)
+    private static Label SectionLabel(string text)
     {
-        // Pulse items can represent more than tasks and requests. Keep shortcuts
-        // pointed at the matching feature instead of sending every unknown item
-        // to Tasks and making unrelated cards appear broken.
+        var label = new Label { Text = text, FontSize = 13, FontAttributes = FontAttributes.Bold, Margin = new Thickness(2, 8, 0, 0) };
+        label.SetDynamicResource(Label.TextColorProperty, "TextMuted");
+        return label;
+    }
+
+    private static string FirstName(string displayName)
+    {
+        var part = displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+        return string.IsNullOrWhiteSpace(part) ? displayName : part;
+    }
+
+    private static async Task OpenKindAsync(string kind)
+    {
         var route = kind.Trim().ToLowerInvariant() switch
         {
             "request" => nameof(RequestsPage),
-            "event" or "calendar" => "//calendar",
+            "event" or "calendar" => nameof(CalendarPage),
             "meal" or "recipe" => nameof(MealsPage),
             "message" or "chat" => nameof(ChatPage),
             "notification" => nameof(NotificationsPage),
-            "family" or "member" or "shopping" or "procurement" => "//family",
-            _ => "//tasks"
+            "family" or "member" or "shopping" or "procurement" => nameof(FamilyPage),
+            "location" or "map" => "//map",
+            _ => nameof(TasksPage)
         };
         await Shell.Current.GoToAsync(route);
-    }
-}
-
-internal static class PulseViewExtensions
-{
-    public static T WithStyle<T>(this T view, string key) where T : VisualElement
-    {
-        view.SetDynamicResource(VisualElement.StyleProperty, key);
-        return view;
     }
 }
