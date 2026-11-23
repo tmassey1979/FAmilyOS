@@ -177,7 +177,7 @@ jobs:
   maui-android-apk:
     name: Build MAUI Android APK
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -232,6 +232,7 @@ jobs:
           dotnet publish src/FamilyOS.Maui/FamilyOS.Maui.csproj
           --configuration Debug
           --framework net11.0-android
+          --no-restore
           -p:AndroidPackageFormat=apk
           -p:ApplicationDisplayVersion=${{ steps.maui-version.outputs.value }}
           -p:ApplicationVersion=${{ steps.maui-version.outputs.code }}
