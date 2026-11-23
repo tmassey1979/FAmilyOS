@@ -278,7 +278,7 @@ public sealed class FamilyMapPage : ContentPage
                     valid.Add(new FamilyLocationDto(
                         ownMember.Id, ownMember.DisplayName,
                         _ownLocation.Latitude, _ownLocation.Longitude,
-                        _ownLocation.Accuracy, _ownLocation.Timestamp.ToUniversalTime()));
+                        _ownLocation.Accuracy, _ownLocation.Timestamp.UtcDateTime));
                 }
             }
 
