@@ -95,6 +95,15 @@ public sealed class LocationController : ControllerBase
     {
         var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
         if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
+        if (body.Enabled)
+        {
+            var sharingEnabled = await _db.MemberLocations.AnyAsync(
+                x => x.FamilyId == familyId && x.MemberId == memberId && x.SharingEnabled, ct);
+            var hasViewer = await _db.MemberLocationViewerGrants.AnyAsync(
+                x => x.FamilyId == familyId && x.SharingMemberId == memberId, ct);
+            if (!sharingEnabled || !hasViewer)
+                return Conflict(new { error = "Enable household sharing and grant at least one viewer before sharing battery status." });
+        }
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
         var row = await _db.MemberLocations.FromSqlInterpolated($"""
             SELECT * FROM familyos."MemberLocations"
@@ -102,8 +111,8 @@ public sealed class LocationController : ControllerBase
             """).SingleOrDefaultAsync(ct);
         if (row is null)
         {
-            row = new MemberLocation { FamilyId = familyId, MemberId = memberId };
-            _db.MemberLocations.Add(row);
+            if (body.Enabled) return Conflict(new { error = "Enable household sharing before battery sharing." });
+            return Ok(new { batterySharingEnabled = false });
         }
         row.BatterySharingEnabled = body.Enabled;
         if (!body.Enabled)
@@ -126,8 +135,12 @@ public sealed class LocationController : ControllerBase
         if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
         var row = await _db.MemberLocations.SingleOrDefaultAsync(
             x => x.FamilyId == familyId && x.MemberId == memberId, ct);
-        if (row?.BatterySharingEnabled != true)
-            return Conflict(new { error = "Enable battery sharing before uploading battery status." });
+        if (row?.BatterySharingEnabled != true || !row.SharingEnabled)
+            return Conflict(new { error = "Enable battery sharing and household sharing before uploading battery status." });
+        var hasViewer = await _db.MemberLocationViewerGrants.AnyAsync(
+            x => x.FamilyId == familyId && x.SharingMemberId == memberId, ct);
+        if (!hasViewer)
+            return Conflict(new { error = "Grant at least one household viewer before uploading battery status." });
         row.BatteryPercent = body.BatteryPercent;
         row.IsCharging = body.IsCharging;
         row.BatteryUpdatedAtUtc = DateTime.UtcNow;
@@ -212,6 +225,14 @@ public sealed class LocationController : ControllerBase
 
             var hasRemainingViewers = await _db.MemberLocationViewerGrants.AnyAsync(x =>
                 x.FamilyId == familyId && x.SharingMemberId == memberId, ct);
+            if (!hasRemainingViewers && location is not null)
+            {
+                // No audience remains: stop battery uploads and erase the last reading.
+                location.BatterySharingEnabled = false;
+                location.BatteryPercent = null;
+                location.IsCharging = null;
+                location.BatteryUpdatedAtUtc = null;
+            }
             if (!hasRemainingViewers && location is not null && !location.HistoryEnabled)
             {
                 // With no audience and no personal history opt-in, retain no coordinates.

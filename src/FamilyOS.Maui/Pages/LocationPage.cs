@@ -233,18 +233,15 @@ public sealed class LocationPage : ContentPage
             _batterySharingEnabled = consent.BatterySharingEnabled;
             _batterySwitch.IsToggled = _batterySharingEnabled;
             _batterySwitch.IsEnabled = _sharingEnabled && !_busy;
-            if (_batterySharingEnabled)
-            {
-                var status = await _api.GetFamilyBatteryAsync();
-                _batteryStatus.Text = status.Count == 0
-                    ? "Battery sharing is on. No authorized household member has a recent battery update."
-                    : string.Join("\\n", status.Select(x =>
-                        $"{x.DisplayName}: {(x.BatteryPercent.HasValue ? $"{x.BatteryPercent.Value}%" : "unknown")}{(x.IsCharging == true ? " · charging" : "")} · {x.UpdatedAtUtc?.ToLocalTime():g}"));
-            }
-            else
-            {
-                _batteryStatus.Text = "Battery sharing is off. Battery details are not uploaded.";
-            }
+            var status = await _api.GetFamilyBatteryAsync();
+            var ownStatus = _batterySharingEnabled
+                ? "Your battery sharing is on."
+                : "Your battery sharing is off; your battery details are not uploaded.";
+            var familyStatus = status.Count == 0
+                ? "No household members with an active viewer grant have a recent battery update."
+                : string.Join("\\n", status.Select(x =>
+                    $"{x.DisplayName}: {(x.BatteryPercent.HasValue ? $"{x.BatteryPercent.Value}%" : "unknown")}{(x.IsCharging == true ? " · charging" : "")} · {x.UpdatedAtUtc?.ToLocalTime():g}"));
+            _batteryStatus.Text = ownStatus + "\\n" + familyStatus;
         }
         catch (Exception ex)
         {
