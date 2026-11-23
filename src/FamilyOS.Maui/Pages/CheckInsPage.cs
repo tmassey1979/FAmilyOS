@@ -106,7 +106,8 @@ public sealed class CheckInsPage : ContentPage
     {
         if (_busy || _memberPicker.SelectedIndex < 0 || _memberPicker.SelectedIndex >= _members.Count)
             return;
-        var due = _dueDate.Date + _dueTime.Time;
+        var dueDate = _dueDate.Date ?? DateTime.Today;
+        var due = dueDate + _dueTime.Time;
         var dueLocal = new DateTimeOffset(DateTime.SpecifyKind(due, DateTimeKind.Local));
         if (dueLocal <= DateTimeOffset.Now || dueLocal > DateTimeOffset.Now.AddDays(7))
         {
