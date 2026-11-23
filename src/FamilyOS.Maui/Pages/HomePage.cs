@@ -1,5 +1,4 @@
 using FamilyOS.Maui.Services;
-using Microsoft.Maui.ApplicationModel;
 
 namespace FamilyOS.Maui.Pages;
 
@@ -8,7 +7,9 @@ public sealed class HomePage : ContentPage
 {
     private readonly PulseApiClient _pulseClient;
     private readonly VerticalStackLayout _content;
+    private readonly Label _greeting;
     private readonly Label _status;
+    private readonly Label _roleChip;
     private readonly Button _refresh;
     private PulseDto? _snapshot;
     private bool _loading;
@@ -18,16 +19,6 @@ public sealed class HomePage : ContentPage
         _pulseClient = pulseClient;
         Title = "Pulse";
 
-        _status = new Label { Text = "Loading your family dashboard…", FontSize = 14 };
-        _status.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
-
-        _refresh = new Button { Text = "Refresh", HorizontalOptions = LayoutOptions.End };
-        _refresh.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
-        _refresh.Clicked += async (_, _) => await LoadAsync();
-
-        _content = new VerticalStackLayout { Padding = new Thickness(20, 12), Spacing = 16 };
-
-        // Navy mark + navy wordmark — readable on light BgPage / BgSurface.
         var brand = new HorizontalStackLayout
         {
             Spacing = 10,
@@ -37,51 +28,70 @@ public sealed class HomePage : ContentPage
                 new Image
                 {
                     Source = "logo_mark.png",
-                    WidthRequest = 32,
-                    HeightRequest = 32,
-                    Aspect = Aspect.AspectFit,
-                    VerticalOptions = LayoutOptions.Center
+                    WidthRequest = 28,
+                    HeightRequest = 28,
+                    Aspect = Aspect.AspectFit
                 },
                 new Image
                 {
                     Source = "logo_wordmark.png",
-                    HeightRequest = 24,
-                    Aspect = Aspect.AspectFit,
-                    VerticalOptions = LayoutOptions.Center
+                    HeightRequest = 20,
+                    Aspect = Aspect.AspectFit
                 }
             }
         };
 
-        var header = new Grid
+        _refresh = new Button { Text = "Refresh" };
+        _refresh.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+        _refresh.Clicked += async (_, _) => await LoadAsync();
+
+        var topBar = new Grid
         {
             ColumnDefinitions =
             {
                 new ColumnDefinition(GridLength.Star),
                 new ColumnDefinition(GridLength.Auto)
             },
-            RowDefinitions =
-            {
-                new RowDefinition(GridLength.Auto),
-                new RowDefinition(GridLength.Auto)
-            }
+            Margin = new Thickness(0, 0, 0, 4)
         };
-        header.Add(brand, 0, 0);
-        header.Add(_refresh, 1, 0);
-        var heading = new Label
-        {
-            Text = "Family Pulse",
-            FontSize = 26,
-            FontAttributes = FontAttributes.Bold,
-            VerticalOptions = LayoutOptions.Center,
-            Margin = new Thickness(0, 8, 0, 0)
-        }.WithStyle("TextDisplay");
-        header.Add(heading, 0, 1);
-        Grid.SetColumnSpan(heading, 2);
+        topBar.Add(brand, 0, 0);
+        topBar.Add(_refresh, 1, 0);
 
-        var layout = new VerticalStackLayout { Spacing = 8, Children = { header, _status, _content } };
+        _greeting = new Label
+        {
+            Text = "Welcome back",
+            FontSize = 28,
+            FontAttributes = FontAttributes.Bold,
+            Margin = new Thickness(0, 8, 0, 0)
+        };
+        _greeting.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
+
+        _roleChip = new Label
+        {
+            Text = "",
+            FontSize = 12,
+            FontAttributes = FontAttributes.Bold,
+            Padding = new Thickness(10, 4),
+            HorizontalOptions = LayoutOptions.Start
+        };
+        _roleChip.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
+        _roleChip.SetDynamicResource(Label.BackgroundColorProperty, "AccentSoft");
+
+        _status = new Label { Text = "Loading your family dashboard…", FontSize = 14, Margin = new Thickness(0, 4, 0, 0) };
+        _status.SetDynamicResource(Label.TextColorProperty, "TextMuted");
+
+        _content = new VerticalStackLayout { Spacing = 14 };
+
+        var page = new VerticalStackLayout
+        {
+            Padding = new Thickness(20, 16, 20, 28),
+            Spacing = 10,
+            Children = { topBar, _greeting, _roleChip, _status, _content }
+        };
+
         Content = new RefreshView
         {
-            Content = new ScrollView { Content = layout },
+            Content = new ScrollView { Content = page },
             Command = new Command(async () => await LoadAsync())
         };
     }
@@ -132,17 +142,24 @@ public sealed class HomePage : ContentPage
     private void Render(PulseDto pulse)
     {
         _content.Children.Clear();
+        _greeting.Text = string.IsNullOrWhiteSpace(pulse.Greeting) ? "Family Pulse" : pulse.Greeting;
+        _roleChip.Text = string.IsNullOrWhiteSpace(pulse.Role) ? "" : pulse.Role.ToUpperInvariant();
+        _roleChip.IsVisible = !string.IsNullOrWhiteSpace(pulse.Role);
         _status.Text = pulse.RoleHint ?? "Your household at a glance.";
-        AddText(pulse.Greeting, "TextTitle");
-        AddText($"Your role: {pulse.Role}", "TextCaption");
 
         if (pulse.NextAction is not null)
         {
             var next = pulse.NextAction;
-            var action = new Button { Text = $"{next.PrimaryAction}: {next.Title}", HorizontalOptions = LayoutOptions.Fill };
+            var action = new Button
+            {
+                Text = string.IsNullOrWhiteSpace(next.PrimaryAction)
+                    ? next.Title
+                    : $"{next.PrimaryAction}: {next.Title}",
+                HorizontalOptions = LayoutOptions.Fill
+            };
             action.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
             action.Clicked += async (_, _) => await NavigateForAsync(next.Kind);
-            AddCard("Your next action", next.Subtitle, action, next.DueLabel);
+            AddHeroCard("Next up", next.Subtitle, action, next.DueLabel);
         }
 
         AddSummary(pulse.Household);
@@ -151,7 +168,7 @@ public sealed class HomePage : ContentPage
             AddAttentionSection("Needs attention", pulse.NeedsAttention);
 
         if (pulse.WaitingBlockers.Count > 0)
-            AddAttentionSection("Waiting and blockers", pulse.WaitingBlockers);
+            AddAttentionSection("Waiting & blockers", pulse.WaitingBlockers);
 
         if (pulse.ComingUp.Count > 0)
         {
@@ -181,13 +198,13 @@ public sealed class HomePage : ContentPage
         if (pulse.NeedsAttention.Count == 0 && pulse.WaitingBlockers.Count == 0
             && pulse.ComingUp.Count == 0 && pulse.NextAction is null)
         {
-            AddCard("You’re all caught up", "There are no urgent actions or upcoming items in this snapshot.", null, "All clear");
+            AddCard("You’re all caught up", "There are no urgent actions or upcoming items right now.", null, "All clear");
         }
     }
 
     private void AddSummary(PulseHouseholdSummaryDto household)
     {
-        AddSectionTitle("Household at a glance");
+        AddSectionTitle("At a glance");
         var grid = new Grid
         {
             ColumnDefinitions =
@@ -196,7 +213,7 @@ public sealed class HomePage : ContentPage
                 new ColumnDefinition(GridLength.Star),
                 new ColumnDefinition(GridLength.Star)
             },
-            ColumnSpacing = 8
+            ColumnSpacing = 10
         };
         grid.Add(StatCard(household.TasksDueToday, "Due today"), 0, 0);
         grid.Add(StatCard(household.RequestsAwaitingApproval, "Approvals"), 1, 0);
@@ -209,62 +226,109 @@ public sealed class HomePage : ContentPage
         AddSectionTitle(title);
         foreach (var item in items)
         {
-            var button = new Button { Text = item.ActionLabel, FontSize = 13, HorizontalOptions = LayoutOptions.End };
-            button.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+            var button = new Button { Text = item.ActionLabel, FontSize = 13, HorizontalOptions = LayoutOptions.Start };
+            button.SetDynamicResource(VisualElement.StyleProperty, "FoChipButtonStyle");
             button.Clicked += async (_, _) => await NavigateForAsync(item.Kind);
             AddCard(item.Title, item.Reason, button, item.Kind);
         }
+    }
+
+    private void AddHeroCard(string title, string? subtitle, View? action, string? meta)
+    {
+        var stack = new VerticalStackLayout { Spacing = 8 };
+        var eyebrow = new Label { Text = title.ToUpperInvariant(), FontSize = 11, FontAttributes = FontAttributes.Bold };
+        eyebrow.SetDynamicResource(Label.TextColorProperty, "AccentSky");
+        stack.Children.Add(eyebrow);
+
+        if (!string.IsNullOrWhiteSpace(subtitle))
+        {
+            var detail = new Label { Text = subtitle, FontSize = 16, LineBreakMode = LineBreakMode.WordWrap };
+            detail.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
+            stack.Children.Add(detail);
+        }
+        if (!string.IsNullOrWhiteSpace(meta))
+        {
+            var caption = new Label { Text = meta, FontSize = 12 };
+            caption.SetDynamicResource(Label.TextColorProperty, "TextMuted");
+            stack.Children.Add(caption);
+        }
+        if (action is not null)
+            stack.Children.Add(action);
+
+        var border = new Border { Padding = 20, Content = stack };
+        border.SetDynamicResource(VisualElement.StyleProperty, "FoCardElevatedStyle");
+        border.SetDynamicResource(Border.BackgroundColorProperty, "BgSurface");
+        _content.Children.Add(border);
     }
 
     private void AddCard(string title, string? subtitle, View? action, string? meta)
     {
         var stack = new VerticalStackLayout { Spacing = 6 };
         var heading = new Label { Text = title, FontSize = 16, FontAttributes = FontAttributes.Bold };
-        heading.SetDynamicResource(VisualElement.StyleProperty, "TextBodyStrong");
+        heading.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
         stack.Children.Add(heading);
         if (!string.IsNullOrWhiteSpace(subtitle))
         {
             var detail = new Label { Text = subtitle, FontSize = 14, LineBreakMode = LineBreakMode.WordWrap };
-            detail.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
+            detail.SetDynamicResource(Label.TextColorProperty, "TextMuted");
             stack.Children.Add(detail);
         }
         if (!string.IsNullOrWhiteSpace(meta))
         {
-            var caption = new Label { Text = meta, FontSize = 12 };
-            caption.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+            var caption = new Label
+            {
+                Text = meta,
+                FontSize = 11,
+                FontAttributes = FontAttributes.Bold,
+                Padding = new Thickness(8, 3),
+                HorizontalOptions = LayoutOptions.Start
+            };
+            caption.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
+            caption.SetDynamicResource(Label.BackgroundColorProperty, "BgSurfaceAlt");
             stack.Children.Add(caption);
         }
         if (action is not null) stack.Children.Add(action);
 
-        var border = new Border { Padding = 14, Content = stack };
+        var border = new Border { Padding = 16, Content = stack };
         border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
         _content.Children.Add(border);
     }
 
     private View StatCard(int value, string label)
     {
-        var valueLabel = new Label { Text = value.ToString(), FontSize = 24, FontAttributes = FontAttributes.Bold,
-            HorizontalTextAlignment = TextAlignment.Center };
-        valueLabel.SetDynamicResource(VisualElement.StyleProperty, "TextTitle");
-        var caption = new Label { Text = label, FontSize = 12, HorizontalTextAlignment = TextAlignment.Center };
-        caption.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+        var valueLabel = new Label
+        {
+            Text = value.ToString(),
+            FontSize = 26,
+            FontAttributes = FontAttributes.Bold,
+            HorizontalTextAlignment = TextAlignment.Center
+        };
+        valueLabel.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
+
+        var caption = new Label
+        {
+            Text = label,
+            FontSize = 11,
+            HorizontalTextAlignment = TextAlignment.Center
+        };
+        caption.SetDynamicResource(Label.TextColorProperty, "TextMuted");
+
         var stack = new VerticalStackLayout { Spacing = 4, Children = { valueLabel, caption } };
-        var border = new Border { Padding = 10, Content = stack };
+        var border = new Border { Padding = new Thickness(8, 14), Content = stack };
         border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
         return border;
     }
 
     private void AddSectionTitle(string title)
     {
-        var label = new Label { Text = title, FontSize = 18, FontAttributes = FontAttributes.Bold };
-        label.SetDynamicResource(VisualElement.StyleProperty, "TextHeading");
-        _content.Children.Add(label);
-    }
-
-    private void AddText(string value, string style)
-    {
-        var label = new Label { Text = value, FontSize = 15, LineBreakMode = LineBreakMode.WordWrap };
-        label.SetDynamicResource(VisualElement.StyleProperty, style);
+        var label = new Label
+        {
+            Text = title,
+            FontSize = 13,
+            FontAttributes = FontAttributes.Bold,
+            Margin = new Thickness(2, 10, 0, 0)
+        };
+        label.SetDynamicResource(Label.TextColorProperty, "TextMuted");
         _content.Children.Add(label);
     }
 
@@ -276,25 +340,19 @@ public sealed class HomePage : ContentPage
         var hint = new Label
         {
             Text = "Sign in or finish setting up your household to use FamilyOS.",
-            FontSize = 13,
+            FontSize = 14,
             LineBreakMode = LineBreakMode.WordWrap
         };
-        hint.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+        hint.SetDynamicResource(Label.TextColorProperty, "TextMuted");
         var button = new Button { Text = "Sign in / set up household" };
         button.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
-        button.Clicked += async (_, _) =>
-        {
-            await Shell.Current.GoToAsync(nameof(OnboardingPage));
-        };
+        button.Clicked += async (_, _) => await Shell.Current.GoToAsync(nameof(OnboardingPage));
         _content.Children.Add(hint);
         _content.Children.Add(button);
     }
 
     private static async Task NavigateForAsync(string kind)
     {
-        // Pulse items can represent more than tasks and requests. Keep shortcuts
-        // pointed at the matching feature instead of sending every unknown item
-        // to Tasks and making unrelated cards appear broken.
         var route = kind.Trim().ToLowerInvariant() switch
         {
             "request" => nameof(RequestsPage),
@@ -306,14 +364,5 @@ public sealed class HomePage : ContentPage
             _ => "//tasks"
         };
         await Shell.Current.GoToAsync(route);
-    }
-}
-
-internal static class PulseViewExtensions
-{
-    public static T WithStyle<T>(this T view, string key) where T : VisualElement
-    {
-        view.SetDynamicResource(VisualElement.StyleProperty, key);
-        return view;
     }
 }
