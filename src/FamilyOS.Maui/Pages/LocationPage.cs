@@ -216,6 +216,7 @@ public sealed class LocationPage : ContentPage
             RefreshState();
             await LoadViewerGrantsAsync();
             await LoadHistoryConsentAsync();
+            await LoadBatteryConsentAsync();
             await RefreshFamilyLocationsAsync();
         }
         catch (Exception ex)
