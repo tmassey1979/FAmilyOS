@@ -11,11 +11,14 @@ public partial class AppShell : Shell
         diagnostics.RecordCheckpoint("AppShell constructor entered");
         InitializeComponent();
         diagnostics.RecordCheckpoint("AppShell.InitializeComponent completed");
-        HomeShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<HomePage>());
-        TasksShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<TasksPage>());
-        CalendarShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<CalendarPage>());
-        FamilyShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<FamilyPage>());
 
+        HomeShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<HomePage>());
+        MapShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<FamilyMapPage>());
+
+        // Modules opened from the Home grid (not bottom tabs).
+        Routing.RegisterRoute(nameof(TasksPage), typeof(TasksPage));
+        Routing.RegisterRoute(nameof(CalendarPage), typeof(CalendarPage));
+        Routing.RegisterRoute(nameof(FamilyPage), typeof(FamilyPage));
         Routing.RegisterRoute(nameof(OnboardingPage), typeof(OnboardingPage));
         Routing.RegisterRoute(nameof(RequestsPage), typeof(RequestsPage));
         Routing.RegisterRoute(nameof(MealsPage), typeof(MealsPage));
@@ -26,11 +29,11 @@ public partial class AppShell : Shell
         Routing.RegisterRoute(nameof(LocationPage), typeof(LocationPage));
         Routing.RegisterRoute(nameof(CheckInsPage), typeof(CheckInsPage));
         Routing.RegisterRoute(nameof(EmergencySosPage), typeof(EmergencySosPage));
-        Routing.RegisterRoute(nameof(FamilyMapPage), typeof(FamilyMapPage));
         Routing.RegisterRoute(nameof(SavedPlacesPage), typeof(SavedPlacesPage));
         Routing.RegisterRoute(nameof(DesignSystemGalleryPage), typeof(DesignSystemGalleryPage));
         Routing.RegisterRoute(nameof(StartupDiagnosticsPage), typeof(StartupDiagnosticsPage));
         Routing.RegisterRoute(nameof(AccessTokenPage), typeof(AccessTokenPage));
+
         Navigated += (_, _) =>
         {
             diagnostics.RecordCheckpoint("AppShell navigation completed");
