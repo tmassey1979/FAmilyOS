@@ -3,18 +3,21 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
-    <!-- Mirrors Expo dark-first theme.ts -->
-    <Color x:Key="BgPage">#0F172A</Color>
+    <Color x:Key="BgPage">#0B1220</Color>
     <Color x:Key="BgSurface">#1E293B</Color>
-    <Color x:Key="BgSurfaceAlt">#334155</Color>
-    <Color x:Key="BorderSubtle">#475569</Color>
+    <Color x:Key="BgSurfaceAlt">#273449</Color>
+    <Color x:Key="BorderSubtle">#334155</Color>
     <Color x:Key="TextPrimary">#F8FAFC</Color>
     <Color x:Key="TextMuted">#94A3B8</Color>
+    <Color x:Key="TextInverse">#0F172A</Color>
     <Color x:Key="TextOnAccent">#0F172A</Color>
     <Color x:Key="AccentPrimary">#38BDF8</Color>
+    <Color x:Key="AccentBrand">#F8FAFC</Color>
+    <Color x:Key="AccentSoft">#0C4A6E</Color>
+    <Color x:Key="AccentSky">#38BDF8</Color>
     <Color x:Key="AccentDanger">#F87171</Color>
     <Color x:Key="AccentSuccess">#4ADE80</Color>
     <Color x:Key="AccentWarning">#FBBF24</Color>
-    <Color x:Key="OverlayScrim">#00000099</Color>
+    <Color x:Key="OverlayScrim">#000000B3</Color>
 
 </ResourceDictionary>
