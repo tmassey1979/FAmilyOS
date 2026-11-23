@@ -17,6 +17,9 @@ public sealed class LocationPage : ContentPage
     private bool _sharingEnabled;
     private bool _hasViewerGrant;
     private bool _historyEnabled;
+    private bool _batterySharingEnabled;
+    private readonly Switch _batterySwitch;
+    private readonly Label _batteryStatus;
     private readonly Label _trackingStatus;
     private readonly Button _startTracking;
     private readonly Button _stopTracking;
@@ -87,6 +90,10 @@ public sealed class LocationPage : ContentPage
         _stopTracking = new Button { Text = "Stop continuous location sharing", IsEnabled = false };
         _stopTracking.Clicked += (_, _) => StopTracking();
         _historySwitch = new Switch { IsToggled = false, HorizontalOptions = LayoutOptions.Start };
+        _batterySwitch = new Switch { IsToggled = false, HorizontalOptions = LayoutOptions.Start };
+        _batterySwitch.Toggled += async (_, e) => { if (!_loadingHistorySwitch) await SetBatterySharingAsync(e.Value); };
+        _batteryStatus = new Label { Text = "Battery sharing is off. Battery details are not uploaded.", FontSize = 12, LineBreakMode = LineBreakMode.WordWrap };
+        _batteryStatus.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
         _historySwitch.Toggled += async (_, e) =>
         {
             if (!_loadingHistorySwitch) await SetHistoryEnabledAsync(e.Value);
@@ -120,7 +127,7 @@ public sealed class LocationPage : ContentPage
             Content = new VerticalStackLayout
             {
                 Spacing = 12,
-                Children = { heading, explanation, _consentStatus, _enable, _update, _disable, _sharingStatus, _enableSharing, _viewerStatus, _viewerControls, _shareNow, _trackingStatus, _startTracking, _stopTracking, new Label { Text = "Location history (separate opt-in)", FontSize = 15, FontAttributes = FontAttributes.Bold }, _historySwitch, _historyStatus, _clearHistory, _stopSharing, _familyStatus, _refreshFamily, _fixStatus, privacy }
+                Children = { heading, explanation, _consentStatus, _enable, _update, _disable, _sharingStatus, _enableSharing, _viewerStatus, _viewerControls, _shareNow, _trackingStatus, _startTracking, _stopTracking, new Label { Text = "Location history (separate opt-in)", FontSize = 15, FontAttributes = FontAttributes.Bold }, _historySwitch, _historyStatus, _clearHistory, new Label { Text = "Battery status sharing (separate opt-in)", FontSize = 15, FontAttributes = FontAttributes.Bold }, _batterySwitch, _batteryStatus, _stopSharing, _familyStatus, _refreshFamily, _fixStatus, privacy }
             }
         };
         card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
@@ -158,6 +165,7 @@ public sealed class LocationPage : ContentPage
         _shareNow.IsEnabled = !_busy && enabled && _sharingEnabled && _hasViewerGrant && _lastLocation is not null;
         _stopSharing.IsEnabled = !_busy && _sharingEnabled;
         _startTracking.IsEnabled = !_busy && enabled && _sharingEnabled && (_hasViewerGrant || _historyEnabled);
+        _batterySwitch.IsEnabled = !_busy && _sharingEnabled;
 #if ANDROID
         var tracking = FamilyOS.Maui.Platforms.Android.LocationTrackingForegroundService.IsTracking;
         _trackingStatus.Text = tracking
@@ -181,6 +189,7 @@ public sealed class LocationPage : ContentPage
                 : "Household sharing is off. Your coordinates are not sent to the server.";
             await LoadViewerGrantsAsync();
             await LoadHistoryConsentAsync();
+            await LoadBatteryConsentAsync();
             await RefreshFamilyLocationsAsync();
         }
         catch (Exception ex)
@@ -212,6 +221,66 @@ public sealed class LocationPage : ContentPage
         catch (Exception ex)
         {
             _sharingStatus.Text = $"Could not update household sharing: {ex.Message}";
+        }
+    }
+
+    private async Task LoadBatteryConsentAsync()
+    {
+        try
+        {
+            var consent = await _api.GetBatteryConsentAsync();
+            _batterySharingEnabled = consent.BatterySharingEnabled;
+            _batterySwitch.IsToggled = _batterySharingEnabled;
+            _batterySwitch.IsEnabled = _sharingEnabled && !_busy;
+            if (_batterySharingEnabled)
+            {
+                var status = await _api.GetFamilyBatteryAsync();
+                _batteryStatus.Text = status.Count == 0
+                    ? "Battery sharing is on. No authorized household member has a recent battery update."
+                    : string.Join("\\n", status.Select(x =>
+                        $"{x.DisplayName}: {(x.BatteryPercent.HasValue ? $"{x.BatteryPercent.Value}%" : "unknown")}{(x.IsCharging == true ? " · charging" : "")} · {x.UpdatedAtUtc?.ToLocalTime():g}"));
+            }
+            else
+            {
+                _batteryStatus.Text = "Battery sharing is off. Battery details are not uploaded.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _batteryStatus.Text = $"Could not load battery sharing settings: {ex.Message}";
+        }
+    }
+
+    private async Task SetBatterySharingAsync(bool enabled)
+    {
+        if (enabled && !_sharingEnabled)
+        {
+            _batterySwitch.IsToggled = false;
+            _batteryStatus.Text = "Enable household sharing before enabling battery status sharing.";
+            return;
+        }
+        if (!await DisplayAlertAsync(enabled ? "Share battery status?" : "Stop sharing battery status?",
+            enabled
+                ? "FamilyOS will upload your battery percentage and charging state while continuous location tracking is active. Only household members you have explicitly allowed to view your location can see it. No additional Android permission is needed."
+                : "FamilyOS will stop uploading battery status and immediately remove your saved battery details.",
+            enabled ? "Enable battery sharing" : "Stop sharing", "Cancel"))
+        {
+            _batterySwitch.IsToggled = !enabled;
+            return;
+        }
+        try
+        {
+            var result = await _api.SetBatterySharingAsync(enabled);
+            _batterySharingEnabled = result.BatterySharingEnabled;
+            _batterySwitch.IsToggled = _batterySharingEnabled;
+            _batteryStatus.Text = enabled
+                ? "Battery sharing is on. Status updates while continuous tracking is active."
+                : "Battery sharing is off and saved battery details have been removed.";
+        }
+        catch (Exception ex)
+        {
+            _batterySwitch.IsToggled = !enabled;
+            _batteryStatus.Text = $"Could not update battery sharing: {ex.Message}";
         }
     }
 
