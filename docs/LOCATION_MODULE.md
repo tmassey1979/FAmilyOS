@@ -18,9 +18,9 @@ The location feature now includes the following consent-gated capabilities:
 
 ## Android tracking behavior and limitations
 
-The foreground service updates approximately once per minute while running. Android requires a visible foreground-service notification, and the service must be started while the app is visible. The implementation intentionally uses while-in-use permission rather than `ACCESS_BACKGROUND_LOCATION`. Android may still restrict execution because of battery management, force-stop, process termination, permission changes, or vendor-specific behavior. The app does not silently restart tracking.
+The foreground service normally samples approximately once per minute. It slows to about three minutes in Android power-save mode and five minutes at or below 15% battery. Transient API/network failures use exponential retry backoff up to five minutes; authentication or household-authorization revocation stops collection instead of retrying indefinitely. Android requires a visible foreground-service notification, and the service must be started while the app is visible. The implementation intentionally uses while-in-use permission rather than `ACCESS_BACKGROUND_LOCATION`. Android may still restrict execution because of battery management, force-stop, process termination, permission changes, or vendor-specific behavior. The app does not silently restart tracking.
 
-The current implementation is not yet validated as a production Life360 replacement. Physical-device validation is required for Android 13–17 notification behavior, screen-off/background operation, Stop action, permission revocation, process death, battery restrictions, location-services-off behavior, and network loss/recovery. There is no bounded offline queue, adaptive movement sampling, battery telemetry, or cross-device service heartbeat.
+The current implementation is not yet validated as a production Life360 replacement. Physical-device validation is required for Android 13–17 notification behavior, screen-off/background operation, Stop action, permission revocation, process death, battery restrictions, location-services-off behavior, and network loss/recovery. There is no bounded offline queue, movement-aware sampling, battery telemetry, or cross-device service heartbeat.
 
 ## API
 
@@ -50,7 +50,7 @@ The current implementation is not yet validated as a production Life360 replacem
 2. User-initiated check-ins with due times, explicit safe responses, overdue state, and no automatic location collection.
 3. Explicit SOS workflow with confirmation, emergency-contact configuration, acknowledgment/resolution, optional consented location snapshot, and clear notice that FamilyOS does not contact emergency services.
 4. Driving insights based on validated trip data. Crash detection must not be claimed until sensor behavior and false-positive handling are validated on physical devices.
-5. Offline handling, battery-aware sampling, location freshness/status, and operational telemetry.
+5. Bounded offline handling, movement-aware sampling, location freshness/status, and operational telemetry.
 6. Physical Android device tests and end-to-end multi-member authorization tests before production rollout.
 
 
