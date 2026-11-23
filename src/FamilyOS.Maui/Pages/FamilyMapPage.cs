@@ -279,6 +279,28 @@ public sealed class FamilyMapPage : ContentPage
             }
 
             _currentLocations = valid;
+
+            // Refresh the history picker after shared locations load. On the first
+            // page appearance the family list is loaded before the map, so filtering
+            // only during LoadFamilyMembersAsync would otherwise hide every other
+            // member until the page is reopened.
+            if (_family is not null)
+            {
+                var previouslySelectedId = (_historyMember.SelectedItem as FamilyMemberDto)?.Id;
+                var visibleIds = valid.Select(x => x.MemberId)
+                    .Append(_family.CurrentMemberId)
+                    .ToHashSet();
+                var availableMembers = _family.Members
+                    .Where(x => x.IsActive && visibleIds.Contains(x.Id))
+                    .ToList();
+                _historyMember.ItemsSource = availableMembers;
+                _historyMember.SelectedItem = availableMembers.FirstOrDefault(x => x.Id == previouslySelectedId)
+                    ?? availableMembers.FirstOrDefault(x => x.Id == _family.CurrentMemberId);
+                var hasSelection = _historyMember.SelectedItem is FamilyMemberDto;
+                _showHistory.IsEnabled = hasSelection;
+                _showTrips.IsEnabled = hasSelection;
+            }
+
             _map.Source = new HtmlWebViewSource { Html = BuildMapHtml(valid, places) };
             var ownVisible = _ownLocation is not null && _family is not null;
             _status.Text = valid.Count == 0
