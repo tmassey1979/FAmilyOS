@@ -106,8 +106,9 @@ public sealed class CheckInsPage : ContentPage
     {
         if (_busy || _memberPicker.SelectedIndex < 0 || _memberPicker.SelectedIndex >= _members.Count)
             return;
-        var dueDate = _dueDate.Date ?? DateTime.Today;
-        var due = dueDate + _dueTime.Time;
+        // DatePicker.Date is DateTime? on some MAUI TFMs; normalize before combining with TimePicker.
+        DateTime dueDate = _dueDate.Date ?? DateTime.Today;
+        DateTime due = dueDate.Date + _dueTime.Time;
         var dueLocal = new DateTimeOffset(DateTime.SpecifyKind(due, DateTimeKind.Local));
         if (dueLocal <= DateTimeOffset.Now || dueLocal > DateTimeOffset.Now.AddDays(7))
         {
