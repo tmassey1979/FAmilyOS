@@ -215,7 +215,7 @@ public sealed class FamilyPage : ContentPage
                     var copy = new Button { Text = "Copy code", FontSize = 12 };
                     copy.Clicked += async (_, _) =>
                     {
-                        await Microsoft.Maui.ApplicationModel.Clipboard.Default.SetTextAsync(invite.Code);
+                        await Microsoft.Maui.ApplicationModel.DataTransfer.Clipboard.Default.SetTextAsync(invite.Code);
                         await DisplayAlertAsync("Invitation code copied", invite.Code, "Done");
                     };
                     var revoke = new Button { Text = "Revoke", FontSize = 12 };
