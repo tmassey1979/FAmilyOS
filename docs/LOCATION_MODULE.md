@@ -81,3 +81,7 @@ The current implementation is not yet validated as a production Life360 replacem
 - Household sharing, individual viewer grants, continuous tracking, and location history remain separate, explicit choices.
 - Continuous tracking requires an explicit start action and a visible Android foreground-service notification with a Stop action.
 - Request notification permission only when the user starts a feature that needs its persistent notification.
+
+## Battery status sharing
+
+Battery percentage and charging state have a separate opt-in switch. Enabling it does not request another Android permission. Status uploads occur during explicitly started continuous location tracking and are visible only to household members who already have an explicit location-viewer grant. Turning battery sharing off clears stored battery values immediately. Stopping household location sharing also clears the last battery reading and removes viewer grants. Battery readings older than 24 hours are not returned. Battery status is not collected by a background process when tracking is stopped.
