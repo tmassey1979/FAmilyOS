@@ -303,11 +303,20 @@ public sealed class FamilyMapPage : ContentPage
 
             _map.Source = new HtmlWebViewSource { Html = BuildMapHtml(valid, places) };
             var ownVisible = _ownLocation is not null && _family is not null;
+            var nowUtc = DateTime.UtcNow;
+            var ages = valid.Select(x => nowUtc - DateTime.SpecifyKind(x.UpdatedAtUtc!.Value, DateTimeKind.Utc))
+                .Select(x => x < TimeSpan.Zero ? TimeSpan.Zero : x)
+                .ToList();
+            var freshCount = ages.Count(x => x < TimeSpan.FromMinutes(2));
+            var recentCount = ages.Count(x => x >= TimeSpan.FromMinutes(2) && x < TimeSpan.FromMinutes(15));
+            var staleCount = ages.Count(x => x >= TimeSpan.FromMinutes(15) && x < TimeSpan.FromHours(1));
+            var oldCount = ages.Count(x => x >= TimeSpan.FromHours(1));
+            var freshness = $"{freshCount} fresh (<2 min), {recentCount} recent (2–15 min), {staleCount} stale (15–60 min), {oldCount} old (>1 hour)";
             _status.Text = valid.Count == 0
-                ? "No recent location is available. Enable device location on the Location page to show this phone on the map."
+                ? "No shared household locations are available. You can still use the map without granting location permission."
                 : ownVisible
-                    ? $"Your phone and {Math.Max(0, valid.Count - 1)} shared household location(s) are shown. Your own pin stays on this device unless you separately share it."
-                    : $"{valid.Count} shared location(s). Last received update: {valid.Max(x => x.UpdatedAtUtc!.Value).ToLocalTime():g}.";
+                    ? $"Your phone and {Math.Max(0, valid.Count - 1)} shared household location(s) are shown. {freshness}. Your own pin stays on this device unless you separately share it."
+                    : $"{valid.Count} household location(s): {freshness}. Latest received update: {valid.Max(x => x.UpdatedAtUtc!.Value).ToLocalTime():g}.";
         }
         catch (Exception ex)
         {
