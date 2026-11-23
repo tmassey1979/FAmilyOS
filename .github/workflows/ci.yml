@@ -177,7 +177,7 @@ jobs:
   maui-android-apk:
     name: Build MAUI Android APK
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -225,18 +225,22 @@ jobs:
         run: dotnet workload install maui-android --ignore-failed-sources
 
       - name: Restore MAUI Android project
-        run: dotnet restore src/FamilyOS.Maui/FamilyOS.Maui.csproj -p:TargetFramework=net11.0-android
+        run: dotnet restore src/FamilyOS.Maui/FamilyOS.Maui.csproj -p:TargetFramework=net11.0-android -p:RuntimeIdentifier=android-arm64
 
       - name: Build installable debug APK
-        run: >
-          dotnet publish src/FamilyOS.Maui/FamilyOS.Maui.csproj
-          --configuration Debug
-          --framework net11.0-android
-          --no-restore
-          -p:RuntimeIdentifier=android-arm64
-          -p:AndroidPackageFormat=apk
-          -p:ApplicationDisplayVersion=${{ steps.maui-version.outputs.value }}
-          -p:ApplicationVersion=${{ steps.maui-version.outputs.code }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          dotnet publish src/FamilyOS.Maui/FamilyOS.Maui.csproj \
+            --configuration Debug \
+            --framework net11.0-android \
+            --no-restore \
+            -p:RuntimeIdentifier=android-arm64 \
+            -p:AndroidPackageFormat=apk \
+            -p:ApplicationDisplayVersion=${{ steps.maui-version.outputs.value }} \
+            -p:ApplicationVersion=${{ steps.maui-version.outputs.code }} \
+            -bl:artifacts/maui-android.binlog
 
       - name: Stage APK
         shell: bash
