@@ -233,6 +233,7 @@ jobs:
           --configuration Debug
           --framework net11.0-android
           --no-restore
+          -p:RuntimeIdentifier=android-arm64
           -p:AndroidPackageFormat=apk
           -p:ApplicationDisplayVersion=${{ steps.maui-version.outputs.value }}
           -p:ApplicationVersion=${{ steps.maui-version.outputs.code }}
