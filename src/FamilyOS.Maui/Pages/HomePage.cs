@@ -13,11 +13,16 @@ public sealed class HomePage : ContentPage
     private readonly Label _greeting = new() { FontSize = 28, FontAttributes = FontAttributes.Bold };
     private readonly Label _status = new() { FontSize = 14 };
     private readonly VerticalStackLayout _pulseSection = new() { Spacing = 10 };
-    private readonly FlexLayout _moduleGrid = new()
+    private readonly Grid _moduleGrid = new()
     {
-        Wrap = FlexWrap.Wrap,
-        JustifyContent = FlexJustify.Start,
-        AlignItems = FlexAlignItems.Start
+        ColumnDefinitions =
+        {
+            new ColumnDefinition(GridLength.Star),
+            new ColumnDefinition(GridLength.Star),
+            new ColumnDefinition(GridLength.Star)
+        },
+        ColumnSpacing = 8,
+        RowSpacing = 8
     };
     private readonly Button _editToggle = new() { Text = "Edit" };
     private List<HomeModule> _modules = [];
@@ -141,7 +146,7 @@ public sealed class HomePage : ContentPage
                 TextColor = Color.FromArgb("#0F172A")
             }
         };
-        avatar.SetDynamicResource(Border.StrokeProperty, "AccentSky");
+        avatar.SetDynamicResource(Border.StrokeProperty, "AccentPrimary");
 
         var name = new Label
         {
@@ -235,11 +240,16 @@ public sealed class HomePage : ContentPage
     private void RebuildModuleGrid()
     {
         _moduleGrid.Children.Clear();
+        _moduleGrid.RowDefinitions.Clear();
+        const int cols = 3;
+        var rows = (_modules.Count + cols - 1) / cols;
+        for (var r = 0; r < rows; r++)
+            _moduleGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+
         for (var i = 0; i < _modules.Count; i++)
         {
-            var index = i;
-            var module = _modules[i];
-            _moduleGrid.Children.Add(BuildModuleTile(module, index));
+            var tile = BuildModuleTile(_modules[i], i);
+            _moduleGrid.Add(tile, i % cols, i / cols);
         }
     }
 
@@ -294,8 +304,6 @@ public sealed class HomePage : ContentPage
 
         var border = new Border
         {
-            WidthRequest = 100,
-            Margin = new Thickness(4),
             Padding = 0,
             Content = body
         };
@@ -319,7 +327,7 @@ public sealed class HomePage : ContentPage
     {
         var stack = new VerticalStackLayout { Spacing = 8 };
         var eye = new Label { Text = eyebrow.ToUpperInvariant(), FontSize = 11, FontAttributes = FontAttributes.Bold };
-        eye.SetDynamicResource(Label.TextColorProperty, "AccentSky");
+        eye.SetDynamicResource(Label.TextColorProperty, "AccentPrimary");
         stack.Children.Add(eye);
         var main = new Label { Text = body, FontSize = 16, LineBreakMode = LineBreakMode.WordWrap };
         main.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
