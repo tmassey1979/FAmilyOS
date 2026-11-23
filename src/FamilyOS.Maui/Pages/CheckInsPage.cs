@@ -109,12 +109,16 @@ public sealed class CheckInsPage : ContentPage
         if (_busy || _memberPicker.SelectedIndex < 0 || _memberPicker.SelectedIndex >= _members.Count)
             return;
 
-        // MAUI DatePicker.Date is DateTime? on net11.0-android — never assign it directly to DateTime.
+        // MAUI 11: DatePicker.Date is DateTime?, TimePicker.Time is TimeSpan?.
         DateTime dueDate = DateTime.Today;
-        if (_dueDate.Date is DateTime picked)
-            dueDate = picked.Date;
+        if (_dueDate.Date is DateTime pickedDate)
+            dueDate = pickedDate.Date;
 
-        DateTime due = dueDate + _dueTime.Time;
+        TimeSpan dueTimeOfDay = DateTime.Now.AddHours(2).TimeOfDay;
+        if (_dueTime.Time is TimeSpan pickedTime)
+            dueTimeOfDay = pickedTime;
+
+        DateTime due = dueDate + dueTimeOfDay;
         var dueLocal = new DateTimeOffset(DateTime.SpecifyKind(due, DateTimeKind.Local));
         if (dueLocal <= DateTimeOffset.Now || dueLocal > DateTimeOffset.Now.AddDays(7))
         {
