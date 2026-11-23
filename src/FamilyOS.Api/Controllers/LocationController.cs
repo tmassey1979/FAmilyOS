@@ -135,7 +135,7 @@ public sealed class LocationController : ControllerBase
         if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
         var row = await _db.MemberLocations.SingleOrDefaultAsync(
             x => x.FamilyId == familyId && x.MemberId == memberId, ct);
-        if (row?.BatterySharingEnabled != true || !row.SharingEnabled)
+        if (row is null || !row.BatterySharingEnabled || !row.SharingEnabled)
             return Conflict(new { error = "Enable battery sharing and household sharing before uploading battery status." });
         var hasViewer = await _db.MemberLocationViewerGrants.AnyAsync(
             x => x.FamilyId == familyId && x.SharingMemberId == memberId, ct);
