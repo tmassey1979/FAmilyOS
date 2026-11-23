@@ -252,7 +252,7 @@ public sealed class FamilyPage : ContentPage
         try
         {
             var invite = await _family.CreateInviteAsync(role, string.IsNullOrWhiteSpace(email) ? null : email.Trim());
-            await Microsoft.Maui.ApplicationModel.Clipboard.Default.SetTextAsync(invite.Code);
+            await Microsoft.Maui.ApplicationModel.DataTransfer.Clipboard.Default.SetTextAsync(invite.Code);
             await DisplayAlertAsync("Invitation created", $"Code: {invite.Code}\n\nCopied to clipboard. Expires {invite.ExpiresAtUtc.ToLocalTime():g}.", "Done");
             await LoadInvitesAsync();
         }
