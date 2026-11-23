@@ -77,6 +77,81 @@ public sealed class LocationController : ControllerBase
         return Ok(new { sharingEnabled = row.SharingEnabled, consentUpdatedAtUtc = row.ConsentUpdatedAtUtc });
     }
 
+    [HttpGet("battery/consent")]
+    public async Task<IActionResult> GetBatteryConsent(CancellationToken ct)
+    {
+        var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
+        if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
+        var row = await _db.MemberLocations.AsNoTracking().SingleOrDefaultAsync(
+            x => x.FamilyId == familyId && x.MemberId == memberId, ct);
+        return Ok(new { batterySharingEnabled = row?.BatterySharingEnabled ?? false });
+    }
+
+    [HttpPut("battery/consent")]
+    public async Task<IActionResult> SetBatteryConsent([FromBody] ConsentBody body, CancellationToken ct)
+    {
+        var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
+        if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        var row = await _db.MemberLocations.FromSqlInterpolated($"""
+            SELECT * FROM familyos."MemberLocations"
+            WHERE "FamilyId" = {familyId} AND "MemberId" = {memberId} FOR UPDATE
+            """).SingleOrDefaultAsync(ct);
+        if (row is null)
+        {
+            row = new MemberLocation { FamilyId = familyId, MemberId = memberId };
+            _db.MemberLocations.Add(row);
+        }
+        row.BatterySharingEnabled = body.Enabled;
+        if (!body.Enabled)
+        {
+            row.BatteryPercent = null;
+            row.IsCharging = null;
+            row.BatteryUpdatedAtUtc = null;
+        }
+        await _db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return Ok(new { batterySharingEnabled = row.BatterySharingEnabled });
+    }
+
+    [HttpPost("battery/current")]
+    public async Task<IActionResult> UpdateBattery([FromBody] BatteryBody body, CancellationToken ct)
+    {
+        if (body.BatteryPercent is < 0 or > 100)
+            return BadRequest(new { error = "Battery percentage must be between 0 and 100." });
+        var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
+        if (!await IsActiveMemberAsync(familyId, memberId, ct)) return Forbid();
+        var row = await _db.MemberLocations.SingleOrDefaultAsync(
+            x => x.FamilyId == familyId && x.MemberId == memberId, ct);
+        if (row?.BatterySharingEnabled != true)
+            return Conflict(new { error = "Enable battery sharing before uploading battery status." });
+        row.BatteryPercent = body.BatteryPercent;
+        row.IsCharging = body.IsCharging;
+        row.BatteryUpdatedAtUtc = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
+    [HttpGet("battery/family")]
+    public async Task<IActionResult> GetFamilyBattery(CancellationToken ct)
+    {
+        var (familyId, viewerId, _) = await _current.RequireFamilyAsync(ct);
+        if (!await IsActiveMemberAsync(familyId, viewerId, ct)) return Forbid();
+        var cutoff = DateTime.UtcNow.AddHours(-24);
+        var rows = await (
+            from location in _db.MemberLocations.AsNoTracking()
+            join member in _db.FamilyMembers.AsNoTracking() on location.MemberId equals member.Id
+            where location.FamilyId == familyId && member.FamilyId == familyId && member.IsActive
+                && location.BatterySharingEnabled && location.BatteryUpdatedAtUtc >= cutoff
+                && _db.MemberLocationViewerGrants.Any(g => g.FamilyId == familyId
+                    && g.SharingMemberId == member.Id && g.ViewerMemberId == viewerId)
+            orderby member.DisplayName
+            select new { memberId = member.Id, displayName = member.DisplayName,
+                batteryPercent = location.BatteryPercent, isCharging = location.IsCharging,
+                updatedAtUtc = location.BatteryUpdatedAtUtc }).ToListAsync(ct);
+        return Ok(rows);
+    }
+
     [HttpGet("viewers")]
     public async Task<IActionResult> GetViewerGrants(CancellationToken ct)
     {
@@ -594,5 +669,6 @@ public sealed class LocationController : ControllerBase
     public sealed record ConsentBody(bool Enabled);
     public sealed record ViewerGrantBody(bool Enabled);
     public sealed record LocationBody(double Latitude, double Longitude, double AccuracyMeters, DateTimeOffset MeasuredAtUtc);
+    public sealed record BatteryBody(int BatteryPercent, bool IsCharging);
     public sealed record SosBody(string? Message, bool IncludeLocation, double? Latitude, double? Longitude);
 }

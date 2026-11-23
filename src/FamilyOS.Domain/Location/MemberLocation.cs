@@ -11,6 +11,10 @@ public sealed class MemberLocation
     public Guid MemberId { get; set; }
     public bool SharingEnabled { get; set; }
     public bool HistoryEnabled { get; set; }
+    public bool BatterySharingEnabled { get; set; }
+    public int? BatteryPercent { get; set; }
+    public bool? IsCharging { get; set; }
+    public DateTime? BatteryUpdatedAtUtc { get; set; }
     public DateTime? ConsentUpdatedAtUtc { get; set; }
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }

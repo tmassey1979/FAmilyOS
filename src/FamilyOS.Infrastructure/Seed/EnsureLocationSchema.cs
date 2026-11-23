@@ -46,6 +46,10 @@ public static class EnsureLocationSchema
                     ON familyos."MemberLocations" ("FamilyId", "SharingEnabled");
                 ALTER TABLE familyos."MemberLocations"
                     ADD COLUMN IF NOT EXISTS "HistoryEnabled" boolean NOT NULL DEFAULT false;
+                ALTER TABLE familyos."MemberLocations" ADD COLUMN IF NOT EXISTS "BatterySharingEnabled" boolean NOT NULL DEFAULT false;
+                ALTER TABLE familyos."MemberLocations" ADD COLUMN IF NOT EXISTS "BatteryPercent" integer NULL;
+                ALTER TABLE familyos."MemberLocations" ADD COLUMN IF NOT EXISTS "IsCharging" boolean NULL;
+                ALTER TABLE familyos."MemberLocations" ADD COLUMN IF NOT EXISTS "BatteryUpdatedAtUtc" timestamp with time zone NULL;
                 CREATE TABLE IF NOT EXISTS familyos."MemberLocationHistory" (
                     "Id" uuid NOT NULL PRIMARY KEY,
                     "FamilyId" uuid NOT NULL,

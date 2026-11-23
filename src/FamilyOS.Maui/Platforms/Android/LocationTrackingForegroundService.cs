@@ -108,6 +108,14 @@ public sealed class LocationTrackingForegroundService : Service
                             accuracy,
                             location.Timestamp.UtcDateTime,
                             cancellationToken);
+                        var batteryConsent = await api.GetBatteryConsentAsync(cancellationToken);
+                        if (batteryConsent.BatterySharingEnabled && Battery.Default.ChargeLevel >= 0)
+                        {
+                            var battery = Battery.Default;
+                            var percent = Math.Clamp((int)Math.Round(battery.ChargeLevel * 100), 0, 100);
+                            var charging = battery.State is BatteryState.Charging or BatteryState.Full;
+                            await api.ShareBatteryStatusAsync(percent, charging, cancellationToken);
+                        }
                         UpdateNotification($"Last update: {location.Timestamp.ToLocalTime():t}");
                     }
                     else

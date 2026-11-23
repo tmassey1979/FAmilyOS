@@ -59,6 +59,18 @@ public sealed class FamilyApiClient
             Longitude = longitude
         }), ct);
 
+    public Task<BatteryConsentDto> GetBatteryConsentAsync(CancellationToken ct = default)
+        => SendAsync<BatteryConsentDto>(HttpMethod.Get, "api/location/battery/consent", null, ct);
+
+    public Task<BatteryConsentDto> SetBatterySharingAsync(bool enabled, CancellationToken ct = default)
+        => SendAsync<BatteryConsentDto>(HttpMethod.Put, "api/location/battery/consent", JsonContent.Create(new { enabled }, options: JsonOptions), ct);
+
+    public Task ShareBatteryStatusAsync(int percent, bool charging, CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Post, "api/location/battery/current", JsonContent.Create(new { batteryPercent = percent, isCharging = charging }, options: JsonOptions), ct);
+
+    public Task<List<FamilyBatteryDto>> GetFamilyBatteryAsync(CancellationToken ct = default)
+        => SendAsync<List<FamilyBatteryDto>>(HttpMethod.Get, "api/location/battery/family", null, ct);
+
     public Task<LocationConsentDto> GetLocationConsentAsync(CancellationToken ct = default)
         => SendAsync<LocationConsentDto>(HttpMethod.Get, "api/location/consent", null, ct);
 
@@ -200,6 +212,8 @@ public sealed record FamilyDto(Guid Id, string Name, string? TimeZone, string? C
 public sealed record FamilyMemberDto(Guid Id, Guid UserId, string DisplayName, string Role, bool IsActive);
 public sealed record SosResultDto(int AlertsSent, bool LocationIncluded);
 public sealed record LocationConsentDto(bool SharingEnabled, DateTime? ConsentUpdatedAtUtc);
+public sealed record BatteryConsentDto(bool BatterySharingEnabled);
+public sealed record FamilyBatteryDto(Guid MemberId, string DisplayName, int? BatteryPercent, bool? IsCharging, DateTime? UpdatedAtUtc);
 public sealed record FamilyLocationDto(Guid MemberId, string DisplayName, double? Latitude, double? Longitude, double? AccuracyMeters, DateTime? UpdatedAtUtc);
 public sealed record LocationViewerDto(Guid MemberId, string DisplayName, bool CanView);
 
