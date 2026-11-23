@@ -70,6 +70,9 @@ public sealed class LocationController : ControllerBase
             row.Longitude = null;
             row.AccuracyMeters = null;
             row.LocationUpdatedAtUtc = null;
+            row.BatteryPercent = null;
+            row.IsCharging = null;
+            row.BatteryUpdatedAtUtc = null;
         }
 
         await _db.SaveChangesAsync(ct);
