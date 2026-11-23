@@ -21,8 +21,8 @@ public sealed class HomePage : ContentPage
             new ColumnDefinition(GridLength.Star),
             new ColumnDefinition(GridLength.Star)
         },
-        ColumnSpacing = 8,
-        RowSpacing = 8
+        ColumnSpacing = 10,
+        RowSpacing = 10
     };
     private readonly Button _editToggle = new() { Text = "Edit" };
     private List<HomeModule> _modules = [];
@@ -119,7 +119,6 @@ public sealed class HomePage : ContentPage
         }
         catch
         {
-            // Member strip is best-effort; Pulse still loads.
         }
     }
 
@@ -247,66 +246,66 @@ public sealed class HomePage : ContentPage
             _moduleGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
 
         for (var i = 0; i < _modules.Count; i++)
-        {
-            var tile = BuildModuleTile(_modules[i], i);
-            _moduleGrid.Add(tile, i % cols, i / cols);
-        }
+            _moduleGrid.Add(BuildModuleTile(_modules[i], i), i % cols, i / cols);
     }
 
     private View BuildModuleTile(HomeModule module, int index)
     {
-        var icon = new Image
+        // Soft tint circle + glyph — always visible (no dependency on broken menu PNGs).
+        var glyph = new Label
         {
-            Source = module.Icon,
-            WidthRequest = 28,
-            HeightRequest = 28,
-            HorizontalOptions = LayoutOptions.Center
+            Text = module.Glyph,
+            FontSize = 26,
+            HorizontalTextAlignment = TextAlignment.Center,
+            VerticalTextAlignment = TextAlignment.Center,
+            TextColor = Color.FromArgb("#0F172A")
         };
+
+        var iconWell = new Border
+        {
+            WidthRequest = 56,
+            HeightRequest = 56,
+            BackgroundColor = Color.FromArgb(module.TintHex),
+            StrokeThickness = 0,
+            HorizontalOptions = LayoutOptions.Center,
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 16 },
+            Content = glyph
+        };
+
         var title = new Label
         {
             Text = module.Title,
-            FontSize = 13,
+            FontSize = 12,
             FontAttributes = FontAttributes.Bold,
-            HorizontalTextAlignment = TextAlignment.Center
+            HorizontalTextAlignment = TextAlignment.Center,
+            LineBreakMode = LineBreakMode.TailTruncation
         };
         title.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
 
         var body = new VerticalStackLayout
         {
             Spacing = 8,
-            Padding = new Thickness(10, 14),
-            Children = { icon, title }
+            Padding = new Thickness(8, 12),
+            Children = { iconWell, title }
         };
 
         if (_editMode)
         {
-            var left = new Button { Text = "←", WidthRequest = 40, FontSize = 14 };
-            var right = new Button { Text = "→", WidthRequest = 40, FontSize = 14 };
+            var left = new Button { Text = "←", WidthRequest = 36, FontSize = 14 };
+            var right = new Button { Text = "→", WidthRequest = 36, FontSize = 14 };
             left.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
             right.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
-            left.Clicked += (_, _) =>
-            {
-                HomeModuleCatalog.Move(_modules, index, -1);
-                RebuildModuleGrid();
-            };
-            right.Clicked += (_, _) =>
-            {
-                HomeModuleCatalog.Move(_modules, index, +1);
-                RebuildModuleGrid();
-            };
+            left.Clicked += (_, _) => { HomeModuleCatalog.Move(_modules, index, -1); RebuildModuleGrid(); };
+            right.Clicked += (_, _) => { HomeModuleCatalog.Move(_modules, index, +1); RebuildModuleGrid(); };
             body.Children.Add(new HorizontalStackLayout
             {
-                Spacing = 4,
+                Spacing = 2,
                 HorizontalOptions = LayoutOptions.Center,
                 Children = { left, right }
             });
         }
 
-        var border = new Border
-        {
-            Padding = 0,
-            Content = body
-        };
+        var border = new Border { Padding = 0, Content = body };
         border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
 
         if (!_editMode)
