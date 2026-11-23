@@ -1,9 +1,11 @@
 using FamilyOS.Domain.Approvals;
 using FamilyOS.Domain.Calendar;
+using FamilyOS.Domain.CheckIns;
 using FamilyOS.Domain.Chat;
 using FamilyOS.Domain.Conditions;
 using FamilyOS.Domain.Execution;
 using FamilyOS.Domain.Family;
+using FamilyOS.Domain.Location;
 using FamilyOS.Domain.Notifications;
 using FamilyOS.Domain.Procurement;
 using FamilyOS.Domain.Requests;
@@ -20,6 +22,12 @@ public partial class FamilyOsDbContext : DbContext, FamilyOS.Application.Interfa
     public DbSet<User> Users => Set<User>();
     public DbSet<Domain.Family.Family> Families => Set<Domain.Family.Family>();
     public DbSet<FamilyMember> FamilyMembers => Set<FamilyMember>();
+    public DbSet<MemberLocation> MemberLocations => Set<MemberLocation>();
+    public DbSet<MemberLocationViewerGrant> MemberLocationViewerGrants => Set<MemberLocationViewerGrant>();
+    public DbSet<SavedPlace> SavedPlaces => Set<SavedPlace>();
+    public DbSet<MemberPlacePresence> MemberPlacePresences => Set<MemberPlacePresence>();
+    public DbSet<MemberLocationHistory> MemberLocationHistory => Set<MemberLocationHistory>();
+    public DbSet<CheckInRequest> CheckInRequests => Set<CheckInRequest>();
     public DbSet<DeclineReason> DeclineReasons => Set<DeclineReason>();
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
     public DbSet<TaskHistoryEntry> TaskHistory => Set<TaskHistoryEntry>();
@@ -80,6 +88,50 @@ public partial class FamilyOsDbContext : DbContext, FamilyOS.Application.Interfa
             e.Property(x => x.Role).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.QuietHoursEnabled).HasDefaultValue(false);
             e.HasQueryFilter(x => !x.IsDeleted);
+        });
+
+        modelBuilder.Entity<MemberLocation>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.MemberId).IsUnique();
+            e.HasIndex(x => new { x.FamilyId, x.SharingEnabled });
+        });
+
+        modelBuilder.Entity<MemberLocationViewerGrant>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.SharingMemberId, x.ViewerMemberId }).IsUnique();
+            e.HasIndex(x => new { x.FamilyId, x.ViewerMemberId });
+        });
+
+        modelBuilder.Entity<SavedPlace>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.FamilyId, x.IsActive });
+            e.Property(x => x.Name).HasMaxLength(120).IsRequired();
+        });
+
+        modelBuilder.Entity<MemberPlacePresence>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.MemberId, x.PlaceId }).IsUnique();
+            e.HasIndex(x => new { x.FamilyId, x.PlaceId });
+        });
+
+        modelBuilder.Entity<CheckInRequest>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.FamilyId, x.TargetMemberId, x.Status, x.DueAtUtc });
+            e.HasIndex(x => new { x.FamilyId, x.RequesterMemberId, x.CreatedAtUtc });
+            e.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            e.Property(x => x.ResponseMessage).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<MemberLocationHistory>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.MemberId, x.RecordedAtUtc });
+            e.HasIndex(x => new { x.FamilyId, x.MemberId, x.RecordedAtUtc });
         });
 
         modelBuilder.Entity<DeclineReason>(e =>

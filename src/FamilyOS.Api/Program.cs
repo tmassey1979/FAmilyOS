@@ -390,6 +390,7 @@ try
         await EnsureFamilyInvitesSchema.RunAsync(db, schemaLog);
         await EnsureMealSchema.RunAsync(db, schemaLog);
         await EnsureRecipeSchema.RunAsync(db, schemaLog);
+        await EnsureLocationSchema.RunAsync(db, schemaLog);
     }
 
     app.Run();

@@ -177,7 +177,7 @@ jobs:
   maui-android-apk:
     name: Build MAUI Android APK
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -225,16 +225,39 @@ jobs:
         run: dotnet workload install maui-android --ignore-failed-sources
 
       - name: Restore MAUI Android project
-        run: dotnet restore src/FamilyOS.Maui/FamilyOS.Maui.csproj -p:TargetFramework=net11.0-android
+        run: dotnet restore src/FamilyOS.Maui/FamilyOS.Maui.csproj -p:TargetFramework=net11.0-android -p:RuntimeIdentifier=android-arm64
 
       - name: Build installable debug APK
-        run: >
-          dotnet publish src/FamilyOS.Maui/FamilyOS.Maui.csproj
-          --configuration Debug
-          --framework net11.0-android
-          -p:AndroidPackageFormat=apk
-          -p:ApplicationDisplayVersion=${{ steps.maui-version.outputs.value }}
-          -p:ApplicationVersion=${{ steps.maui-version.outputs.code }}
+        timeout-minutes: 20
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p artifacts
+          dotnet publish src/FamilyOS.Maui/FamilyOS.Maui.csproj \
+            --configuration Debug \
+            --framework net11.0-android \
+            --no-restore \
+            -m:1 \
+            -p:BuildInParallel=false \
+            -p:RuntimeIdentifier=android-arm64 \
+            -p:AndroidPackageFormat=apk \
+            -p:ApplicationDisplayVersion=${{ steps.maui-version.outputs.value }} \
+            -p:ApplicationVersion=${{ steps.maui-version.outputs.code }} \
+            -v:diag \
+            -bl:artifacts/maui-android.binlog \
+            > artifacts/maui-android-diagnostic.log 2>&1
+          RESULT=$?
+          tail -n 160 artifacts/maui-android-diagnostic.log || true
+          exit "$RESULT"
+
+      - name: Upload Android build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FamilyOS-Android-Build-Diagnostics
+          path: artifacts/maui-android-*
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Stage APK
         shell: bash

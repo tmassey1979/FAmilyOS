@@ -4,6 +4,8 @@ using FamilyOS.Infrastructure.Identity;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using FamilyOS.Infrastructure.Persistence;
 
 namespace FamilyOS.Api.Controllers;
 
@@ -12,8 +14,13 @@ namespace FamilyOS.Api.Controllers;
 public class FamilyController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly FamilyOsDbContext _db;
 
-    public FamilyController(IMediator mediator) => _mediator = mediator;
+    public FamilyController(IMediator mediator, FamilyOsDbContext db)
+    {
+        _mediator = mediator;
+        _db = db;
+    }
 
     /// <summary>Onboarding: create a new household. Requires auth but not existing family membership.</summary>
     [HttpPost]
@@ -64,7 +71,50 @@ public class FamilyController : ControllerBase
     [HttpPost("members/{id:guid}/deactivate")]
     [Authorize(Policy = FamilyAuthPolicies.OwnerOnly)]
     public async Task<ActionResult<MemberDto>> Deactivate(Guid id, CancellationToken ct)
-        => Ok(await _mediator.Send(new DeactivateMemberCommand(id), ct));
+    {
+        var member = await _mediator.Send(new DeactivateMemberCommand(id), ct);
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        // Serialize cleanup with any in-flight viewer grant operation for this member.
+        var location = await _db.MemberLocations
+            .FromSqlInterpolated($"""
+                SELECT * FROM familyos."MemberLocations"
+                WHERE "MemberId" = {id}
+                FOR UPDATE
+                """)
+            .SingleOrDefaultAsync(ct);
+        var affectedSharers = await _db.MemberLocationViewerGrants.AsNoTracking()
+            .Where(x => x.ViewerMemberId == id)
+            .Select(x => x.SharingMemberId)
+            .Distinct()
+            .ToListAsync(ct);
+        await _db.MemberLocationViewerGrants
+            .Where(x => x.SharingMemberId == id || x.ViewerMemberId == id)
+            .ExecuteDeleteAsync(ct);
+        foreach (var sharerId in affectedSharers)
+        {
+            var stillHasViewer = await _db.MemberLocationViewerGrants.AnyAsync(
+                x => x.SharingMemberId == sharerId, ct);
+            if (stillHasViewer) continue;
+            var sharerLocation = await _db.MemberLocations.SingleOrDefaultAsync(
+                x => x.MemberId == sharerId, ct);
+            if (sharerLocation is null) continue;
+            sharerLocation.BatterySharingEnabled = false;
+            sharerLocation.BatteryPercent = null;
+            sharerLocation.IsCharging = null;
+            sharerLocation.BatteryUpdatedAtUtc = null;
+        }
+        await _db.MemberLocationHistory
+            .Where(x => x.MemberId == id)
+            .ExecuteDeleteAsync(ct);
+        await _db.MemberPlacePresences
+            .Where(x => x.MemberId == id)
+            .ExecuteDeleteAsync(ct);
+        if (location is not null)
+            _db.MemberLocations.Remove(location);
+        await _db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return Ok(member);
+    }
 
     [HttpGet("decline-reasons")]
     [Authorize(Policy = FamilyAuthPolicies.FamilyMember)]

@@ -110,7 +110,12 @@ public enum NotificationType
     CalendarReminder = 6,
     ProcurementChanged = 7,
     TaskDeclined = 8,
-    RequestQuestionAsked = 9
+    RequestQuestionAsked = 9,
+    LocationArrived = 10,
+    LocationDeparted = 11,
+    EmergencySos = 12,
+    CheckInRequested = 13,
+    CheckInResponded = 14
 }
 
 public enum CalendarEventStatus
