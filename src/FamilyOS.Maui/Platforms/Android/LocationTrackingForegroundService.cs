@@ -25,7 +25,7 @@ public sealed class LocationTrackingForegroundService : Service
             if (!preferences.Get(TrackingPreferenceKey, false)) return false;
             var raw = preferences.Get(TrackingHeartbeatKey, string.Empty);
             if (!DateTime.TryParse(raw, null, System.Globalization.DateTimeStyles.RoundtripKind, out var heartbeat)
-                || DateTime.UtcNow - heartbeat.ToUniversalTime() > TimeSpan.FromMinutes(2))
+                || DateTime.UtcNow - heartbeat.ToUniversalTime() > TimeSpan.FromMinutes(6))
             {
                 preferences.Set(TrackingPreferenceKey, false);
                 return false;
@@ -34,7 +34,10 @@ public sealed class LocationTrackingForegroundService : Service
         }
     }
     private const int NotificationId = 4107;
-    private static readonly TimeSpan UpdateInterval = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan NormalUpdateInterval = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan PowerSaveUpdateInterval = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan LowBatteryUpdateInterval = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan MaximumRetryInterval = TimeSpan.FromMinutes(5);
     private CancellationTokenSource? _cancellation;
     private Task? _trackingTask;
 
@@ -82,8 +85,10 @@ public sealed class LocationTrackingForegroundService : Service
                 return;
             }
 
+            var consecutiveFailures = 0;
             while (!cancellationToken.IsCancellationRequested)
             {
+                var retryDelay = TimeSpan.Zero;
                 try
                 {
                     Microsoft.Maui.Storage.Preferences.Default.Set(TrackingHeartbeatKey, DateTime.UtcNow.ToString("O"));
@@ -116,6 +121,7 @@ public sealed class LocationTrackingForegroundService : Service
                             var charging = battery.State is BatteryState.Charging or BatteryState.Full;
                             await api.ShareBatteryStatusAsync(percent, charging, cancellationToken);
                         }
+                        consecutiveFailures = 0;
                         UpdateNotification($"Last update: {location.Timestamp.ToLocalTime():t}");
                     }
                     else
@@ -140,10 +146,24 @@ public sealed class LocationTrackingForegroundService : Service
                 catch (Exception)
                 {
                     // Keep the foreground service alive and retry on the next interval.
-                    UpdateNotification("Location update unavailable; retrying…");
+                    consecutiveFailures = Math.Min(consecutiveFailures + 1, 8);
+                    var retrySeconds = Math.Min(MaximumRetryInterval.TotalSeconds,
+                        30 * Math.Pow(2, consecutiveFailures - 1));
+                    retryDelay = TimeSpan.FromSeconds(retrySeconds);
+                    UpdateNotification($"Connection unavailable; retrying in {(int)retryDelay.TotalSeconds}s…");
                 }
 
-                await Task.Delay(UpdateInterval, cancellationToken);
+                // Respect Android power-save mode and low battery by reducing GPS/network
+                // activity instead of sampling at the normal one-minute interval.
+                var interval = GetPowerAwareInterval();
+                if (retryDelay > interval)
+                    interval = retryDelay;
+
+                // Refresh the heartbeat before intentional idle time so stale-heartbeat
+                // detection still distinguishes a sleeping service from a killed service.
+                Microsoft.Maui.Storage.Preferences.Default.Set(
+                    TrackingHeartbeatKey, DateTime.UtcNow.ToString("O"));
+                await Task.Delay(interval, cancellationToken);
             }
         }
         catch (OperationCanceledException)
@@ -153,6 +173,22 @@ public sealed class LocationTrackingForegroundService : Service
         {
             StopSelf();
         }
+    }
+
+    private TimeSpan GetPowerAwareInterval()
+    {
+        var battery = Battery.Default;
+        if (battery.ChargeLevel is >= 0 and <= 0.15)
+            return LowBatteryUpdateInterval;
+
+        if (Build.VERSION.SdkInt >= BuildVersionCodes.Lollipop)
+        {
+            var power = (PowerManager?)GetSystemService(PowerService);
+            if (power?.IsPowerSaveMode == true)
+                return PowerSaveUpdateInterval;
+        }
+
+        return NormalUpdateInterval;
     }
 
     private void StopTracking()
