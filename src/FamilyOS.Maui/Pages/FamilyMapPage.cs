@@ -24,6 +24,8 @@ public sealed class FamilyMapPage : ContentPage
     private readonly Button _showTrips;
     private FamilyDto? _family;
     private List<FamilyLocationDto> _currentLocations = [];
+    private List<LocationHistoryPointDto> _visibleHistory = [];
+    private bool _historyViewActive;
     private bool _loading;
     private bool _isVisible;
     private bool _timerStarted;
@@ -205,7 +207,9 @@ public sealed class FamilyMapPage : ContentPage
             var from = DateTimeOffset.UtcNow.AddHours(-24);
             var history = await _api.GetLocationHistoryAsync(member.Id, from);
             var places = await _api.GetSavedPlacesAsync();
-            _map.Source = new HtmlWebViewSource { Html = BuildMapHtml(_currentLocations, places, history) };
+            _visibleHistory = history;
+            _historyViewActive = true;
+            _map.Source = new HtmlWebViewSource { Html = BuildMapHtml(_currentLocations, places, _visibleHistory) };
             _historyStatus.Text = history.Count < 2
                 ? $"{member.DisplayName}: not enough saved points to draw a route in the last 24 hours."
                 : $"{member.DisplayName}: showing {history.Count} history points from the last 24 hours.";
@@ -301,7 +305,12 @@ public sealed class FamilyMapPage : ContentPage
                 _showTrips.IsEnabled = hasSelection;
             }
 
-            _map.Source = new HtmlWebViewSource { Html = BuildMapHtml(valid, places) };
+            // The 30-second live refresh must not silently erase a history route
+            // while the user is inspecting it.
+            _map.Source = new HtmlWebViewSource
+            {
+                Html = BuildMapHtml(valid, places, _historyViewActive ? _visibleHistory : null)
+            };
             var ownVisible = _ownLocation is not null && _family is not null;
             var nowUtc = DateTime.UtcNow;
             var ages = valid.Select(x => nowUtc - DateTime.SpecifyKind(x.UpdatedAtUtc!.Value, DateTimeKind.Utc))
