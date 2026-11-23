@@ -24,34 +24,42 @@ public sealed class ThemeService : IThemeService
 
     private static readonly Dictionary<string, Color> Light = new(StringComparer.Ordinal)
     {
-        ["BgPage"] = Color.FromArgb("#F8F5F0"),
+        ["BgPage"] = Color.FromArgb("#F4F0E8"),
         ["BgSurface"] = Color.FromArgb("#FFFFFF"),
-        ["BgSurfaceAlt"] = Color.FromArgb("#F1EDE6"),
-        ["BorderSubtle"] = Color.FromArgb("#E2E8F0"),
+        ["BgSurfaceAlt"] = Color.FromArgb("#EFE9DF"),
+        ["BorderSubtle"] = Color.FromArgb("#E2D9CC"),
         ["TextPrimary"] = Color.FromArgb("#0F172A"),
         ["TextMuted"] = Color.FromArgb("#64748B"),
-        ["TextOnAccent"] = Color.FromArgb("#0F172A"),
-        ["AccentPrimary"] = Color.FromArgb("#38BDF8"),
-        ["AccentDanger"] = Color.FromArgb("#F87171"),
-        ["AccentSuccess"] = Color.FromArgb("#4ADE80"),
-        ["AccentWarning"] = Color.FromArgb("#FBBF24"),
-        ["OverlayScrim"] = Color.FromArgb("#00000066"),
+        ["TextInverse"] = Color.FromArgb("#F8FAFC"),
+        ["TextOnAccent"] = Color.FromArgb("#FFFFFF"),
+        ["AccentPrimary"] = Color.FromArgb("#0F172A"),
+        ["AccentBrand"] = Color.FromArgb("#0F172A"),
+        ["AccentSoft"] = Color.FromArgb("#E0F2FE"),
+        ["AccentSky"] = Color.FromArgb("#0EA5E9"),
+        ["AccentDanger"] = Color.FromArgb("#EF4444"),
+        ["AccentSuccess"] = Color.FromArgb("#16A34A"),
+        ["AccentWarning"] = Color.FromArgb("#D97706"),
+        ["OverlayScrim"] = Color.FromArgb("#0F172A99"),
     };
 
     private static readonly Dictionary<string, Color> Dark = new(StringComparer.Ordinal)
     {
-        ["BgPage"] = Color.FromArgb("#0F172A"),
+        ["BgPage"] = Color.FromArgb("#0B1220"),
         ["BgSurface"] = Color.FromArgb("#1E293B"),
-        ["BgSurfaceAlt"] = Color.FromArgb("#334155"),
-        ["BorderSubtle"] = Color.FromArgb("#475569"),
+        ["BgSurfaceAlt"] = Color.FromArgb("#273449"),
+        ["BorderSubtle"] = Color.FromArgb("#334155"),
         ["TextPrimary"] = Color.FromArgb("#F8FAFC"),
         ["TextMuted"] = Color.FromArgb("#94A3B8"),
+        ["TextInverse"] = Color.FromArgb("#0F172A"),
         ["TextOnAccent"] = Color.FromArgb("#0F172A"),
         ["AccentPrimary"] = Color.FromArgb("#38BDF8"),
+        ["AccentBrand"] = Color.FromArgb("#F8FAFC"),
+        ["AccentSoft"] = Color.FromArgb("#0C4A6E"),
+        ["AccentSky"] = Color.FromArgb("#38BDF8"),
         ["AccentDanger"] = Color.FromArgb("#F87171"),
         ["AccentSuccess"] = Color.FromArgb("#4ADE80"),
         ["AccentWarning"] = Color.FromArgb("#FBBF24"),
-        ["OverlayScrim"] = Color.FromArgb("#00000099"),
+        ["OverlayScrim"] = Color.FromArgb("#000000B3"),
     };
 
     public AppThemePreference Preference { get; private set; }
@@ -60,10 +68,10 @@ public sealed class ThemeService : IThemeService
 
     public ThemeService()
     {
-        var stored = Preferences.Default.Get(PreferenceKey, nameof(AppThemePreference.System));
+        var stored = Preferences.Default.Get(PreferenceKey, nameof(AppThemePreference.Light));
         Preference = Enum.TryParse<AppThemePreference>(stored, out var p)
             ? p
-            : AppThemePreference.System;
+            : AppThemePreference.Light;
         Apply(Preference);
     }
 
