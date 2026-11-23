@@ -15,12 +15,12 @@ public static class HomeModuleCatalog
 
     public static IReadOnlyList<HomeModule> Defaults { get; } =
     [
-        new("tasks", "Tasks", "Assign & track", "menu_tasks.png", "//tasks"),
-        new("calendar", "Calendar", "Events & plans", "menu_calendar.png", "//calendar"),
+        new("tasks", "Tasks", "Assign & track", "menu_tasks.png", nameof(Pages.TasksPage)),
+        new("calendar", "Calendar", "Events & plans", "menu_calendar.png", nameof(Pages.CalendarPage)),
         new("requests", "Requests", "Ask & approve", "menu_requests.png", nameof(Pages.RequestsPage)),
         new("meals", "Meals", "Plan & share", "menu_meals.png", nameof(Pages.MealsPage)),
         new("chat", "Chat", "Family chat", "menu_chat.png", nameof(Pages.ChatPage)),
-        new("shopping", "Shopping", "Lists & needs", "menu_family.png", nameof(Pages.FamilyPage)),
+        new("shopping", "Shopping", "Lists & people", "menu_family.png", nameof(Pages.FamilyPage)),
         new("map", "Map", "Family locations", "menu_family.png", "//map"),
         new("notifications", "Alerts", "Stay informed", "menu_notifications.png", nameof(Pages.NotificationsPage)),
         new("settings", "Settings", "Preferences", "menu_settings.png", nameof(Pages.SettingsPage)),
@@ -41,7 +41,6 @@ public static class HomeModuleCatalog
             }
         }
 
-        // Append any new modules not in the saved order.
         foreach (var module in Defaults)
         {
             if (byId.Remove(module.Id))
@@ -53,8 +52,7 @@ public static class HomeModuleCatalog
 
     public static void SaveOrder(IEnumerable<HomeModule> modules)
     {
-        var order = string.Join(',', modules.Select(m => m.Id));
-        Preferences.Default.Set(OrderPreferenceKey, order);
+        Preferences.Default.Set(OrderPreferenceKey, string.Join(',', modules.Select(m => m.Id)));
     }
 
     public static void Move(List<HomeModule> modules, int index, int delta)
