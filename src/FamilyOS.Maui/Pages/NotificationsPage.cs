@@ -222,10 +222,6 @@ public sealed class NotificationsPage : ContentPage
         {
             _status.Text = "Could not mark notifications as read.";
         }
-        finally
-        {
-            // LoadAsync owns the enabled state based on the latest unread count.
-        }
     }
 
     private void AddCard(string title, string detail)
