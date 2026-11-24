@@ -227,6 +227,7 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
                 .Where(x => x.IsActive && visibleIds.Contains(x.Id))
                 .ToList();
             _historyMember.SelectedItem = _family.Members.FirstOrDefault(x => x.Id == (_requestedMemberId ?? _family.CurrentMemberId));
+            _requestedMemberId = null;
             var selected = _historyMember.SelectedItem is FamilyMemberDto;
             _showHistory.IsEnabled = selected;
             _showTrips.IsEnabled = selected;
@@ -367,6 +368,7 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
     private static string BuildMapHtml(IReadOnlyList<FamilyLocationDto> locations, IReadOnlyList<SavedPlaceDto> places, IReadOnlyList<LocationHistoryPointDto>? history = null, Guid? selectedMemberId = null)
     {
         var data = locations.Select(x => new MapPin(
+            x.MemberId,
             x.DisplayName,
             x.Latitude!.Value,
             x.Longitude!.Value,
@@ -397,7 +399,8 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
               <script>
                 const locations = {{json}};
                 const places = {{placeJson}};
-                const history = {{historyJson}};\n                const selectedMemberId = {{JsonSerializer.Serialize(selectedMemberId?.ToString())}};
+                const history = {{historyJson}};
+                const selectedMemberId = {{JsonSerializer.Serialize(selectedMemberId?.ToString())}};
                 const map = L.map('map', { zoomControl: true, attributionControl: true }).setView([39.5, -98.35], 4);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                   maxZoom: 19,
@@ -423,7 +426,8 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
                     popup.append(name, detail);
                     L.circle(point, { radius: place.radiusMeters, color: '#0EA5E9', weight: 2, fillOpacity: 0.08 }).addTo(map).bindPopup(popup);
                   }
-                  let selectedMarkerFound = false;\n                  for (const item of locations) {
+                  let selectedMarkerFound = false;
+                  for (const item of locations) {
                     const point = [item.latitude, item.longitude];
                     bounds.push(point);
                     const popup = document.createElement('div');
@@ -437,7 +441,12 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
                     if (Number.isFinite(item.accuracyMeters)) {
                       L.circle(point, { radius: Math.min(Math.max(item.accuracyMeters, 5), 10000), weight: 1, color: '#0F172A', fillOpacity: 0.06 }).addTo(map);
                     }
-                    const marker = L.marker(point).addTo(map).bindPopup(popup);\n                    if (selectedMemberId && item.memberId === selectedMemberId) {\n                      map.setView(point, 16);\n                      marker.openPopup();\n                      selectedMarkerFound = true;\n                    }
+                    const marker = L.marker(point).addTo(map).bindPopup(popup);
+                    if (selectedMemberId && item.memberId === selectedMemberId) {
+                      map.setView(point, 16);
+                      marker.openPopup();
+                      selectedMarkerFound = true;
+                    }
                   }
                   if (!selectedMarkerFound && bounds.length === 1) {
                     map.setView(bounds[0], 15);
