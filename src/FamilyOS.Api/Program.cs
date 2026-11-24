@@ -5,6 +5,7 @@ using System.IdentityModel.Tokens.Jwt;
 using JsonWebToken = Microsoft.IdentityModel.JsonWebTokens.JsonWebToken;
 using JwtRegisteredClaimNames = System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using FamilyOS.Api.Hubs;
 using FamilyOS.Api.Middleware;
 using FamilyOS.Api.Observability;
@@ -26,6 +27,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.OpenApi.Models;
 using Prometheus;
 using Serilog;
@@ -212,6 +214,21 @@ try
         });
     }
 
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.AddPolicy("client-logs", context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 30,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                }));
+    });
+
     builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
         p.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin()));
     builder.Services.AddSignalR();
@@ -248,6 +265,7 @@ try
     app.UseForwardedHeaders(fwd);
 
     app.UseMiddleware<CorrelationIdMiddleware>();
+    app.UseRateLimiter();
     app.UseMiddleware<ExceptionHandlingMiddleware>();
     app.UseSerilogRequestLogging(opts =>
     {
