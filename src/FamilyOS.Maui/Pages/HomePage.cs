@@ -163,7 +163,7 @@ public sealed class HomePage : ContentPage
             await LoadMembersAsync();
             _status.Text = $"Focused on {member.DisplayName}";
             if (member.Id != default)
-                await Shell.Current.GoToAsync("//map");
+                await Shell.Current.GoToAsync($"//map?memberId={member.Id}");
         };
         stack.GestureRecognizers.Add(tap);
         return stack;
