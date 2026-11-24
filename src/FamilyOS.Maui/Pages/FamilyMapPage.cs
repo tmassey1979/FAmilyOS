@@ -423,7 +423,7 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
                     popup.append(name, detail);
                     L.circle(point, { radius: place.radiusMeters, color: '#0EA5E9', weight: 2, fillOpacity: 0.08 }).addTo(map).bindPopup(popup);
                   }
-                  for (const item of locations) {
+                  let selectedMarkerFound = false;\n                  for (const item of locations) {
                     const point = [item.latitude, item.longitude];
                     bounds.push(point);
                     const popup = document.createElement('div');
@@ -437,11 +437,11 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
                     if (Number.isFinite(item.accuracyMeters)) {
                       L.circle(point, { radius: Math.min(Math.max(item.accuracyMeters, 5), 10000), weight: 1, color: '#0F172A', fillOpacity: 0.06 }).addTo(map);
                     }
-                    const marker = L.marker(point).addTo(map).bindPopup(popup);\n                    if (selectedMemberId && item.memberId === selectedMemberId) {\n                      map.setView(point, 16);\n                      marker.openPopup();\n                    }
+                    const marker = L.marker(point).addTo(map).bindPopup(popup);\n                    if (selectedMemberId && item.memberId === selectedMemberId) {\n                      map.setView(point, 16);\n                      marker.openPopup();\n                      selectedMarkerFound = true;\n                    }
                   }
-                  if (bounds.length === 1) {
+                  if (!selectedMarkerFound && bounds.length === 1) {
                     map.setView(bounds[0], 15);
-                  } else if (bounds.length > 1) {
+                  } else if (!selectedMarkerFound && bounds.length > 1) {
                     map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
                   }
                 }
