@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.RateLimiting;
 using Prometheus;
 
 namespace FamilyOS.Api.Controllers;
@@ -25,7 +24,6 @@ public sealed class ClientLogsController : ControllerBase
 
     [HttpPost]
     [AllowAnonymous]
-    [EnableRateLimiting("client-logs")]
     public IActionResult Post([FromBody] ClientLogBatchDto? batch)
     {
         if (batch?.Entries is null || batch.Entries.Count == 0)
