@@ -48,6 +48,9 @@ public sealed class LocationTrackingForegroundService : Service
     private readonly object _motionLock = new();
     private readonly SemaphoreSlim _motionSignal = new(0, 1);
     private DateTime _lastMotionAtUtc = DateTime.UtcNow;
+    private double? _lastAccelerationX;
+    private double? _lastAccelerationY;
+    private double? _lastAccelerationZ;
     private bool _motionSensorStarted;
     private CancellationTokenSource? _cancellation;
     private Task? _trackingTask;
@@ -120,6 +123,11 @@ public sealed class LocationTrackingForegroundService : Service
                     var location = await deviceLocation.GetCurrentLocationAsync(cancellationToken);
                     if (location?.Accuracy is double accuracy)
                     {
+                        // GPS speed also detects sustained vehicle movement after
+                        // acceleration settles, when the accelerometer alone looks still.
+                        if (location.Speed is double speed && speed >= 1.0)
+                            MarkMotionDetected();
+
                         await api.ShareLocationAsync(
                             location.Latitude,
                             location.Longitude,
@@ -229,9 +237,36 @@ public sealed class LocationTrackingForegroundService : Service
             acceleration.Y * acceleration.Y +
             acceleration.Z * acceleration.Z);
         var deviation = Math.Abs(magnitude - 9.80665);
-        if (deviation < MotionAccelerationThreshold)
-            return;
+        var wakeTracking = false;
+        lock (_motionLock)
+        {
+            var delta = _lastAccelerationX.HasValue
+                ? Math.Sqrt(
+                    Math.Pow(acceleration.X - _lastAccelerationX.Value, 2) +
+                    Math.Pow(acceleration.Y - _lastAccelerationY!.Value, 2) +
+                    Math.Pow(acceleration.Z - _lastAccelerationZ!.Value, 2))
+                : 0;
+            _lastAccelerationX = acceleration.X;
+            _lastAccelerationY = acceleration.Y;
+            _lastAccelerationZ = acceleration.Z;
 
+            if (deviation >= MotionAccelerationThreshold || delta >= 0.8)
+            {
+                var wasStationary = DateTime.UtcNow - _lastMotionAtUtc >= StationaryDetectionWindow;
+                _lastMotionAtUtc = DateTime.UtcNow;
+                wakeTracking = wasStationary;
+            }
+        }
+
+        if (wakeTracking)
+        {
+            try { _motionSignal.Release(); }
+            catch (SemaphoreFullException) { }
+        }
+    }
+
+    private void MarkMotionDetected()
+    {
         var wakeTracking = false;
         lock (_motionLock)
         {
