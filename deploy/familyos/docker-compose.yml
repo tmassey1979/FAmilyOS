@@ -1,6 +1,7 @@
 # Family OS production stack
 # Keycloak uses the shared PostgreSQL server with its own persistent database.
 # Realm import runs only when the "familyos" realm does not already exist.
+# Observability: docker compose --profile observability up -d
 
 name: familyos
 
@@ -23,9 +24,6 @@ services:
       timeout: 5s
       retries: 12
 
-  # Idempotently provisions a separate Keycloak database on the same server.
-  # This also works with an already-initialized postgres_data volume; initdb
-  # scripts alone would not run against an existing volume.
   keycloak-db-init:
     image: postgres:16-alpine
     restart: "no"
@@ -83,8 +81,6 @@ services:
       KC_HTTP_PORT: 8080
       KC_PROXY_HEADERS: xforwarded
       KC_HTTP_ENABLED: "true"
-      # Keep the public issuer stable while advertising internal backchannel URLs
-      # to services that discover Keycloak over the Docker network.
       KC_HOSTNAME: https://auth.${DOMAIN}
       KC_HOSTNAME_STRICT: "true"
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
@@ -110,7 +106,6 @@ services:
       - traefik.http.routers.keycloak.entrypoints=websecure
       - traefik.http.routers.keycloak.tls.certresolver=le
       - traefik.http.services.keycloak.loadbalancer.server.port=8080
-      # Do NOT attach sec-headers@file — X-Frame-Options DENY + stacked CSP break admin console after login
 
   api:
     image: ghcr.io/tmassey1979/familyos-api:latest
@@ -148,9 +143,54 @@ services:
       - traefik.http.services.familyos-api.loadbalancer.server.port=5080
       - traefik.http.routers.familyos-api.middlewares=sec-headers@file
 
+  # Optional: docker compose --profile observability up -d
+  prometheus:
+    profiles: ["observability"]
+    image: prom/prometheus:v2.54.1
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    volumes:
+      - ../../observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - internal
+    depends_on:
+      - api
+
+  grafana:
+    profiles: ["observability"]
+    image: grafana/grafana:11.2.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-familyos-change-me}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: https://grafana.${DOMAIN}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../../observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../../observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - internal
+      - proxy
+    depends_on:
+      - prometheus
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.familyos-grafana.rule=Host(`grafana.${DOMAIN}`)
+      - traefik.http.routers.familyos-grafana.entrypoints=websecure
+      - traefik.http.routers.familyos-grafana.tls.certresolver=le
+      - traefik.http.services.familyos-grafana.loadbalancer.server.port=3000
+
 volumes:
   postgres_data_fresh:
   rabbitmq_data:
+  prometheus_data:
+  grafana_data:
 
 networks:
   proxy:
