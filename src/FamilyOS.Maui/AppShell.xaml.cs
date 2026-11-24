@@ -13,12 +13,12 @@ public partial class AppShell : Shell
         diagnostics.RecordCheckpoint("AppShell.InitializeComponent completed");
 
         HomeShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<HomePage>());
+        FamilyShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<FamilyPage>());
         MapShellContent.ContentTemplate = new DataTemplate(() => services.GetRequiredService<FamilyMapPage>());
 
         // Modules opened from the Home grid (not bottom tabs).
         Routing.RegisterRoute(nameof(TasksPage), typeof(TasksPage));
         Routing.RegisterRoute(nameof(CalendarPage), typeof(CalendarPage));
-        Routing.RegisterRoute(nameof(FamilyPage), typeof(FamilyPage));
         Routing.RegisterRoute(nameof(OnboardingPage), typeof(OnboardingPage));
         Routing.RegisterRoute(nameof(RequestsPage), typeof(RequestsPage));
         Routing.RegisterRoute(nameof(MealsPage), typeof(MealsPage));
