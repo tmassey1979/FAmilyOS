@@ -58,9 +58,9 @@ public sealed class ClientLogService : IDisposable
     public async Task FlushAsync()
     {
         if (Interlocked.Exchange(ref _flushing, 1) == 1) return;
+        var batch = new List<ClientLogEntry>(32);
         try
         {
-            var batch = new List<ClientLogEntry>(32);
             while (batch.Count < 50 && _queue.TryDequeue(out var item))
                 batch.Add(item);
             if (batch.Count == 0) return;
@@ -92,21 +92,31 @@ public sealed class ClientLogService : IDisposable
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(12));
             using var response = await _http.SendAsync(request, cts.Token);
-            // Best-effort: drop on failure to avoid infinite retry loops offline.
-            if (!response.IsSuccessStatusCode && batch.Count < 20)
-            {
-                foreach (var e in batch)
-                    _queue.Enqueue(e);
-            }
+            // Retry only transient failures. Permanent client errors are dropped to avoid
+            // retrying malformed or rejected payloads forever.
+            if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests
+                || (int)response.StatusCode >= 500)
+                Requeue(batch);
         }
         catch
         {
-            // Offline / API down — keep buffer for next tick when possible.
+            // Network failures/timeouts are transient; retain the batch for the next tick.
+            Requeue(batch);
         }
         finally
         {
             Interlocked.Exchange(ref _flushing, 0);
         }
+    }
+
+    private void Requeue(IReadOnlyList<ClientLogEntry> batch)
+    {
+        foreach (var entry in batch)
+            _queue.Enqueue(entry);
+
+        // Keep memory bounded even when the API remains unavailable for a long period.
+        while (_queue.Count > 250)
+            _queue.TryDequeue(out _);
     }
 
     public void Dispose() => _timer.Dispose();
