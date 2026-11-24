@@ -41,7 +41,7 @@ public sealed class NotificationsPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (_items.Children.Count == 0 && !_loading)
+        if (!_loading)
             await LoadAsync();
     }
 
@@ -72,21 +72,23 @@ public sealed class NotificationsPage : ContentPage
         catch (FamilyApiException ex)
         {
             _items.Children.Clear();
+            _markAll.IsEnabled = false;
             _status.Text = ex.Message;
         }
         catch (HttpRequestException)
         {
+            _markAll.IsEnabled = false;
             _status.Text = "FamilyOS could not be reached. Check your connection and try again.";
         }
         catch (Exception)
         {
+            _markAll.IsEnabled = false;
             _status.Text = "Something went wrong while loading notifications.";
         }
         finally
         {
             _loading = false;
             _refresh.IsEnabled = true;
-            _markAll.IsEnabled = true;
         }
     }
 
@@ -222,7 +224,7 @@ public sealed class NotificationsPage : ContentPage
         }
         finally
         {
-            _markAll.IsEnabled = true;
+            // LoadAsync owns the enabled state based on the latest unread count.
         }
     }
 
