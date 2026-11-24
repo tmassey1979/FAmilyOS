@@ -222,9 +222,8 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
         try
         {
             _family = await _api.GetFamilyAsync();
-            var visibleIds = _currentLocations.Select(x => x.MemberId).Append(_family.CurrentMemberId).ToHashSet();
             _historyMember.ItemsSource = _family.Members
-                .Where(x => x.IsActive && visibleIds.Contains(x.Id))
+                .Where(x => x.IsActive)
                 .ToList();
             _historyMember.SelectedItem = _family.Members.FirstOrDefault(x => x.Id == (_requestedMemberId ?? _family.CurrentMemberId));
             _requestedMemberId = null;
@@ -327,11 +326,10 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
             if (_family is not null)
             {
                 var previouslySelectedId = _requestedMemberId ?? (_historyMember.SelectedItem as FamilyMemberDto)?.Id;
-                var visibleIds = valid.Select(x => x.MemberId)
-                    .Append(_family.CurrentMemberId)
-                    .ToHashSet();
+                // Keep every active member selectable, even when they have not shared a pin.
+                // History requests remain authorization-checked by the API.
                 var availableMembers = _family.Members
-                    .Where(x => x.IsActive && visibleIds.Contains(x.Id))
+                    .Where(x => x.IsActive)
                     .ToList();
                 _historyMember.ItemsSource = availableMembers;
                 _historyMember.SelectedItem = availableMembers.FirstOrDefault(x => x.Id == previouslySelectedId)
@@ -347,7 +345,12 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
             };
 
             var ownVisible = _ownLocation is not null;
-            if (valid.Count == 0)
+            var selectedMember = _historyMember.SelectedItem as FamilyMemberDto;
+            if (selectedMember is not null
+                && selectedMember.Id != _family?.CurrentMemberId
+                && !valid.Any(x => x.MemberId == selectedMember.Id))
+                _status.Text = $"{selectedMember.DisplayName} isn't sharing a location right now.";
+            else if (valid.Count == 0)
                 _status.Text = "No pins yet — enable location or wait for shared updates.";
             else if (ownVisible)
                 _status.Text = $"You · {Math.Max(0, valid.Count - 1)} shared · updated {DateTime.Now:t}";
