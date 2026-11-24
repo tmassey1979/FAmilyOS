@@ -40,7 +40,7 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
     private List<FamilyLocationDto> _currentLocations = [];
     private List<LocationHistoryPointDto> _visibleHistory = [];
     private bool _historyViewActive;
-    private string? _historyTargetMemberId;
+    private Guid? _historyTargetMemberId;
     private bool _loading;
     private bool _isVisible;
     private bool _timerStarted;
