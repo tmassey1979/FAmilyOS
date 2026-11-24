@@ -20,8 +20,14 @@
             <ShellContent x:Name="HomeShellContent" Title="Home"
                           ContentTemplate="{DataTemplate pages:HomePage}" />
         </Tab>
-        <Tab Title="Map"
+        <Tab Title="Family"
              Icon="menu_family.png"
+             Route="family">
+            <ShellContent x:Name="FamilyShellContent" Title="Family"
+                          ContentTemplate="{DataTemplate pages:FamilyPage}" />
+        </Tab>
+        <Tab Title="Map"
+             Icon="menu_map.png"
              Route="map">
             <ShellContent x:Name="MapShellContent" Title="Map"
                           ContentTemplate="{DataTemplate pages:FamilyMapPage}" />
