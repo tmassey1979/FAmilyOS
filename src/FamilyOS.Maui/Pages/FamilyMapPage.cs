@@ -40,6 +40,7 @@ public sealed class FamilyMapPage : ContentPage
     private List<FamilyLocationDto> _currentLocations = [];
     private List<LocationHistoryPointDto> _visibleHistory = [];
     private bool _historyViewActive;
+    private string? _historyTargetMemberId;
     private bool _loading;
     private bool _isVisible;
     private bool _timerStarted;
@@ -62,9 +63,19 @@ public sealed class FamilyMapPage : ContentPage
         _refresh.Clicked += async (_, _) => await RefreshAsync();
         _historyMember.SelectedIndexChanged += (_, _) =>
         {
-            var selected = _historyMember.SelectedItem is FamilyMemberDto;
-            _showHistory.IsEnabled = selected;
-            _showTrips.IsEnabled = selected;
+            var selectedMember = _historyMember.SelectedItem as FamilyMemberDto;
+            _showHistory.IsEnabled = selectedMember is not null;
+            _showTrips.IsEnabled = selectedMember is not null;
+
+            if (_historyViewActive && selectedMember?.Id != _historyTargetMemberId)
+            {
+                _visibleHistory = [];
+                _historyViewActive = false;
+                _historyTargetMemberId = null;
+                _historyStatus.IsVisible = false;
+                if (!_loading)
+                    _ = RefreshAsync();
+            }
         };
         _showHistory.Clicked += async (_, _) => await ShowHistoryAsync();
         _showTrips.Clicked += async (_, _) => await ShowTripsAsync();
@@ -225,6 +236,7 @@ public sealed class FamilyMapPage : ContentPage
             var history = await _api.GetLocationHistoryAsync(member.Id, from);
             var places = await _api.GetSavedPlacesAsync();
             _visibleHistory = history;
+            _historyTargetMemberId = member.Id;
             _historyViewActive = true;
             _map.Source = new HtmlWebViewSource { Html = BuildMapHtml(_currentLocations, places, _visibleHistory) };
             _historyStatus.IsVisible = true;
