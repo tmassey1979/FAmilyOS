@@ -141,7 +141,10 @@ public sealed class NotificationsPage : ContentPage
         {
             // Marking read is best-effort; the destination still opens if this request fails.
             if (!item.IsRead)
-                await _api.MarkReadAsync(item.Id);
+            {
+                try { await _api.MarkReadAsync(item.Id); }
+                catch { /* Navigation should remain available if read-state sync is offline. */ }
+            }
             await Shell.Current.GoToAsync(route);
         }
         catch (FamilyApiException ex)
