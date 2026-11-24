@@ -107,7 +107,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Package names must be lowercase for GHCR.
       - name: Build and publish API image
         uses: docker/build-push-action@v6
         with:
@@ -199,16 +198,44 @@ jobs:
       - name: Restore MAUI Android project
         run: dotnet restore src/FamilyOS.Maui/FamilyOS.Maui.csproj -p:TargetFramework=net11.0-android
 
-      - name: Publish versioned MAUI Release APK
-        run: >
-          dotnet publish src/FamilyOS.Maui/FamilyOS.Maui.csproj
-          --configuration Release
-          --framework net11.0-android
-          -p:AndroidPackageFormat=apk
-          -p:ApplicationDisplayVersion=${{ steps.version.outputs.value }}
-          -p:ApplicationVersion=${{ steps.version.outputs.code }}
-          -p:Version=${{ steps.version.outputs.value }}
-          -p:InformationalVersion=${{ steps.version.outputs.value }}+${GITHUB_SHA::7}
+      - name: Decode Android release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${ANDROID_KEYSTORE_BASE64:-}" ]]; then
+            echo "::error::Missing secret ANDROID_KEYSTORE_BASE64. Add the release keystore (base64) so APKs can be signed for upgrades."
+            echo "Also set ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD."
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/familyos-release.jks"
+          ls -la "$RUNNER_TEMP/familyos-release.jks"
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/familyos-release.jks" >> "$GITHUB_ENV"
+
+      - name: Publish signed MAUI Release APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${ANDROID_KEYSTORE_PASSWORD:-}" || -z "${ANDROID_KEY_ALIAS:-}" || -z "${ANDROID_KEY_PASSWORD:-}" ]]; then
+            echo "::error::Missing ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD secrets."
+            exit 1
+          fi
+          dotnet publish src/FamilyOS.Maui/FamilyOS.Maui.csproj \
+            --configuration Release \
+            --framework net11.0-android \
+            -p:AndroidPackageFormat=apk \
+            -p:ApplicationDisplayVersion=${{ steps.version.outputs.value }} \
+            -p:ApplicationVersion=${{ steps.version.outputs.code }} \
+            -p:Version=${{ steps.version.outputs.value }} \
+            -p:InformationalVersion=${{ steps.version.outputs.value }}+${GITHUB_SHA::7} \
+            -p:AndroidKeyStore=true \
+            -p:AndroidSigningKeyStore="$KEYSTORE_PATH" \
+            -p:AndroidSigningStorePass="$ANDROID_KEYSTORE_PASSWORD" \
+            -p:AndroidSigningKeyAlias="$ANDROID_KEY_ALIAS" \
+            -p:AndroidSigningKeyPass="$ANDROID_KEY_PASSWORD"
 
       - name: Stage versioned APK
         id: apk
@@ -242,7 +269,6 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-  # Deploy only when both the server images and installable client have built.
   deploy-server:
     name: Deploy and verify AWS server
     needs: [build-server-images, build-android]
@@ -250,7 +276,6 @@ jobs:
     uses: ./.github/workflows/deploy-stack.yml
     secrets: inherit
 
-  # Do not publish a client release when the production deployment or health checks fail.
   publish-coordinated-release:
     name: Publish release with installable MAUI APK
     needs: [build-android, deploy-server]
@@ -278,7 +303,6 @@ jobs:
           TAG="v${VERSION}-build${BUILD_NUMBER}"
           ARGS=("$APK")
           if [[ -n "${SUMS:-}" ]]; then ARGS+=("$SUMS"); fi
-          # Replace an existing tag only when retrying this exact run's release.
           if gh release view "$TAG" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
             gh release delete "$TAG" --repo "${GITHUB_REPOSITORY}" --yes || true
             git push origin ":refs/tags/${TAG}" || true
@@ -287,13 +311,13 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "FamilyOS v${VERSION} (build ${BUILD_NUMBER})" \
-            --notes "FamilyOS MAUI Android release.
+            --notes "FamilyOS MAUI Android release (release-keystore signed for upgrades).
 
           - **versionName:** ${VERSION}
           - **versionCode:** ${VERSION_CODE}
           - **Commit:** ${GITHUB_SHA}
 
-          Install the attached APK. This release is published only after API and Keycloak deployment health checks pass." \
+          Install the attached APK. Published only after API and Keycloak health checks pass." \
             --latest
 
       - name: Release summary
