@@ -5,8 +5,8 @@ using FamilyOS.Maui.Services;
 namespace FamilyOS.Maui.Pages;
 
 /// <summary>
-/// Displays only the latest locations explicitly shared by active household members.
-/// Map tiles are provided by OpenStreetMap with visible attribution.
+/// Full-screen household map. Own device location is requested automatically when the tab opens.
+/// Shared household pins only appear when members have explicitly shared.
 /// </summary>
 public sealed class FamilyMapPage : ContentPage
 {
@@ -14,14 +14,28 @@ public sealed class FamilyMapPage : ContentPage
     private readonly DeviceLocationService _deviceLocation;
     private Location? _ownLocation;
     private DateTimeOffset _ownLocationReadAtUtc;
-    private readonly WebView _map;
-    private readonly Label _status;
-    private readonly Button _refresh;
-    private readonly Button _showMyLocation;
-    private readonly Picker _historyMember;
-    private readonly Label _historyStatus;
-    private readonly Button _showHistory;
-    private readonly Button _showTrips;
+    private readonly WebView _map = new()
+    {
+        HorizontalOptions = LayoutOptions.Fill,
+        VerticalOptions = LayoutOptions.Fill
+    };
+    private readonly Label _status = new()
+    {
+        FontSize = 12,
+        LineBreakMode = LineBreakMode.WordWrap,
+        HorizontalTextAlignment = TextAlignment.Center
+    };
+    private readonly Button _locate = new() { Text = "⌖", FontSize = 20, WidthRequest = 48, HeightRequest = 48 };
+    private readonly Button _refresh = new() { Text = "↻", FontSize = 20, WidthRequest = 48, HeightRequest = 48 };
+    private readonly Picker _historyMember = new()
+    {
+        Title = "Member",
+        ItemDisplayBinding = new Binding(nameof(FamilyMemberDto.DisplayName)),
+        FontSize = 13
+    };
+    private readonly Button _showHistory = new() { Text = "24h", FontSize = 13, IsEnabled = false };
+    private readonly Button _showTrips = new() { Text = "Trips", FontSize = 13, IsEnabled = false };
+    private readonly Label _historyStatus = new() { FontSize = 11, LineBreakMode = LineBreakMode.WordWrap, IsVisible = false };
     private FamilyDto? _family;
     private List<FamilyLocationDto> _currentLocations = [];
     private List<LocationHistoryPointDto> _visibleHistory = [];
@@ -29,91 +43,92 @@ public sealed class FamilyMapPage : ContentPage
     private bool _loading;
     private bool _isVisible;
     private bool _timerStarted;
+    private bool _autoLocated;
 
     public FamilyMapPage(FamilyApiClient api, DeviceLocationService deviceLocation)
     {
         _api = api;
         _deviceLocation = deviceLocation;
-        Title = "Family map";
+        Title = "Map";
 
-        var heading = new Label
-        {
-            Text = "Household map",
-            FontSize = 25,
-            FontAttributes = FontAttributes.Bold
-        };
-        heading.SetDynamicResource(VisualElement.StyleProperty, "TextDisplay");
+        _status.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
+        _status.Text = "Finding your location…";
+        _locate.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+        _refresh.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+        _showHistory.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+        _showTrips.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
 
-        var explanation = new Label
-        {
-            Text = "Your own device location can appear locally when device location is enabled. Other household pins appear only when those members explicitly share with you. Map tiles are provided by OpenStreetMap.",
-            FontSize = 13,
-            LineBreakMode = LineBreakMode.WordWrap
-        };
-        explanation.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
-
-        _status = new Label
-        {
-            Text = "Load shared household locations to see the map.",
-            FontSize = 13,
-            LineBreakMode = LineBreakMode.WordWrap
-        };
-        _status.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
-
-        _refresh = new Button { Text = "Refresh household map" };
+        _locate.Clicked += async (_, _) => await EnsureOwnLocationAsync(forcePrompt: true);
         _refresh.Clicked += async (_, _) => await RefreshAsync();
-        _showMyLocation = new Button { Text = "Show my location on this map" };
-        _showMyLocation.Clicked += async (_, _) => await EnableAndShowOwnLocationAsync();
-        _historyMember = new Picker { Title = "Choose a household member", ItemDisplayBinding = new Binding(nameof(FamilyMemberDto.DisplayName)) };
         _historyMember.SelectedIndexChanged += (_, _) =>
         {
             var selected = _historyMember.SelectedItem is FamilyMemberDto;
             _showHistory.IsEnabled = selected;
             _showTrips.IsEnabled = selected;
         };
-        _historyStatus = new Label { Text = "Choose a member to view permitted location history.", FontSize = 12, LineBreakMode = LineBreakMode.WordWrap };
-        _historyStatus.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
-        _showHistory = new Button { Text = "Show last 24 hours", IsEnabled = false, FontSize = 13 };
         _showHistory.Clicked += async (_, _) => await ShowHistoryAsync();
-        _showTrips = new Button { Text = "Show trip summaries", IsEnabled = false, FontSize = 13 };
         _showTrips.Clicked += async (_, _) => await ShowTripsAsync();
 
-        _map = new WebView
+        var statusChip = new Border
         {
-            HeightRequest = 480,
-            HorizontalOptions = LayoutOptions.Fill,
-            VerticalOptions = LayoutOptions.Fill
+            Padding = new Thickness(12, 8),
+            StrokeThickness = 0,
+            Content = _status,
+            HorizontalOptions = LayoutOptions.Fill
+        };
+        statusChip.SetDynamicResource(Border.BackgroundColorProperty, "BgSurface");
+        statusChip.StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 14 };
+
+        var topOverlay = new VerticalStackLayout
+        {
+            Padding = new Thickness(12, 8, 12, 0),
+            Spacing = 8,
+            Children = { statusChip }
         };
 
-        var attribution = new Label
+        var fabColumn = new VerticalStackLayout
         {
-            Text = "Map data © OpenStreetMap contributors · Map tiles are loaded from OpenStreetMap.",
-            FontSize = 11,
-            LineBreakMode = LineBreakMode.WordWrap
+            Spacing = 8,
+            HorizontalOptions = LayoutOptions.End,
+            VerticalOptions = LayoutOptions.End,
+            Margin = new Thickness(0, 0, 12, 100),
+            Children = { _locate, _refresh }
         };
-        attribution.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
 
-        var card = new Border
+        var bottomBar = new Border
         {
-            Padding = 12,
+            Padding = new Thickness(12, 10),
+            StrokeThickness = 0,
             Content = new VerticalStackLayout
             {
-                Spacing = 10,
-                Children = { heading, explanation, _status, _showMyLocation, _refresh, new Label { Text = "Location history and trips", FontSize = 16, FontAttributes = FontAttributes.Bold }, _historyMember, _showHistory, _showTrips, _historyStatus, _map, attribution }
+                Spacing = 6,
+                Children =
+                {
+                    new HorizontalStackLayout
+                    {
+                        Spacing = 8,
+                        Children = { _historyMember, _showHistory, _showTrips }
+                    },
+                    _historyStatus
+                }
             }
         };
-        card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
+        bottomBar.SetDynamicResource(Border.BackgroundColorProperty, "BgSurface");
+        bottomBar.StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 16 };
 
-        Content = new ScrollView
+        var root = new Grid { RowDefinitions = { new RowDefinition(GridLength.Star) } };
+        root.Add(_map, 0, 0);
+        root.Add(topOverlay, 0, 0);
+        root.Add(fabColumn, 0, 0);
+        var bottomHost = new VerticalStackLayout
         {
-            Content = new VerticalStackLayout
-            {
-                Padding = new Thickness(16, 12),
-                Spacing = 12,
-                Children = { card }
-            }
+            VerticalOptions = LayoutOptions.End,
+            Padding = new Thickness(12, 0, 12, 12),
+            Children = { bottomBar }
         };
+        root.Add(bottomHost, 0, 0);
 
+        Content = root;
         _map.Source = new HtmlWebViewSource { Html = BuildMapHtml([], []) };
     }
 
@@ -121,9 +136,6 @@ public sealed class FamilyMapPage : ContentPage
     {
         base.OnAppearing();
         _isVisible = true;
-        _showMyLocation.Text = _deviceLocation.IsEnabled
-            ? "Update my location on this map"
-            : "Show my location on this map";
         if (!_timerStarted)
         {
             _timerStarted = true;
@@ -138,7 +150,13 @@ public sealed class FamilyMapPage : ContentPage
                 return true;
             });
         }
+
         await LoadFamilyMembersAsync();
+        if (!_autoLocated)
+        {
+            _autoLocated = true;
+            await EnsureOwnLocationAsync(forcePrompt: false);
+        }
         await RefreshAsync();
     }
 
@@ -148,34 +166,32 @@ public sealed class FamilyMapPage : ContentPage
         base.OnDisappearing();
     }
 
-    private async Task EnableAndShowOwnLocationAsync()
+    private async Task EnsureOwnLocationAsync(bool forcePrompt)
     {
-        if (!await DisplayAlertAsync(
-            "Use your device location?",
-            "FamilyOS will ask Android for foreground location permission so it can place your current position on this map. Your position stays on this device; this action does not share it with your household or save location history.",
-            "Continue", "Not now"))
-            return;
-
         try
         {
-            _showMyLocation.IsEnabled = false;
-            if (!await _deviceLocation.EnableAsync())
+            _locate.IsEnabled = false;
+            if (!_deviceLocation.IsEnabled || forcePrompt)
             {
-                _status.Text = "Location permission was not granted. You can still view locations household members have shared with you.";
-                return;
+                if (!await _deviceLocation.EnableAsync())
+                {
+                    _status.Text = "Location permission off — shared household pins still load.";
+                    return;
+                }
             }
 
-            _ownLocation = null;
-            _status.Text = "Getting your current device location…";
+            _status.Text = "Getting your location…";
+            _ownLocation = await _deviceLocation.GetCurrentLocationAsync();
+            _ownLocationReadAtUtc = DateTimeOffset.UtcNow;
             await RefreshAsync();
         }
         catch (Exception ex)
         {
-            _status.Text = $"Could not access your device location: {ex.Message}";
+            _status.Text = $"Could not get your location: {ex.Message}";
         }
         finally
         {
-            _showMyLocation.IsEnabled = true;
+            _locate.IsEnabled = true;
         }
     }
 
@@ -195,7 +211,8 @@ public sealed class FamilyMapPage : ContentPage
         }
         catch (Exception ex)
         {
-            _historyStatus.Text = $"Could not load household members: {ex.Message}";
+            _historyStatus.IsVisible = true;
+            _historyStatus.Text = $"Household: {ex.Message}";
         }
     }
 
@@ -210,13 +227,15 @@ public sealed class FamilyMapPage : ContentPage
             _visibleHistory = history;
             _historyViewActive = true;
             _map.Source = new HtmlWebViewSource { Html = BuildMapHtml(_currentLocations, places, _visibleHistory) };
+            _historyStatus.IsVisible = true;
             _historyStatus.Text = history.Count < 2
-                ? $"{member.DisplayName}: not enough saved points to draw a route in the last 24 hours."
-                : $"{member.DisplayName}: showing {history.Count} history points from the last 24 hours.";
+                ? $"{member.DisplayName}: not enough points in the last 24 hours."
+                : $"{member.DisplayName}: {history.Count} points · last 24 hours.";
         }
         catch (Exception ex)
         {
-            _historyStatus.Text = $"Location history is unavailable: {ex.Message}";
+            _historyStatus.IsVisible = true;
+            _historyStatus.Text = $"History unavailable: {ex.Message}";
         }
     }
 
@@ -226,14 +245,16 @@ public sealed class FamilyMapPage : ContentPage
         try
         {
             var trips = await _api.GetLocationTripsAsync(member.Id, DateTimeOffset.UtcNow.AddHours(-24));
+            _historyStatus.IsVisible = true;
             _historyStatus.Text = trips.Count == 0
-                ? $"{member.DisplayName}: no trips met the minimum distance and duration thresholds in the last 24 hours."
-                : string.Join("\n", trips.Select((trip, index) =>
-                    $"Trip {index + 1}: {trip.StartedAtUtc.ToLocalTime():t}–{trip.EndedAtUtc.ToLocalTime():t} · {trip.DistanceMeters / 1000:0.0} km · {trip.DurationMinutes:0} min"));
+                ? $"{member.DisplayName}: no trips in the last 24 hours."
+                : string.Join(" · ", trips.Select((trip, index) =>
+                    $"#{index + 1} {trip.DistanceMeters / 1000:0.0} km"));
         }
         catch (Exception ex)
         {
-            _historyStatus.Text = $"Trip summaries are unavailable: {ex.Message}";
+            _historyStatus.IsVisible = true;
+            _historyStatus.Text = $"Trips unavailable: {ex.Message}";
         }
     }
 
@@ -242,7 +263,6 @@ public sealed class FamilyMapPage : ContentPage
         if (_loading) return;
         _loading = true;
         _refresh.IsEnabled = false;
-        _status.Text = "Loading locations shared by your household…";
         try
         {
             var locations = await _api.GetFamilyLocationsAsync();
@@ -254,7 +274,6 @@ public sealed class FamilyMapPage : ContentPage
                     && x.UpdatedAtUtc.HasValue)
                 .ToList();
 
-            // Show this phone's fix locally without uploading it or granting household access.
             if (_deviceLocation.IsEnabled && (_ownLocation is null ||
                 DateTimeOffset.UtcNow - _ownLocationReadAtUtc > TimeSpan.FromMinutes(2)))
             {
@@ -263,10 +282,7 @@ public sealed class FamilyMapPage : ContentPage
                     _ownLocation = await _deviceLocation.GetCurrentLocationAsync();
                     _ownLocationReadAtUtc = DateTimeOffset.UtcNow;
                 }
-                catch
-                {
-                    _ownLocation = null;
-                }
+                catch { }
             }
 
             if (_ownLocation is not null && _family is not null)
@@ -284,10 +300,6 @@ public sealed class FamilyMapPage : ContentPage
 
             _currentLocations = valid;
 
-            // Refresh the history picker after shared locations load. On the first
-            // page appearance the family list is loaded before the map, so filtering
-            // only during LoadFamilyMembersAsync would otherwise hide every other
-            // member until the page is reopened.
             if (_family is not null)
             {
                 var previouslySelectedId = (_historyMember.SelectedItem as FamilyMemberDto)?.Id;
@@ -305,31 +317,22 @@ public sealed class FamilyMapPage : ContentPage
                 _showTrips.IsEnabled = hasSelection;
             }
 
-            // The 30-second live refresh must not silently erase a history route
-            // while the user is inspecting it.
             _map.Source = new HtmlWebViewSource
             {
                 Html = BuildMapHtml(valid, places, _historyViewActive ? _visibleHistory : null)
             };
-            var ownVisible = _ownLocation is not null && _family is not null;
-            var nowUtc = DateTime.UtcNow;
-            var ages = valid.Select(x => nowUtc - DateTime.SpecifyKind(x.UpdatedAtUtc!.Value, DateTimeKind.Utc))
-                .Select(x => x < TimeSpan.Zero ? TimeSpan.Zero : x)
-                .ToList();
-            var freshCount = ages.Count(x => x < TimeSpan.FromMinutes(2));
-            var recentCount = ages.Count(x => x >= TimeSpan.FromMinutes(2) && x < TimeSpan.FromMinutes(15));
-            var staleCount = ages.Count(x => x >= TimeSpan.FromMinutes(15) && x < TimeSpan.FromHours(1));
-            var oldCount = ages.Count(x => x >= TimeSpan.FromHours(1));
-            var freshness = $"{freshCount} fresh (<2 min), {recentCount} recent (2–15 min), {staleCount} stale (15–60 min), {oldCount} old (>1 hour)";
-            _status.Text = valid.Count == 0
-                ? "No shared household locations are available. You can still use the map without granting location permission."
-                : ownVisible
-                    ? $"Your phone and {Math.Max(0, valid.Count - 1)} shared household location(s) are shown. {freshness}. Your own pin stays on this device unless you separately share it."
-                    : $"{valid.Count} household location(s): {freshness}. Latest received update: {valid.Max(x => x.UpdatedAtUtc!.Value).ToLocalTime():g}.";
+
+            var ownVisible = _ownLocation is not null;
+            if (valid.Count == 0)
+                _status.Text = "No pins yet — enable location or wait for shared updates.";
+            else if (ownVisible)
+                _status.Text = $"You · {Math.Max(0, valid.Count - 1)} shared · updated {DateTime.Now:t}";
+            else
+                _status.Text = $"{valid.Count} shared · latest {valid.Max(x => x.UpdatedAtUtc!.Value).ToLocalTime():t}";
         }
         catch (Exception ex)
         {
-            _status.Text = $"Could not load household locations: {ex.Message}";
+            _status.Text = $"Map update failed: {ex.Message}";
         }
         finally
         {
@@ -353,14 +356,15 @@ public sealed class FamilyMapPage : ContentPage
             <!doctype html>
             <html lang="en">
             <head>
-              <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+              <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
               <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
                 integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
               <style>
-                html, body, #map { height: 100%; width: 100%; margin: 0; padding: 0; }
-                body { font-family: sans-serif; }
-                .empty { padding: 24px; color: #475569; font-size: 15px; }
-                .leaflet-popup-content { line-height: 1.5; }
+                html, body, #map { height: 100%; width: 100%; margin: 0; padding: 0; background: #F4F0E8; }
+                body { font-family: -apple-system, system-ui, sans-serif; }
+                .empty { display:flex; align-items:center; justify-content:center; height:100%; color:#64748B; font-size:15px; padding:24px; text-align:center; }
+                .leaflet-popup-content { line-height: 1.45; margin: 10px 12px; }
+                .leaflet-control-attribution { font-size: 10px; }
               </style>
             </head>
             <body>
@@ -371,19 +375,19 @@ public sealed class FamilyMapPage : ContentPage
                 const locations = {{json}};
                 const places = {{placeJson}};
                 const history = {{historyJson}};
-                const map = L.map('map', { zoomControl: true }).setView([39.5, -98.35], 4);
+                const map = L.map('map', { zoomControl: true, attributionControl: true }).setView([39.5, -98.35], 4);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                   maxZoom: 19,
-                  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  attribution: '&copy; OpenStreetMap'
                 }).addTo(map);
                 if (locations.length === 0 && places.length === 0 && history.length === 0) {
-                  document.getElementById('map').innerHTML = '<div class="empty">No shared locations available.</div>';
+                  document.getElementById('map').innerHTML = '<div class="empty">Waiting for location…</div>';
                 } else {
                   const bounds = [];
                   if (history.length > 1) {
                     const routePoints = history.map(point => [point.latitude, point.longitude]);
                     routePoints.forEach(point => bounds.push(point));
-                    L.polyline(routePoints, { color: '#dc2626', weight: 4, opacity: 0.8 }).addTo(map);
+                    L.polyline(routePoints, { color: '#0EA5E9', weight: 4, opacity: 0.85 }).addTo(map);
                   }
                   for (const place of places) {
                     const point = [place.latitude, place.longitude];
@@ -392,31 +396,33 @@ public sealed class FamilyMapPage : ContentPage
                     const name = document.createElement('strong');
                     name.textContent = place.name || 'Saved place';
                     const detail = document.createElement('div');
-                    detail.textContent = 'Geofence radius: ' + Math.round(place.radiusMeters) + ' m';
+                    detail.textContent = 'Geofence · ' + Math.round(place.radiusMeters) + ' m';
                     popup.append(name, detail);
-                    L.circle(point, { radius: place.radiusMeters, color: '#2563eb', weight: 2, fillOpacity: 0.08 }).addTo(map).bindPopup(popup);
+                    L.circle(point, { radius: place.radiusMeters, color: '#0EA5E9', weight: 2, fillOpacity: 0.08 }).addTo(map).bindPopup(popup);
                   }
                   for (const item of locations) {
                     const point = [item.latitude, item.longitude];
                     bounds.push(point);
                     const popup = document.createElement('div');
                     const name = document.createElement('strong');
-                    name.textContent = item.displayName || 'Household member';
+                    name.textContent = item.displayName || 'Member';
                     const updated = document.createElement('div');
                     const ageMinutes = (Date.now() - new Date(item.updatedAtUtc).getTime()) / 60000;
-                    const freshness = ageMinutes < 2 ? 'Recently updated' : ageMinutes < 15 ? 'A few minutes old' : ageMinutes < 60 ? 'Stale location' : 'Old location';
-                    updated.textContent = freshness + ' · Last shared: ' + new Date(item.updatedAtUtc).toLocaleString();
+                    const freshness = ageMinutes < 2 ? 'Live' : ageMinutes < 15 ? 'Recent' : ageMinutes < 60 ? 'Stale' : 'Old';
+                    updated.textContent = freshness + ' · ' + new Date(item.updatedAtUtc).toLocaleString();
                     popup.append(name, updated);
                     if (Number.isFinite(item.accuracyMeters)) {
-                      const accuracy = document.createElement('div');
-                      accuracy.textContent = 'Reported accuracy: ±' + Math.round(item.accuracyMeters) + ' m';
-                      popup.append(accuracy);
-                      L.circle(point, { radius: Math.min(Math.max(item.accuracyMeters, 5), 10000), weight: 1, fillOpacity: 0.08 }).addTo(map);
+                      L.circle(point, { radius: Math.min(Math.max(item.accuracyMeters, 5), 10000), weight: 1, color: '#0F172A', fillOpacity: 0.06 }).addTo(map);
                     }
                     L.marker(point).addTo(map).bindPopup(popup);
                   }
-                  map.fitBounds(bounds, { padding: [28, 28], maxZoom: 15 });
+                  if (bounds.length === 1) {
+                    map.setView(bounds[0], 15);
+                  } else if (bounds.length > 1) {
+                    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+                  }
                 }
+                setTimeout(() => map.invalidateSize(), 200);
               </script>
             </body>
             </html>
