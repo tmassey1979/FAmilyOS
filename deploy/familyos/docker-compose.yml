@@ -1,6 +1,4 @@
 # Family OS production stack
-# Keycloak uses the shared PostgreSQL server with its own persistent database.
-# Realm import runs only when the "familyos" realm does not already exist.
 # Observability: docker compose --profile observability up -d
 
 name: familyos
@@ -143,7 +141,6 @@ services:
       - traefik.http.services.familyos-api.loadbalancer.server.port=5080
       - traefik.http.routers.familyos-api.middlewares=sec-headers@file
 
-  # Optional: docker compose --profile observability up -d
   prometheus:
     profiles: ["observability"]
     image: prom/prometheus:v2.54.1
@@ -153,7 +150,7 @@ services:
       - --storage.tsdb.retention.time=15d
       - --web.enable-lifecycle
     volumes:
-      - ../../observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     networks:
       - internal
@@ -171,8 +168,8 @@ services:
       GF_SERVER_ROOT_URL: https://grafana.${DOMAIN}
     volumes:
       - grafana_data:/var/lib/grafana
-      - ../../observability/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ../../observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ../observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
       - internal
       - proxy
