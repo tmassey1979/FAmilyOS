@@ -25,6 +25,7 @@ public static class MauiProgram
         builder.Services.AddTransient<AccessTokenPage>();
         builder.Services.AddSingleton<HttpClient>();
         builder.Services.AddSingleton<IAuthSessionService, KeycloakAuthService>();
+        builder.Services.AddSingleton<ClientLogService>();
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddTransient<HomePage>();
         builder.Services.AddSingleton<PulseApiClient>();
@@ -65,6 +66,11 @@ public static class MauiProgram
             diagnostics.RecordCheckpoint("MauiProgram.Build starting");
             var app = builder.Build();
             diagnostics.RecordCheckpoint("MauiProgram.Build completed");
+
+            // Resolve once so the flush timer starts; log launch for remote observability.
+            var clientLogs = app.Services.GetService<ClientLogService>();
+            clientLogs?.Info("app_launch", "MauiProgram");
+
             return app;
         }
         catch (Exception ex)
