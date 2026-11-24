@@ -35,9 +35,7 @@ public sealed class LocationTrackingForegroundService : Service
         }
     }
     private const int NotificationId = 4107;
-    private static readonly TimeSpan NormalUpdateInterval = TimeSpan.FromMinutes(1);
-    private static readonly TimeSpan PowerSaveUpdateInterval = TimeSpan.FromMinutes(3);
-    private static readonly TimeSpan LowBatteryUpdateInterval = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan LocationUpdateInterval = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan MaximumRetryInterval = TimeSpan.FromMinutes(5);
     private CancellationTokenSource? _cancellation;
     private Task? _trackingTask;
@@ -89,6 +87,7 @@ public sealed class LocationTrackingForegroundService : Service
             var consecutiveFailures = 0;
             while (!cancellationToken.IsCancellationRequested)
             {
+                var cycleStarted = System.Diagnostics.Stopwatch.GetTimestamp();
                 var retryDelay = TimeSpan.Zero;
                 try
                 {
@@ -158,9 +157,12 @@ public sealed class LocationTrackingForegroundService : Service
                     UpdateNotification($"Connection unavailable; retrying in {(int)retryDelay.TotalSeconds}s…");
                 }
 
-                // Respect Android power-save mode and low battery by reducing GPS/network
-                // activity instead of sampling at the normal one-minute interval.
-                var interval = GetPowerAwareInterval();
+                // Target a five-second start-to-start cadence while tracking is active.
+                // Retry backoff takes precedence after a transient failure.
+                var elapsed = System.Diagnostics.Stopwatch.GetElapsedTime(cycleStarted);
+                var interval = elapsed >= LocationUpdateInterval
+                    ? TimeSpan.Zero
+                    : LocationUpdateInterval - elapsed;
                 if (retryDelay > interval)
                     interval = retryDelay;
 
@@ -178,22 +180,6 @@ public sealed class LocationTrackingForegroundService : Service
         {
             StopSelf();
         }
-    }
-
-    private TimeSpan GetPowerAwareInterval()
-    {
-        var battery = Battery.Default;
-        if (battery.ChargeLevel is >= 0 and <= 0.15)
-            return LowBatteryUpdateInterval;
-
-        if (Build.VERSION.SdkInt >= BuildVersionCodes.Lollipop)
-        {
-            var power = (PowerManager?)GetSystemService(PowerService);
-            if (power?.IsPowerSaveMode == true)
-                return PowerSaveUpdateInterval;
-        }
-
-        return NormalUpdateInterval;
     }
 
     private void StopTracking()
