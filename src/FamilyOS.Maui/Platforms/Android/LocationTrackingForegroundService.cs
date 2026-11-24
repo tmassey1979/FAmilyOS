@@ -143,8 +143,8 @@ public sealed class LocationTrackingForegroundService : Service
                             await api.ShareBatteryStatusAsync(percent, charging, cancellationToken);
                         }
                         consecutiveFailures = 0;
-                        var mode = GetTrackingMode();
-                        UpdateNotification($"Last update: {location.Timestamp.ToLocalTime():t} · {mode.Description}");
+                        var currentMode = GetTrackingMode();
+                        UpdateNotification($"Last update: {location.Timestamp.ToLocalTime():t} · {currentMode.Description}");
                     }
                     else
                     {
@@ -351,7 +351,7 @@ public sealed class LocationTrackingForegroundService : Service
         await Task.WhenAny(delayTask, motionTask);
         waitCancellation.Cancel();
         try { await Task.WhenAll(delayTask, motionTask); }
-        catch (OperationCanceledException) { }
+        catch (System.OperationCanceledException) { }
         cancellationToken.ThrowIfCancellationRequested();
     }
 
