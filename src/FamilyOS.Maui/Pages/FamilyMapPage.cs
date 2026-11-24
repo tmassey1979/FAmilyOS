@@ -8,7 +8,7 @@ namespace FamilyOS.Maui.Pages;
 /// Full-screen household map. Own device location is requested automatically when the tab opens.
 /// Shared household pins only appear when members have explicitly shared.
 /// </summary>
-public sealed class FamilyMapPage : ContentPage
+public sealed class FamilyMapPage : ContentPage, IQueryAttributable
 {
     private readonly FamilyApiClient _api;
     private readonly DeviceLocationService _deviceLocation;
@@ -45,6 +45,7 @@ public sealed class FamilyMapPage : ContentPage
     private bool _isVisible;
     private bool _timerStarted;
     private bool _autoLocated;
+    private Guid? _requestedMemberId;
 
     public FamilyMapPage(FamilyApiClient api, DeviceLocationService deviceLocation)
     {
@@ -143,6 +144,16 @@ public sealed class FamilyMapPage : ContentPage
         _map.Source = new HtmlWebViewSource { Html = BuildMapHtml([], []) };
     }
 
+    public void ApplyQueryAttributes(IDictionary<string, object> query)
+    {
+        if (query.TryGetValue("memberId", out var raw) && Guid.TryParse(raw?.ToString(), out var memberId))
+        {
+            _requestedMemberId = memberId;
+            if (_family is not null)
+                _historyMember.SelectedItem = _family.Members.FirstOrDefault(x => x.Id == memberId);
+        }
+    }
+
     protected override async void OnAppearing()
     {
         base.OnAppearing();
@@ -215,7 +226,7 @@ public sealed class FamilyMapPage : ContentPage
             _historyMember.ItemsSource = _family.Members
                 .Where(x => x.IsActive && visibleIds.Contains(x.Id))
                 .ToList();
-            _historyMember.SelectedItem = _family.Members.FirstOrDefault(x => x.Id == _family.CurrentMemberId);
+            _historyMember.SelectedItem = _family.Members.FirstOrDefault(x => x.Id == (_requestedMemberId ?? _family.CurrentMemberId));
             var selected = _historyMember.SelectedItem is FamilyMemberDto;
             _showHistory.IsEnabled = selected;
             _showTrips.IsEnabled = selected;
@@ -238,7 +249,7 @@ public sealed class FamilyMapPage : ContentPage
             _visibleHistory = history;
             _historyTargetMemberId = member.Id;
             _historyViewActive = true;
-            _map.Source = new HtmlWebViewSource { Html = BuildMapHtml(_currentLocations, places, _visibleHistory) };
+            _map.Source = new HtmlWebViewSource { Html = BuildMapHtml(_currentLocations, places, _visibleHistory, member.Id) };
             _historyStatus.IsVisible = true;
             _historyStatus.Text = history.Count < 2
                 ? $"{member.DisplayName}: not enough points in the last 24 hours."
@@ -314,7 +325,7 @@ public sealed class FamilyMapPage : ContentPage
 
             if (_family is not null)
             {
-                var previouslySelectedId = (_historyMember.SelectedItem as FamilyMemberDto)?.Id;
+                var previouslySelectedId = _requestedMemberId ?? (_historyMember.SelectedItem as FamilyMemberDto)?.Id;
                 var visibleIds = valid.Select(x => x.MemberId)
                     .Append(_family.CurrentMemberId)
                     .ToHashSet();
@@ -331,7 +342,7 @@ public sealed class FamilyMapPage : ContentPage
 
             _map.Source = new HtmlWebViewSource
             {
-                Html = BuildMapHtml(valid, places, _historyViewActive ? _visibleHistory : null)
+                Html = BuildMapHtml(valid, places, _historyViewActive ? _visibleHistory : null, _requestedMemberId ?? (_historyMember.SelectedItem as FamilyMemberDto)?.Id)
             };
 
             var ownVisible = _ownLocation is not null;
@@ -353,7 +364,7 @@ public sealed class FamilyMapPage : ContentPage
         }
     }
 
-    private static string BuildMapHtml(IReadOnlyList<FamilyLocationDto> locations, IReadOnlyList<SavedPlaceDto> places, IReadOnlyList<LocationHistoryPointDto>? history = null)
+    private static string BuildMapHtml(IReadOnlyList<FamilyLocationDto> locations, IReadOnlyList<SavedPlaceDto> places, IReadOnlyList<LocationHistoryPointDto>? history = null, Guid? selectedMemberId = null)
     {
         var data = locations.Select(x => new MapPin(
             x.DisplayName,
@@ -386,7 +397,7 @@ public sealed class FamilyMapPage : ContentPage
               <script>
                 const locations = {{json}};
                 const places = {{placeJson}};
-                const history = {{historyJson}};
+                const history = {{historyJson}};\n                const selectedMemberId = {{JsonSerializer.Serialize(selectedMemberId?.ToString())}};
                 const map = L.map('map', { zoomControl: true, attributionControl: true }).setView([39.5, -98.35], 4);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                   maxZoom: 19,
@@ -426,7 +437,7 @@ public sealed class FamilyMapPage : ContentPage
                     if (Number.isFinite(item.accuracyMeters)) {
                       L.circle(point, { radius: Math.min(Math.max(item.accuracyMeters, 5), 10000), weight: 1, color: '#0F172A', fillOpacity: 0.06 }).addTo(map);
                     }
-                    L.marker(point).addTo(map).bindPopup(popup);
+                    const marker = L.marker(point).addTo(map).bindPopup(popup);\n                    if (selectedMemberId && item.memberId === selectedMemberId) {\n                      map.setView(point, 16);\n                      marker.openPopup();\n                    }
                   }
                   if (bounds.length === 1) {
                     map.setView(bounds[0], 15);
@@ -441,5 +452,5 @@ public sealed class FamilyMapPage : ContentPage
             """;
     }
 
-    private sealed record MapPin(string DisplayName, double Latitude, double Longitude, double? AccuracyMeters, string UpdatedAtUtc);
+    private sealed record MapPin(Guid MemberId, string DisplayName, double Latitude, double Longitude, double? AccuracyMeters, string UpdatedAtUtc);
 }
