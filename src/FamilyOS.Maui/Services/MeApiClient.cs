@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace FamilyOS.Maui.Services;
 
-/// <summary>Authenticated account and quiet-hours preferences.</summary>
+/// <summary>Authenticated account, profile, and quiet-hours preferences.</summary>
 public sealed class MeApiClient
 {
     private static readonly Uri ApiBaseUri = new("https://api.18.226.226.118.sslip.io/");
@@ -36,6 +36,37 @@ public sealed class MeApiClient
 
     public Task DisconnectGoogleCalendarAsync(CancellationToken ct = default)
         => SendNoContentAsync(HttpMethod.Delete, "api/me/google-calendar", ct);
+
+    public Task<ProfileDto> GetProfileAsync(CancellationToken ct = default)
+        => SendAsync<ProfileDto>(HttpMethod.Get, "api/me/profile", null, ct);
+
+    public Task<ProfileDto> UpdateProfileAsync(string displayName, CancellationToken ct = default)
+        => SendAsync<ProfileDto>(HttpMethod.Put, "api/me/profile",
+            new StringContent(JsonSerializer.Serialize(new { displayName }, JsonOptions), Encoding.UTF8, "application/json"), ct);
+
+    public async Task<ProfileDto> UploadAvatarAsync(Stream image, string fileName, string contentType, CancellationToken ct = default)
+    {
+        var token = await _auth.GetAccessTokenAsync(ct);
+        if (string.IsNullOrWhiteSpace(token))
+            throw new FamilyApiException(HttpStatusCode.Unauthorized, "Sign in to upload a photo.");
+        using var content = new MultipartFormDataContent();
+        var streamContent = new StreamContent(image);
+        streamContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        content.Add(streamContent, "file", fileName);
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(ApiBaseUri, "api/me/avatar")) { Content = content };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(60));
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+        if (!response.IsSuccessStatusCode)
+            throw new FamilyApiException(response.StatusCode, $"Could not upload photo (HTTP {(int)response.StatusCode}).");
+        await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
+        return await JsonSerializer.DeserializeAsync<ProfileDto>(stream, JsonOptions, timeout.Token)
+            ?? throw new InvalidOperationException("Empty profile response.");
+    }
+
+    public Task<ProfileDto> ClearAvatarAsync(CancellationToken ct = default)
+        => SendAsync<ProfileDto>(HttpMethod.Delete, "api/me/avatar", null, ct);
 
     private async Task SendNoContentAsync(HttpMethod method, string path, CancellationToken ct)
     {
@@ -85,6 +116,7 @@ public sealed class MeApiClient
 }
 
 public sealed record MeDto(string? ExternalIdentityId, Guid? UserId, Guid? FamilyId, Guid? MemberId, string? Role);
+public sealed record ProfileDto(Guid MemberId, string DisplayName, string Role, string? AvatarUrl);
 public sealed record QuietHoursDto(bool Enabled, int? StartMinutes, int? EndMinutes, string? StartLabel, string? EndLabel);
 public sealed record UpdateQuietHoursBody(bool Enabled, int? StartMinutes, int? EndMinutes);
 
