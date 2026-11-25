@@ -10,7 +10,7 @@ public class FamilyMember : Entity
     public string DisplayName { get; private set; } = string.Empty;
     public bool IsActive { get; private set; } = true;
 
-    /// <summary>Public path or absolute URL for the member profile photo, if any.</summary>
+    /// <summary>Relative or absolute URL for the member's profile photo (e.g. /avatars/{file}).</summary>
     public string? AvatarUrl { get; private set; }
 
     /// <summary>When true, suppress non-urgent notifications between Start/End (local minutes from midnight).</summary>
@@ -56,6 +56,13 @@ public class FamilyMember : Entity
         MarkUpdated();
     }
 
+    public void ClearAvatar()
+    {
+        if (AvatarUrl is null) return;
+        AvatarUrl = null;
+        MarkUpdated();
+    }
+
     public void Deactivate()
     {
         IsActive = false;
@@ -90,8 +97,9 @@ public class FamilyMember : Entity
         var mins = (int)localTimeOfDay.TotalMinutes;
         var start = QuietHoursStartMinutes.Value;
         var end = QuietHoursEndMinutes.Value;
-        if (start == end) return true;
+        if (start == end) return true; // full-day quiet
         if (start < end) return mins >= start && mins < end;
+        // Overnight: e.g. 22:00–07:00
         return mins >= start || mins < end;
     }
 }
