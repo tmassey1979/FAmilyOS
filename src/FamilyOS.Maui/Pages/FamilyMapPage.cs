@@ -5,8 +5,8 @@ using FamilyOS.Maui.Services;
 namespace FamilyOS.Maui.Pages;
 
 /// <summary>
-/// Full-screen household map. Own device location is requested automatically when the tab opens.
-/// Shared household pins only appear when members have explicitly shared.
+/// Full-screen household map with explicit location sharing controls.
+/// Sharing is opt-in; coordinates only leave the device when the user shares.
 /// </summary>
 public sealed class FamilyMapPage : ContentPage, IQueryAttributable
 {
@@ -46,6 +46,13 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
     private bool _timerStarted;
     private bool _autoLocated;
     private Guid? _requestedMemberId;
+    private bool _sharingEnabled;
+    private bool _loadingShareToggle;
+    private readonly Switch _shareToggle = new() { HorizontalOptions = LayoutOptions.Start };
+    private readonly Label _shareLabel = new() { FontSize = 13, VerticalOptions = LayoutOptions.Center };
+    private readonly Button _shareNow = new() { Text = "Share now", FontSize = 13 };
+    private readonly Button _placesBtn = new() { Text = "Places", FontSize = 13 };
+    private readonly Button _locationSettings = new() { Text = "Settings", FontSize = 13 };
 
     public FamilyMapPage(FamilyApiClient api, DeviceLocationService deviceLocation)
     {
@@ -59,6 +66,10 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
         _refresh.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         _showHistory.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
         _showTrips.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+        _shareNow.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
+        _placesBtn.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+        _locationSettings.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+        _shareLabel.Text = "Sharing: …";
 
         _locate.Clicked += async (_, _) => await EnsureOwnLocationAsync(forcePrompt: true);
         _refresh.Clicked += async (_, _) => await RefreshAsync();
@@ -80,6 +91,14 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
         };
         _showHistory.Clicked += async (_, _) => await ShowHistoryAsync();
         _showTrips.Clicked += async (_, _) => await ShowTripsAsync();
+        _shareToggle.Toggled += async (_, e) =>
+        {
+            if (!_loadingShareToggle)
+                await SetSharingAsync(e.Value);
+        };
+        _shareNow.Clicked += async (_, _) => await ShareNowAsync();
+        _placesBtn.Clicked += async (_, _) => await Shell.Current.GoToAsync(nameof(SavedPlacesPage));
+        _locationSettings.Clicked += async (_, _) => await Shell.Current.GoToAsync(nameof(LocationPage));
 
         var statusChip = new Border
         {
@@ -91,11 +110,36 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
         statusChip.SetDynamicResource(Border.BackgroundColorProperty, "BgSurface");
         statusChip.StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 14 };
 
+        var shareBar = new Border
+        {
+            Padding = new Thickness(12, 8),
+            StrokeThickness = 0,
+            Content = new VerticalStackLayout
+            {
+                Spacing = 8,
+                Children =
+                {
+                    new HorizontalStackLayout
+                    {
+                        Spacing = 10,
+                        Children = { _shareToggle, _shareLabel }
+                    },
+                    new HorizontalStackLayout
+                    {
+                        Spacing = 8,
+                        Children = { _shareNow, _placesBtn, _locationSettings }
+                    }
+                }
+            }
+        };
+        shareBar.SetDynamicResource(Border.BackgroundColorProperty, "BgSurface");
+        shareBar.StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 14 };
+
         var topOverlay = new VerticalStackLayout
         {
             Padding = new Thickness(12, 8, 12, 0),
             Spacing = 8,
-            Children = { statusChip }
+            Children = { statusChip, shareBar }
         };
 
         var fabColumn = new VerticalStackLayout
@@ -174,6 +218,7 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
         }
 
         await LoadFamilyMembersAsync();
+        await LoadSharingStateAsync();
         if (!_autoLocated)
         {
             _autoLocated = true;
@@ -186,6 +231,143 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
     {
         _isVisible = false;
         base.OnDisappearing();
+    }
+
+    private async Task LoadSharingStateAsync()
+    {
+        try
+        {
+            var consent = await _api.GetLocationConsentAsync();
+            _sharingEnabled = consent.SharingEnabled;
+            _loadingShareToggle = true;
+            _shareToggle.IsToggled = _sharingEnabled;
+            _loadingShareToggle = false;
+            UpdateShareUi();
+        }
+        catch (Exception ex)
+        {
+            _shareLabel.Text = $"Sharing: unavailable ({ex.Message})";
+            _shareNow.IsEnabled = false;
+        }
+    }
+
+    private void UpdateShareUi()
+    {
+        _shareLabel.Text = _sharingEnabled
+            ? "Sharing on — household can see your pin when you share"
+            : "Sharing off — only you see your location on this device";
+        _shareNow.IsEnabled = _sharingEnabled && _deviceLocation.IsEnabled;
+        _shareToggle.IsEnabled = true;
+    }
+
+    private async Task SetSharingAsync(bool enabled)
+    {
+        try
+        {
+            if (enabled)
+            {
+                var ok = await DisplayAlert(
+                    "Share location with household?",
+                    "Only people you allow in Location settings can see coordinates you share. Nothing is sent until you tap Share now or start continuous tracking.",
+                    "Turn on sharing",
+                    "Cancel");
+                if (!ok)
+                {
+                    _loadingShareToggle = true;
+                    _shareToggle.IsToggled = false;
+                    _loadingShareToggle = false;
+                    return;
+                }
+                if (!_deviceLocation.IsEnabled)
+                {
+                    if (!await _deviceLocation.EnableAsync())
+                    {
+                        await DisplayAlert("Permission needed", "Allow location access on this device to share.", "OK");
+                        _loadingShareToggle = true;
+                        _shareToggle.IsToggled = false;
+                        _loadingShareToggle = false;
+                        return;
+                    }
+                }
+            }
+            else
+            {
+                var ok = await DisplayAlert(
+                    "Stop sharing?",
+                    "Your last shared coordinates will be removed from the household map.",
+                    "Stop sharing",
+                    "Cancel");
+                if (!ok)
+                {
+                    _loadingShareToggle = true;
+                    _shareToggle.IsToggled = true;
+                    _loadingShareToggle = false;
+                    return;
+                }
+            }
+
+            var result = await _api.SetLocationSharingAsync(enabled);
+            _sharingEnabled = result.SharingEnabled;
+            _loadingShareToggle = true;
+            _shareToggle.IsToggled = _sharingEnabled;
+            _loadingShareToggle = false;
+            UpdateShareUi();
+            _status.Text = _sharingEnabled
+                ? "Sharing is on. Tap Share now to publish your current position."
+                : "Sharing is off. Your pin is only local until you turn it on again.";
+            await RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            _loadingShareToggle = true;
+            _shareToggle.IsToggled = _sharingEnabled;
+            _loadingShareToggle = false;
+            _status.Text = $"Could not update sharing: {ex.Message}";
+            UpdateShareUi();
+        }
+    }
+
+    private async Task ShareNowAsync()
+    {
+        if (!_sharingEnabled)
+        {
+            _status.Text = "Turn sharing on first.";
+            return;
+        }
+        try
+        {
+            _shareNow.IsEnabled = false;
+            if (!_deviceLocation.IsEnabled && !await _deviceLocation.EnableAsync())
+            {
+                _status.Text = "Location permission is required to share.";
+                return;
+            }
+
+            _status.Text = "Getting your location…";
+            _ownLocation = await _deviceLocation.GetCurrentLocationAsync();
+            _ownLocationReadAtUtc = DateTimeOffset.UtcNow;
+            if (_ownLocation is null)
+            {
+                _status.Text = "Could not read a GPS fix.";
+                return;
+            }
+
+            await _api.ShareLocationAsync(
+                _ownLocation.Latitude,
+                _ownLocation.Longitude,
+                _ownLocation.Accuracy ?? 0,
+                _ownLocation.Timestamp.UtcDateTime);
+            _status.Text = $"Shared {DateTime.Now:t} · {_ownLocation.Latitude:F5}, {_ownLocation.Longitude:F5}";
+            await RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            _status.Text = $"Share failed: {ex.Message}";
+        }
+        finally
+        {
+            UpdateShareUi();
+        }
     }
 
     private async Task EnsureOwnLocationAsync(bool forcePrompt)
@@ -305,7 +487,7 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
                     _ownLocation = await _deviceLocation.GetCurrentLocationAsync();
                     _ownLocationReadAtUtc = DateTimeOffset.UtcNow;
                 }
-                catch { }
+                catch { /* keep last known */ }
             }
 
             if (_ownLocation is not null && _family is not null)
@@ -326,8 +508,6 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
             if (_family is not null)
             {
                 var previouslySelectedId = _requestedMemberId ?? (_historyMember.SelectedItem as FamilyMemberDto)?.Id;
-                // Keep every active member selectable, even when they have not shared a pin.
-                // History requests remain authorization-checked by the API.
                 var availableMembers = _family.Members
                     .Where(x => x.IsActive)
                     .ToList();
@@ -351,7 +531,7 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
                 && !valid.Any(x => x.MemberId == selectedMember.Id))
                 _status.Text = $"{selectedMember.DisplayName} isn't sharing a location right now.";
             else if (valid.Count == 0)
-                _status.Text = "No pins yet — enable location or wait for shared updates.";
+                _status.Text = "No pins yet — turn on sharing and tap Share now, or wait for household updates.";
             else if (ownVisible)
                 _status.Text = $"You · {Math.Max(0, valid.Count - 1)} shared · updated {DateTime.Now:t}";
             else
@@ -429,7 +609,6 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
                     popup.append(name, detail);
                     L.circle(point, { radius: place.radiusMeters, color: '#0EA5E9', weight: 2, fillOpacity: 0.08 }).addTo(map).bindPopup(popup);
                   }
-                  let selectedMarkerFound = false;
                   for (const item of locations) {
                     const point = [item.latitude, item.longitude];
                     bounds.push(point);
@@ -441,23 +620,12 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
                     const freshness = ageMinutes < 2 ? 'Live' : ageMinutes < 15 ? 'Recent' : ageMinutes < 60 ? 'Stale' : 'Old';
                     updated.textContent = freshness + ' · ' + new Date(item.updatedAtUtc).toLocaleString();
                     popup.append(name, updated);
-                    if (Number.isFinite(item.accuracyMeters)) {
-                      L.circle(point, { radius: Math.min(Math.max(item.accuracyMeters, 5), 10000), weight: 1, color: '#0F172A', fillOpacity: 0.06 }).addTo(map);
-                    }
                     const marker = L.marker(point).addTo(map).bindPopup(popup);
-                    if (selectedMemberId && item.memberId === selectedMemberId) {
-                      map.setView(point, 16);
-                      marker.openPopup();
-                      selectedMarkerFound = true;
-                    }
+                    if (selectedMemberId && item.memberId === selectedMemberId) marker.openPopup();
                   }
-                  if (!selectedMarkerFound && bounds.length === 1) {
-                    map.setView(bounds[0], 15);
-                  } else if (!selectedMarkerFound && bounds.length > 1) {
-                    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
-                  }
+                  if (bounds.length) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
                 }
-                setTimeout(() => map.invalidateSize(), 200);
+                setTimeout(() => map.invalidateSize(), 120);
               </script>
             </body>
             </html>
