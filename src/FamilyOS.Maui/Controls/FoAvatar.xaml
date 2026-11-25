@@ -11,12 +11,19 @@
         <Border.StrokeShape>
             <RoundRectangle CornerRadius="20" />
         </Border.StrokeShape>
-        <Label x:Name="InitialsLabel"
-               FontSize="14"
-               FontAttributes="Bold"
-               HorizontalOptions="Center"
-               VerticalOptions="Center"
-               HorizontalTextAlignment="Center"
-               VerticalTextAlignment="Center" />
+        <Grid>
+            <Label x:Name="InitialsLabel"
+                   FontSize="14"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center"
+                   HorizontalTextAlignment="Center"
+                   VerticalTextAlignment="Center" />
+            <Image x:Name="Photo"
+                   Aspect="AspectFill"
+                   IsVisible="False"
+                   HorizontalOptions="Fill"
+                   VerticalOptions="Fill" />
+        </Grid>
     </Border>
 </ContentView>

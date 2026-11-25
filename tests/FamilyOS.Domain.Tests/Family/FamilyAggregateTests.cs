@@ -1,4 +1,3 @@
-using FamilyOS.Domain.Common;
 using FamilyOS.Domain.Family;
 using FluentAssertions;
 
@@ -39,6 +38,10 @@ public class FamilyAggregateTests
         m.CanApproveRequests.Should().BeTrue();
 
         m.UpdateDisplayName("Alex H");
+        m.SetAvatarUrl("/avatars/alex.jpg");
+        m.AvatarUrl.Should().Be("/avatars/alex.jpg");
+        m.ClearAvatar();
+        m.AvatarUrl.Should().BeNull();
         m.DisplayName.Should().Be("Alex H");
 
         m.Deactivate();
