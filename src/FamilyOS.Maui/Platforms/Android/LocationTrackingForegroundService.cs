@@ -4,6 +4,7 @@ using Android.Content;
 using Android.OS;
 using Android.Content.PM;
 using Microsoft.Maui;
+using Microsoft.Maui.Devices.Sensors;
 
 namespace FamilyOS.Maui.Platforms.Android;
 
@@ -35,10 +36,22 @@ public sealed class LocationTrackingForegroundService : Service
         }
     }
     private const int NotificationId = 4107;
-    private static readonly TimeSpan NormalUpdateInterval = TimeSpan.FromMinutes(1);
-    private static readonly TimeSpan PowerSaveUpdateInterval = TimeSpan.FromMinutes(3);
-    private static readonly TimeSpan LowBatteryUpdateInterval = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan MovingUpdateInterval = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan StationaryUpdateInterval = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan LowBatteryMovingInterval = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan LowBatteryStationaryInterval = TimeSpan.FromSeconds(90);
+    private static readonly TimeSpan CriticalBatteryMovingInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan CriticalBatteryStationaryInterval = TimeSpan.FromSeconds(180);
+    private static readonly TimeSpan StationaryDetectionWindow = TimeSpan.FromSeconds(30);
+    private const double MotionAccelerationThreshold = 1.0;
     private static readonly TimeSpan MaximumRetryInterval = TimeSpan.FromMinutes(5);
+    private readonly object _motionLock = new();
+    private readonly SemaphoreSlim _motionSignal = new(0, 1);
+    private DateTime _lastMotionAtUtc = DateTime.UtcNow;
+    private double? _lastAccelerationX;
+    private double? _lastAccelerationY;
+    private double? _lastAccelerationZ;
+    private bool _motionSensorStarted;
     private CancellationTokenSource? _cancellation;
     private Task? _trackingTask;
 
@@ -86,9 +99,11 @@ public sealed class LocationTrackingForegroundService : Service
                 return;
             }
 
+            StartMotionMonitoring();
             var consecutiveFailures = 0;
             while (!cancellationToken.IsCancellationRequested)
             {
+                var cycleStarted = System.Diagnostics.Stopwatch.GetTimestamp();
                 var retryDelay = TimeSpan.Zero;
                 try
                 {
@@ -108,6 +123,11 @@ public sealed class LocationTrackingForegroundService : Service
                     var location = await deviceLocation.GetCurrentLocationAsync(cancellationToken);
                     if (location?.Accuracy is double accuracy)
                     {
+                        // GPS speed also detects sustained vehicle movement after
+                        // acceleration settles, when the accelerometer alone looks still.
+                        if (location.Speed is double speed && speed >= 1.0)
+                            MarkMotionDetected();
+
                         await api.ShareLocationAsync(
                             location.Latitude,
                             location.Longitude,
@@ -123,7 +143,8 @@ public sealed class LocationTrackingForegroundService : Service
                             await api.ShareBatteryStatusAsync(percent, charging, cancellationToken);
                         }
                         consecutiveFailures = 0;
-                        UpdateNotification($"Last update: {location.Timestamp.ToLocalTime():t}");
+                        var currentMode = GetTrackingMode();
+                        UpdateNotification($"Last update: {location.Timestamp.ToLocalTime():t} · {currentMode.Description}");
                     }
                     else
                     {
@@ -158,17 +179,19 @@ public sealed class LocationTrackingForegroundService : Service
                     UpdateNotification($"Connection unavailable; retrying in {(int)retryDelay.TotalSeconds}s…");
                 }
 
-                // Respect Android power-save mode and low battery by reducing GPS/network
-                // activity instead of sampling at the normal one-minute interval.
-                var interval = GetPowerAwareInterval();
+                // Adapt GPS/network activity to battery and motion. Accelerometer monitoring
+                // remains active while GPS sleeps so movement can wake the tracking loop.
+                var mode = GetTrackingMode();
+                var elapsed = System.Diagnostics.Stopwatch.GetElapsedTime(cycleStarted);
+                var interval = elapsed >= mode.Interval ? TimeSpan.Zero : mode.Interval - elapsed;
                 if (retryDelay > interval)
                     interval = retryDelay;
 
-                // Refresh the heartbeat before intentional idle time so stale-heartbeat
-                // detection still distinguishes a sleeping service from a killed service.
+                // Refresh the heartbeat during long stationary/low-battery waits so the
+                // UI does not mistake intentional idle time for a dead service.
                 Microsoft.Maui.Storage.Preferences.Default.Set(
                     TrackingHeartbeatKey, DateTime.UtcNow.ToString("O"));
-                await Task.Delay(interval, cancellationToken);
+                await WaitForNextUpdateAsync(interval, cancellationToken);
             }
         }
         catch (System.OperationCanceledException)
@@ -176,24 +199,160 @@ public sealed class LocationTrackingForegroundService : Service
         }
         finally
         {
+            StopMotionMonitoring();
             StopSelf();
         }
     }
 
-    private TimeSpan GetPowerAwareInterval()
+    private void StartMotionMonitoring()
     {
-        var battery = Battery.Default;
-        if (battery.ChargeLevel is >= 0 and <= 0.15)
-            return LowBatteryUpdateInterval;
-
-        if (Build.VERSION.SdkInt >= BuildVersionCodes.Lollipop)
+        try
         {
-            var power = (PowerManager?)GetSystemService(PowerService);
-            if (power?.IsPowerSaveMode == true)
-                return PowerSaveUpdateInterval;
+            var accelerometer = Accelerometer.Default;
+            if (!accelerometer.IsSupported)
+                return;
+
+            lock (_motionLock)
+                _lastMotionAtUtc = DateTime.UtcNow; // Start in fast mode until stationary is established.
+
+            accelerometer.ReadingChanged += OnAccelerometerReadingChanged;
+            accelerometer.Start(SensorSpeed.UI);
+            _motionSensorStarted = true;
+        }
+        catch (FeatureNotSupportedException)
+        {
+            _motionSensorStarted = false;
+        }
+        catch (InvalidOperationException)
+        {
+            _motionSensorStarted = false;
+        }
+    }
+
+    private void OnAccelerometerReadingChanged(object? sender, AccelerometerChangedEventArgs e)
+    {
+        var acceleration = e.Reading.Acceleration;
+        var magnitude = Math.Sqrt(
+            acceleration.X * acceleration.X +
+            acceleration.Y * acceleration.Y +
+            acceleration.Z * acceleration.Z);
+        var deviation = Math.Abs(magnitude - 9.80665);
+        var wakeTracking = false;
+        lock (_motionLock)
+        {
+            var delta = _lastAccelerationX.HasValue
+                ? Math.Sqrt(
+                    Math.Pow(acceleration.X - _lastAccelerationX.Value, 2) +
+                    Math.Pow(acceleration.Y - _lastAccelerationY!.Value, 2) +
+                    Math.Pow(acceleration.Z - _lastAccelerationZ!.Value, 2))
+                : 0;
+            _lastAccelerationX = acceleration.X;
+            _lastAccelerationY = acceleration.Y;
+            _lastAccelerationZ = acceleration.Z;
+
+            if (deviation >= MotionAccelerationThreshold || delta >= 0.8)
+            {
+                var wasStationary = DateTime.UtcNow - _lastMotionAtUtc >= StationaryDetectionWindow;
+                _lastMotionAtUtc = DateTime.UtcNow;
+                wakeTracking = wasStationary;
+            }
         }
 
-        return NormalUpdateInterval;
+        if (wakeTracking)
+        {
+            try { _motionSignal.Release(); }
+            catch (SemaphoreFullException) { }
+        }
+    }
+
+    private void MarkMotionDetected()
+    {
+        var wakeTracking = false;
+        lock (_motionLock)
+        {
+            var wasStationary = DateTime.UtcNow - _lastMotionAtUtc >= StationaryDetectionWindow;
+            _lastMotionAtUtc = DateTime.UtcNow;
+            wakeTracking = wasStationary;
+        }
+
+        if (wakeTracking)
+        {
+            try { _motionSignal.Release(); }
+            catch (SemaphoreFullException) { }
+        }
+    }
+
+    private void StopMotionMonitoring()
+    {
+        if (!_motionSensorStarted)
+            return;
+
+        try
+        {
+            Accelerometer.Default.ReadingChanged -= OnAccelerometerReadingChanged;
+            if (Accelerometer.Default.IsMonitoring)
+                Accelerometer.Default.Stop();
+        }
+        catch (Exception)
+        {
+            // Sensor cleanup must not prevent the foreground service from stopping.
+        }
+        finally
+        {
+            _motionSensorStarted = false;
+        }
+    }
+
+    private (TimeSpan Interval, string Description) GetTrackingMode()
+    {
+        var battery = Battery.Default;
+        var batteryLevel = battery.ChargeLevel;
+        var charging = battery.State is BatteryState.Charging or BatteryState.Full;
+        bool moving;
+        lock (_motionLock)
+            moving = !_motionSensorStarted || DateTime.UtcNow - _lastMotionAtUtc < StationaryDetectionWindow;
+
+        // Charging devices can use the normal cadence. Otherwise progressively
+        // reduce GPS and upload frequency as the battery becomes depleted.
+        if (charging)
+            return moving
+                ? (MovingUpdateInterval, "moving · 5s updates")
+                : (StationaryUpdateInterval, "stationary · 60s updates");
+
+        if (batteryLevel is >= 0 and <= 0.08)
+            return moving
+                ? (CriticalBatteryMovingInterval, "low battery · 30s updates")
+                : (CriticalBatteryStationaryInterval, "low battery, idle · 3m updates");
+
+        if (batteryLevel is >= 0 and <= 0.15)
+            return moving
+                ? (LowBatteryMovingInterval, "low battery · 15s updates")
+                : (LowBatteryStationaryInterval, "low battery, idle · 90s updates");
+
+        return moving
+            ? (MovingUpdateInterval, "moving · 5s updates")
+            : (StationaryUpdateInterval, "stationary · 60s updates");
+    }
+
+    private async Task WaitForNextUpdateAsync(TimeSpan interval, CancellationToken cancellationToken)
+    {
+        if (interval <= TimeSpan.Zero)
+            return;
+
+        if (!_motionSensorStarted)
+        {
+            await Task.Delay(interval, cancellationToken);
+            return;
+        }
+
+        using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var delayTask = Task.Delay(interval, waitCancellation.Token);
+        var motionTask = _motionSignal.WaitAsync(waitCancellation.Token);
+        await Task.WhenAny(delayTask, motionTask);
+        waitCancellation.Cancel();
+        try { await Task.WhenAll(delayTask, motionTask); }
+        catch (System.OperationCanceledException) { }
+        cancellationToken.ThrowIfCancellationRequested();
     }
 
     private void StopTracking()

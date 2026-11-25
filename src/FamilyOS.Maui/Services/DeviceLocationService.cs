@@ -37,7 +37,7 @@ public sealed class DeviceLocationService
         if (permission != PermissionStatus.Granted)
             throw new UnauthorizedAccessException("Location permission is not currently granted.");
 
-        var request = new GeolocationRequest(GeolocationAccuracy.Best, TimeSpan.FromSeconds(12));
+        var request = new GeolocationRequest(GeolocationAccuracy.Best, TimeSpan.FromSeconds(4));
         return await Geolocation.Default.GetLocationAsync(request, cancellationToken);
     }
 }

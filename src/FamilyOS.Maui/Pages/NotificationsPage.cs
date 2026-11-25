@@ -41,7 +41,7 @@ public sealed class NotificationsPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (_items.Children.Count == 0 && !_loading)
+        if (!_loading)
             await LoadAsync();
     }
 
@@ -72,21 +72,23 @@ public sealed class NotificationsPage : ContentPage
         catch (FamilyApiException ex)
         {
             _items.Children.Clear();
+            _markAll.IsEnabled = false;
             _status.Text = ex.Message;
         }
         catch (HttpRequestException)
         {
+            _markAll.IsEnabled = false;
             _status.Text = "FamilyOS could not be reached. Check your connection and try again.";
         }
         catch (Exception)
         {
+            _markAll.IsEnabled = false;
             _status.Text = "Something went wrong while loading notifications.";
         }
         finally
         {
             _loading = false;
             _refresh.IsEnabled = true;
-            _markAll.IsEnabled = true;
         }
     }
 
@@ -107,19 +109,84 @@ public sealed class NotificationsPage : ContentPage
         meta.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
         stack.Children.Add(meta);
 
+        var actions = new HorizontalStackLayout { Spacing = 8 };
         if (!item.IsRead)
         {
-            var button = new Button { Text = "Mark read", FontSize = 13, HorizontalOptions = LayoutOptions.Start };
+            var button = new Button { Text = "Mark read", FontSize = 13 };
             button.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
             button.Clicked += async (_, _) => await MarkReadAsync(item.Id);
-            stack.Children.Add(button);
+            actions.Children.Add(button);
         }
+
+        var destination = ResolveDestination(item);
+        if (destination is not null)
+        {
+            var open = new Button { Text = "Open section", FontSize = 13 };
+            open.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
+            open.Clicked += async (_, _) => await OpenNotificationAsync(item, destination);
+            actions.Children.Add(open);
+        }
+
+        if (actions.Children.Count > 0)
+            stack.Children.Add(actions);
 
         var border = new Border { Padding = 14, Content = stack };
         border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
         if (!item.IsRead)
             border.Stroke = new SolidColorBrush((Color)Application.Current!.Resources["AccentPrimary"]);
         _items.Children.Add(border);
+    }
+
+    private async Task OpenNotificationAsync(FamilyNotificationDto item, string route)
+    {
+        try
+        {
+            // Marking read is best-effort; the destination still opens if this request fails.
+            if (!item.IsRead)
+            {
+                try { await _api.MarkReadAsync(item.Id); }
+                catch { /* Navigation should remain available if read-state sync is offline. */ }
+            }
+            await Shell.Current.GoToAsync(route);
+        }
+        catch (FamilyApiException ex)
+        {
+            _status.Text = ex.Message;
+        }
+        catch
+        {
+            _status.Text = "Could not open that notification destination.";
+        }
+    }
+
+    private static string? ResolveDestination(FamilyNotificationDto item)
+    {
+        var entity = item.RelatedEntityType?.Trim().ToLowerInvariant();
+        if (!string.IsNullOrWhiteSpace(entity))
+        {
+            var entityRoute = entity switch
+            {
+                "task" => nameof(TasksPage),
+                "request" => nameof(RequestsPage),
+                "calendarevent" or "event" => nameof(CalendarPage),
+                "procurementitem" or "shopping" => "//family",
+                "location" or "savedplace" => "//map",
+                _ => null
+            };
+            if (entityRoute is not null) return entityRoute;
+        }
+
+        return item.Type.Trim().ToLowerInvariant() switch
+        {
+            "taskassigned" or "taskdeclined" => nameof(TasksPage),
+            "requestsubmitted" or "requestapproved" or "requestdenied"
+                or "requestquestionasked" or "conditionpending" => nameof(RequestsPage),
+            "calendarreminder" => nameof(CalendarPage),
+            "procurementchanged" => "//family",
+            "locationarrived" or "locationdeparted" or "emergencysos" => "//map",
+            "checkinrequested" or "checkinresponded" => nameof(CheckInsPage),
+            _ => null
+        };
     }
 
     private async Task MarkReadAsync(Guid id)
@@ -154,10 +221,6 @@ public sealed class NotificationsPage : ContentPage
         catch (Exception)
         {
             _status.Text = "Could not mark notifications as read.";
-        }
-        finally
-        {
-            _markAll.IsEnabled = true;
         }
     }
 

@@ -487,6 +487,8 @@ public sealed class LocationController : ControllerBase
         return null;
     }
 
+    // Continuous clients target a five-second cadence. The API accepts each newer,
+    // consent-authorized fix and persists it as the latest location (and history when opted in).
     [HttpPost("current")]
     public async Task<IActionResult> UpdateCurrentLocation([FromBody] LocationBody body, CancellationToken ct)
     {

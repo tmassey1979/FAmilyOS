@@ -8,7 +8,7 @@ namespace FamilyOS.Maui.Pages;
 /// Full-screen household map. Own device location is requested automatically when the tab opens.
 /// Shared household pins only appear when members have explicitly shared.
 /// </summary>
-public sealed class FamilyMapPage : ContentPage
+public sealed class FamilyMapPage : ContentPage, IQueryAttributable
 {
     private readonly FamilyApiClient _api;
     private readonly DeviceLocationService _deviceLocation;
@@ -40,10 +40,12 @@ public sealed class FamilyMapPage : ContentPage
     private List<FamilyLocationDto> _currentLocations = [];
     private List<LocationHistoryPointDto> _visibleHistory = [];
     private bool _historyViewActive;
+    private Guid? _historyTargetMemberId;
     private bool _loading;
     private bool _isVisible;
     private bool _timerStarted;
     private bool _autoLocated;
+    private Guid? _requestedMemberId;
 
     public FamilyMapPage(FamilyApiClient api, DeviceLocationService deviceLocation)
     {
@@ -62,9 +64,19 @@ public sealed class FamilyMapPage : ContentPage
         _refresh.Clicked += async (_, _) => await RefreshAsync();
         _historyMember.SelectedIndexChanged += (_, _) =>
         {
-            var selected = _historyMember.SelectedItem is FamilyMemberDto;
-            _showHistory.IsEnabled = selected;
-            _showTrips.IsEnabled = selected;
+            var selectedMember = _historyMember.SelectedItem as FamilyMemberDto;
+            _showHistory.IsEnabled = selectedMember is not null;
+            _showTrips.IsEnabled = selectedMember is not null;
+
+            if (_historyViewActive && selectedMember?.Id != _historyTargetMemberId)
+            {
+                _visibleHistory = [];
+                _historyViewActive = false;
+                _historyTargetMemberId = null;
+                _historyStatus.IsVisible = false;
+                if (!_loading)
+                    _ = RefreshAsync();
+            }
         };
         _showHistory.Clicked += async (_, _) => await ShowHistoryAsync();
         _showTrips.Clicked += async (_, _) => await ShowTripsAsync();
@@ -130,6 +142,16 @@ public sealed class FamilyMapPage : ContentPage
 
         Content = root;
         _map.Source = new HtmlWebViewSource { Html = BuildMapHtml([], []) };
+    }
+
+    public void ApplyQueryAttributes(IDictionary<string, object> query)
+    {
+        if (query.TryGetValue("memberId", out var raw) && Guid.TryParse(raw?.ToString(), out var memberId))
+        {
+            _requestedMemberId = memberId;
+            if (_family is not null)
+                _historyMember.SelectedItem = _family.Members.FirstOrDefault(x => x.Id == memberId);
+        }
     }
 
     protected override async void OnAppearing()
@@ -200,11 +222,11 @@ public sealed class FamilyMapPage : ContentPage
         try
         {
             _family = await _api.GetFamilyAsync();
-            var visibleIds = _currentLocations.Select(x => x.MemberId).Append(_family.CurrentMemberId).ToHashSet();
             _historyMember.ItemsSource = _family.Members
-                .Where(x => x.IsActive && visibleIds.Contains(x.Id))
+                .Where(x => x.IsActive)
                 .ToList();
-            _historyMember.SelectedItem = _family.Members.FirstOrDefault(x => x.Id == _family.CurrentMemberId);
+            _historyMember.SelectedItem = _family.Members.FirstOrDefault(x => x.Id == (_requestedMemberId ?? _family.CurrentMemberId));
+            _requestedMemberId = null;
             var selected = _historyMember.SelectedItem is FamilyMemberDto;
             _showHistory.IsEnabled = selected;
             _showTrips.IsEnabled = selected;
@@ -225,8 +247,9 @@ public sealed class FamilyMapPage : ContentPage
             var history = await _api.GetLocationHistoryAsync(member.Id, from);
             var places = await _api.GetSavedPlacesAsync();
             _visibleHistory = history;
+            _historyTargetMemberId = member.Id;
             _historyViewActive = true;
-            _map.Source = new HtmlWebViewSource { Html = BuildMapHtml(_currentLocations, places, _visibleHistory) };
+            _map.Source = new HtmlWebViewSource { Html = BuildMapHtml(_currentLocations, places, _visibleHistory, member.Id) };
             _historyStatus.IsVisible = true;
             _historyStatus.Text = history.Count < 2
                 ? $"{member.DisplayName}: not enough points in the last 24 hours."
@@ -302,12 +325,11 @@ public sealed class FamilyMapPage : ContentPage
 
             if (_family is not null)
             {
-                var previouslySelectedId = (_historyMember.SelectedItem as FamilyMemberDto)?.Id;
-                var visibleIds = valid.Select(x => x.MemberId)
-                    .Append(_family.CurrentMemberId)
-                    .ToHashSet();
+                var previouslySelectedId = _requestedMemberId ?? (_historyMember.SelectedItem as FamilyMemberDto)?.Id;
+                // Keep every active member selectable, even when they have not shared a pin.
+                // History requests remain authorization-checked by the API.
                 var availableMembers = _family.Members
-                    .Where(x => x.IsActive && visibleIds.Contains(x.Id))
+                    .Where(x => x.IsActive)
                     .ToList();
                 _historyMember.ItemsSource = availableMembers;
                 _historyMember.SelectedItem = availableMembers.FirstOrDefault(x => x.Id == previouslySelectedId)
@@ -319,11 +341,16 @@ public sealed class FamilyMapPage : ContentPage
 
             _map.Source = new HtmlWebViewSource
             {
-                Html = BuildMapHtml(valid, places, _historyViewActive ? _visibleHistory : null)
+                Html = BuildMapHtml(valid, places, _historyViewActive ? _visibleHistory : null, _requestedMemberId ?? (_historyMember.SelectedItem as FamilyMemberDto)?.Id)
             };
 
             var ownVisible = _ownLocation is not null;
-            if (valid.Count == 0)
+            var selectedMember = _historyMember.SelectedItem as FamilyMemberDto;
+            if (selectedMember is not null
+                && selectedMember.Id != _family?.CurrentMemberId
+                && !valid.Any(x => x.MemberId == selectedMember.Id))
+                _status.Text = $"{selectedMember.DisplayName} isn't sharing a location right now.";
+            else if (valid.Count == 0)
                 _status.Text = "No pins yet — enable location or wait for shared updates.";
             else if (ownVisible)
                 _status.Text = $"You · {Math.Max(0, valid.Count - 1)} shared · updated {DateTime.Now:t}";
@@ -341,9 +368,10 @@ public sealed class FamilyMapPage : ContentPage
         }
     }
 
-    private static string BuildMapHtml(IReadOnlyList<FamilyLocationDto> locations, IReadOnlyList<SavedPlaceDto> places, IReadOnlyList<LocationHistoryPointDto>? history = null)
+    private static string BuildMapHtml(IReadOnlyList<FamilyLocationDto> locations, IReadOnlyList<SavedPlaceDto> places, IReadOnlyList<LocationHistoryPointDto>? history = null, Guid? selectedMemberId = null)
     {
         var data = locations.Select(x => new MapPin(
+            x.MemberId,
             x.DisplayName,
             x.Latitude!.Value,
             x.Longitude!.Value,
@@ -375,6 +403,7 @@ public sealed class FamilyMapPage : ContentPage
                 const locations = {{json}};
                 const places = {{placeJson}};
                 const history = {{historyJson}};
+                const selectedMemberId = {{JsonSerializer.Serialize(selectedMemberId?.ToString())}};
                 const map = L.map('map', { zoomControl: true, attributionControl: true }).setView([39.5, -98.35], 4);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                   maxZoom: 19,
@@ -400,6 +429,7 @@ public sealed class FamilyMapPage : ContentPage
                     popup.append(name, detail);
                     L.circle(point, { radius: place.radiusMeters, color: '#0EA5E9', weight: 2, fillOpacity: 0.08 }).addTo(map).bindPopup(popup);
                   }
+                  let selectedMarkerFound = false;
                   for (const item of locations) {
                     const point = [item.latitude, item.longitude];
                     bounds.push(point);
@@ -414,11 +444,16 @@ public sealed class FamilyMapPage : ContentPage
                     if (Number.isFinite(item.accuracyMeters)) {
                       L.circle(point, { radius: Math.min(Math.max(item.accuracyMeters, 5), 10000), weight: 1, color: '#0F172A', fillOpacity: 0.06 }).addTo(map);
                     }
-                    L.marker(point).addTo(map).bindPopup(popup);
+                    const marker = L.marker(point).addTo(map).bindPopup(popup);
+                    if (selectedMemberId && item.memberId === selectedMemberId) {
+                      map.setView(point, 16);
+                      marker.openPopup();
+                      selectedMarkerFound = true;
+                    }
                   }
-                  if (bounds.length === 1) {
+                  if (!selectedMarkerFound && bounds.length === 1) {
                     map.setView(bounds[0], 15);
-                  } else if (bounds.length > 1) {
+                  } else if (!selectedMarkerFound && bounds.length > 1) {
                     map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
                   }
                 }
@@ -429,5 +464,5 @@ public sealed class FamilyMapPage : ContentPage
             """;
     }
 
-    private sealed record MapPin(string DisplayName, double Latitude, double Longitude, double? AccuracyMeters, string UpdatedAtUtc);
+    private sealed record MapPin(Guid MemberId, string DisplayName, double Latitude, double Longitude, double? AccuracyMeters, string UpdatedAtUtc);
 }
