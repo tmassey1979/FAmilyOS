@@ -1,44 +1,57 @@
-using FamilyOS.Maui.Pages;
 using FamilyOS.Maui.Services;
-using FamilyOS.Maui.Services.Api;
-using FamilyOS.Maui.Services.Offline;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FamilyOS.Maui;
 
 public partial class App : Application
 {
-    private readonly IServiceProvider _services;
-    private readonly IAuthSession _session;
+    private readonly AppShell _shell;
+    private readonly IThemeService _theme;
+    private readonly StartupDiagnosticsService _diagnostics;
 
-    public App(IServiceProvider services, IThemeService theme, IAuthSession session)
+    public App(IServiceProvider services, StartupDiagnosticsService diagnostics)
     {
-        InitializeComponent();
-        _services = services;
-        _session = session;
-        theme.SetPreference(theme.Preference);
+        _diagnostics = diagnostics;
+        _diagnostics.RecordCheckpoint("App constructor entered");
 
-        if (session.IsAuthenticated)
+        try
         {
-            MainPage = services.GetRequiredService<AppShell>();
-            _ = services.GetRequiredService<OfflineFlushService>().FlushAsync();
+            // Load Application resources before constructing AppShell. The Shell XAML
+            // references StaticResource keys defined in App.xaml, so resolving Shell
+            // through constructor injection before InitializeComponent can crash startup.
+            InitializeComponent();
+            _diagnostics.RecordCheckpoint("App.InitializeComponent completed");
+
+            _theme = services.GetRequiredService<IThemeService>();
+            _diagnostics.RecordCheckpoint("App theme service resolved");
+
+            _shell = services.GetRequiredService<AppShell>();
+            _diagnostics.RecordCheckpoint("AppShell service resolved");
+
+            // Apply stored preference once Application.Current and its resources exist.
+            _theme.SetPreference(_theme.Preference);
+            _diagnostics.RecordCheckpoint("App theme preference applied");
         }
-        else
+        catch (Exception ex)
         {
-            MainPage = services.GetRequiredService<LoginPage>();
+            _diagnostics.RecordException("App initialization failed", ex);
+            throw;
         }
     }
 
-    public void GoToShell()
+    protected override Window CreateWindow(IActivationState? activationState)
     {
-        MainPage = _services.GetRequiredService<AppShell>();
-        // Best-effort: push any queued mutations when session becomes active.
-        _ = _services.GetRequiredService<OfflineFlushService>().FlushAsync();
-    }
-
-    public void GoToLogin()
-    {
-        _session.Clear();
-        MainPage = _services.GetRequiredService<LoginPage>();
+        _diagnostics.RecordCheckpoint("App.CreateWindow entered");
+        try
+        {
+            var window = new Window(_shell);
+            _diagnostics.RecordCheckpoint("App.CreateWindow completed");
+            return window;
+        }
+        catch (Exception ex)
+        {
+            _diagnostics.RecordException("App.CreateWindow failed", ex);
+            throw;
+        }
     }
 }
