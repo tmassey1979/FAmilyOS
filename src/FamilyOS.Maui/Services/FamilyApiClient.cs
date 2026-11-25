@@ -29,12 +29,16 @@ public sealed class FamilyApiClient
     public async Task RevokeInviteAsync(Guid inviteId, CancellationToken ct = default)
         => await SendNoContentAsync(HttpMethod.Post, $"api/invites/{inviteId:D}/revoke", null, ct);
 
-    public async Task<FamilyMemberDto> ChangeMemberRoleAsync(Guid memberId, string role, CancellationToken ct = default)
-        => await SendAsync<FamilyMemberDto>(HttpMethod.Post, $"api/family/members/{memberId:D}/change-role",
+    public Task ChangeMemberRoleAsync(Guid memberId, string role, CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Put, $"api/family/members/{memberId:D}/role",
             JsonContent.Create(new { role }, options: JsonOptions), ct);
 
-    public async Task<FamilyMemberDto> DeactivateMemberAsync(Guid memberId, CancellationToken ct = default)
-        => await SendAsync<FamilyMemberDto>(HttpMethod.Post, $"api/family/members/{memberId:D}/deactivate", null, ct);
+    public Task DeactivateMemberAsync(Guid memberId, CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Delete, $"api/family/members/{memberId:D}", null, ct);
+
+    public Task UpdateFamilyAsync(string name, string? timeZone, string? currency, CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Put, "api/family",
+            JsonContent.Create(new { name, timeZone, currency }, options: JsonOptions), ct);
 
     public Task<List<CheckInDto>> GetCheckInsAsync(bool includeCompleted = true, CancellationToken ct = default)
         => SendAsync<List<CheckInDto>>(HttpMethod.Get, $"api/checkins?includeCompleted={includeCompleted.ToString().ToLowerInvariant()}", null, ct);
@@ -104,8 +108,8 @@ public sealed class FamilyApiClient
     {
         var path = $"api/location/history/{memberId:D}";
         var query = new List<string>();
-        if (fromUtc.HasValue) query.Add($"fromUtc={Uri.EscapeDataString(fromUtc.Value.ToString("O"))}");
-        if (toUtc.HasValue) query.Add($"toUtc={Uri.EscapeDataString(toUtc.Value.ToString("O"))}");
+        if (fromUtc.HasValue) query.Add($"fromUtc={Uri.EscapeDataString(fromUtc.Value.ToString(\"O\"))}");
+        if (toUtc.HasValue) query.Add($"toUtc={Uri.EscapeDataString(toUtc.Value.ToString(\"O\"))}");
         if (query.Count > 0) path += "?" + string.Join("&", query);
         return SendAsync<List<LocationHistoryPointDto>>(HttpMethod.Get, path, null, ct);
     }
@@ -115,8 +119,8 @@ public sealed class FamilyApiClient
     {
         var path = $"api/location/trips/{memberId:D}";
         var query = new List<string>();
-        if (fromUtc.HasValue) query.Add($"fromUtc={Uri.EscapeDataString(fromUtc.Value.ToString("O"))}");
-        if (toUtc.HasValue) query.Add($"toUtc={Uri.EscapeDataString(toUtc.Value.ToString("O"))}");
+        if (fromUtc.HasValue) query.Add($"fromUtc={Uri.EscapeDataString(fromUtc.Value.ToString(\"O\"))}");
+        if (toUtc.HasValue) query.Add($"toUtc={Uri.EscapeDataString(toUtc.Value.ToString(\"O\"))}");
         if (query.Count > 0) path += "?" + string.Join("&", query);
         return SendAsync<List<LocationTripDto>>(HttpMethod.Get, path, null, ct);
     }
