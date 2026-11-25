@@ -1,25 +1,37 @@
 using FamilyOS.Application.Common;
 using FamilyOS.Application.Interfaces;
 using FamilyOS.Domain.Common;
+using FamilyOS.Domain.Family;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 
 namespace FamilyOS.Application.Family;
 
-public record ProfileDto(Guid MemberId, string DisplayName, string Role, string? AvatarUrl);
+public record ProfileDto(
+    Guid MemberId,
+    Guid UserId,
+    string DisplayName,
+    FamilyRole Role,
+    string? AvatarUrl,
+    bool IsActive);
 
 public record GetMyProfileQuery() : IRequest<ProfileDto>;
-public record UpdateMyProfileCommand(string DisplayName) : IRequest<ProfileDto>;
+
+public record UpdateMyDisplayNameCommand(string DisplayName) : IRequest<ProfileDto>;
+
 public record SetMyAvatarCommand(string AvatarUrl) : IRequest<ProfileDto>;
+
 public record ClearMyAvatarCommand() : IRequest<ProfileDto>;
-public record UpdateFamilyDetailsCommand(string Name, string? TimeZone, string? Currency) : IRequest<FamilyDto>;
+
+/// <summary>Owner (or self) can update another member's display name.</summary>
+public record UpdateMemberDisplayNameCommand(Guid MemberId, string DisplayName) : IRequest<MemberDto>;
 
 public class ProfileCommandHandlers :
     IRequestHandler<GetMyProfileQuery, ProfileDto>,
-    IRequestHandler<UpdateMyProfileCommand, ProfileDto>,
+    IRequestHandler<UpdateMyDisplayNameCommand, ProfileDto>,
     IRequestHandler<SetMyAvatarCommand, ProfileDto>,
     IRequestHandler<ClearMyAvatarCommand, ProfileDto>,
-    IRequestHandler<UpdateFamilyDetailsCommand, FamilyDto>
+    IRequestHandler<UpdateMemberDisplayNameCommand, MemberDto>
 {
     private readonly IFamilyOsDbContext _db;
     private readonly ICurrentUserService _current;
@@ -30,70 +42,60 @@ public class ProfileCommandHandlers :
         _current = current;
     }
 
-    public async Task<ProfileDto> Handle(GetMyProfileQuery request, CancellationToken ct)
+    public async Task<ProfileDto> Handle(GetMyProfileQuery query, CancellationToken ct)
     {
-        var (familyId, memberId, role) = await _current.RequireFamilyAsync(ct);
-        var member = await _db.FamilyMembers
-            .AsNoTracking()
-            .FirstOrDefaultAsync(m => m.Id == memberId && m.FamilyId == familyId, ct)
-            ?? throw new NotFoundException("Member", memberId);
-        return new ProfileDto(member.Id, member.DisplayName, member.Role.ToString(), member.AvatarUrl);
+        var member = await LoadSelfAsync(ct);
+        return ToProfile(member);
     }
 
-    public async Task<ProfileDto> Handle(UpdateMyProfileCommand request, CancellationToken ct)
+    public async Task<ProfileDto> Handle(UpdateMyDisplayNameCommand cmd, CancellationToken ct)
+    {
+        var member = await LoadSelfAsync(ct);
+        member.UpdateDisplayName(cmd.DisplayName);
+        await _db.SaveChangesAsync(ct);
+        return ToProfile(member);
+    }
+
+    public async Task<ProfileDto> Handle(SetMyAvatarCommand cmd, CancellationToken ct)
+    {
+        var member = await LoadSelfAsync(ct);
+        member.SetAvatarUrl(cmd.AvatarUrl);
+        await _db.SaveChangesAsync(ct);
+        return ToProfile(member);
+    }
+
+    public async Task<ProfileDto> Handle(ClearMyAvatarCommand cmd, CancellationToken ct)
+    {
+        var member = await LoadSelfAsync(ct);
+        member.ClearAvatar();
+        await _db.SaveChangesAsync(ct);
+        return ToProfile(member);
+    }
+
+    public async Task<MemberDto> Handle(UpdateMemberDisplayNameCommand cmd, CancellationToken ct)
+    {
+        var (familyId, actorMemberId, role) = await _current.RequireFamilyAsync(ct);
+        var member = await _db.FamilyMembers
+            .FirstOrDefaultAsync(m => m.Id == cmd.MemberId && m.FamilyId == familyId, ct)
+            ?? throw new NotFoundException("Member", cmd.MemberId);
+
+        var isSelf = member.Id == actorMemberId;
+        if (!isSelf && role != FamilyRole.Owner)
+            throw new ForbiddenException("Only the Owner can rename other members.");
+
+        member.UpdateDisplayName(cmd.DisplayName);
+        await _db.SaveChangesAsync(ct);
+        return new MemberDto(member.Id, member.UserId, member.DisplayName, member.Role, member.IsActive, member.AvatarUrl);
+    }
+
+    private async Task<FamilyMember> LoadSelfAsync(CancellationToken ct)
     {
         var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
-        var member = await _db.FamilyMembers
+        return await _db.FamilyMembers
             .FirstOrDefaultAsync(m => m.Id == memberId && m.FamilyId == familyId, ct)
             ?? throw new NotFoundException("Member", memberId);
-        member.UpdateDisplayName(request.DisplayName);
-        await _db.SaveChangesAsync(ct);
-        return new ProfileDto(member.Id, member.DisplayName, member.Role.ToString(), member.AvatarUrl);
     }
 
-    public async Task<ProfileDto> Handle(SetMyAvatarCommand request, CancellationToken ct)
-    {
-        var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
-        var member = await _db.FamilyMembers
-            .FirstOrDefaultAsync(m => m.Id == memberId && m.FamilyId == familyId, ct)
-            ?? throw new NotFoundException("Member", memberId);
-        member.SetAvatarUrl(request.AvatarUrl);
-        await _db.SaveChangesAsync(ct);
-        return new ProfileDto(member.Id, member.DisplayName, member.Role.ToString(), member.AvatarUrl);
-    }
-
-    public async Task<ProfileDto> Handle(ClearMyAvatarCommand request, CancellationToken ct)
-    {
-        var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
-        var member = await _db.FamilyMembers
-            .FirstOrDefaultAsync(m => m.Id == memberId && m.FamilyId == familyId, ct)
-            ?? throw new NotFoundException("Member", memberId);
-        member.SetAvatarUrl(null);
-        await _db.SaveChangesAsync(ct);
-        return new ProfileDto(member.Id, member.DisplayName, member.Role.ToString(), member.AvatarUrl);
-    }
-
-    public async Task<FamilyDto> Handle(UpdateFamilyDetailsCommand request, CancellationToken ct)
-    {
-        var (familyId, _, role) = await _current.RequireFamilyAsync(ct);
-        if (role != FamilyRole.Owner)
-            throw new ForbiddenException("Only the Owner can update household settings.");
-
-        var family = await _db.Families
-            .Include(f => f.Members)
-            .FirstOrDefaultAsync(f => f.Id == familyId, ct)
-            ?? throw new NotFoundException("Family", familyId);
-
-        family.UpdateDetails(request.Name, request.TimeZone, request.Currency);
-        await _db.SaveChangesAsync(ct);
-
-        var currentMemberId = _current.MemberId
-            ?? throw new ForbiddenException("Not a family member.");
-        return new FamilyDto(
-            family.Id, family.Name, family.TimeZone, family.Currency,
-            family.Members.Where(m => m.IsActive)
-                .Select(m => new MemberDto(m.Id, m.UserId, m.DisplayName, m.Role, m.IsActive, m.AvatarUrl))
-                .ToList(),
-            currentMemberId);
-    }
+    private static ProfileDto ToProfile(FamilyMember m) =>
+        new(m.Id, m.UserId, m.DisplayName, m.Role, m.AvatarUrl, m.IsActive);
 }
