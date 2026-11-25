@@ -4,7 +4,7 @@ using FamilyOS.Maui.Services;
 namespace FamilyOS.Maui.Pages;
 
 /// <summary>Household management: members, roles, invites, and family settings.</summary>
-public sealed class FamilyPage : ContentPage
+public sealed partial class FamilyPage : ContentPage
 {
     private readonly FamilyApiClient _family;
     private readonly VerticalStackLayout _members;
@@ -21,9 +21,10 @@ public sealed class FamilyPage : ContentPage
     private bool _isAdultOrOwner;
     private FamilyDto? _family;
 
-    public FamilyPage(FamilyApiClient family)
+    public FamilyPage(FamilyApiClient family, MeApiClient me)
     {
         _family = family;
+        WireProfile(me);
         Title = "Family";
 
         _name = new Label { Text = "Your family", FontSize = 26, FontAttributes = FontAttributes.Bold };
@@ -156,22 +157,8 @@ public sealed class FamilyPage : ContentPage
         var isYou = member.Id == _currentMemberId;
         var initials = string.Join("", member.DisplayName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Take(2).Select(part => part[0])).ToUpperInvariant();
-        var avatar = new Border
-        {
-            WidthRequest = 44,
-            HeightRequest = 44,
-            StrokeThickness = 0,
-            BackgroundColor = Color.FromArgb(isYou ? "#29466F" : "#E8EEF9"),
-            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 22 },
-            Content = new Label
-            {
-                Text = string.IsNullOrWhiteSpace(initials) ? "?" : initials,
-                HorizontalTextAlignment = TextAlignment.Center,
-                VerticalTextAlignment = TextAlignment.Center,
-                TextColor = Color.FromArgb(isYou ? "#FFFFFF" : "#29466F"),
-                FontAttributes = FontAttributes.Bold
-            }
-        };
+        if (string.IsNullOrWhiteSpace(initials)) initials = "?";
+        var avatar = BuildMemberAvatar(member, isYou, initials);
 
         var identity = new VerticalStackLayout { Spacing = 3, VerticalOptions = LayoutOptions.Center };
         var titleRow = new HorizontalStackLayout { Spacing = 8 };
@@ -197,6 +184,9 @@ public sealed class FamilyPage : ContentPage
 
         var memberContent = new VerticalStackLayout { Spacing = 10 };
         memberContent.Children.Add(new HorizontalStackLayout { Spacing = 12, Children = { avatar, identity } });
+
+        if (isYou)
+            memberContent.Children.Add(BuildSelfProfileActions(member));
 
         if (_isOwner && !isYou)
         {
