@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FamilyOS.Application.Family;
 
-public record FamilyDto(Guid Id, string Name, string? TimeZone, string? Currency, List<MemberDto> Members);
+public record FamilyDto(Guid Id, string Name, string? TimeZone, string? Currency, List<MemberDto> Members, Guid CurrentMemberId);
 public record MemberDto(Guid Id, Guid UserId, string DisplayName, FamilyRole Role, bool IsActive, string? AvatarUrl = null);
 public record DeclineReasonDto(Guid Id, string Text, int SortOrder, bool IsEnabled);
 
@@ -32,7 +32,7 @@ public class FamilyQueryHandlers :
     public async Task<FamilyDto> Handle(GetMyFamilyQuery query, CancellationToken ct)
     {
         await _current.EnsureLoadedAsync(ct);
-        if (!_current.FamilyId.HasValue)
+        if (!_current.FamilyId.HasValue || !_current.MemberId.HasValue)
             throw new ForbiddenException("Not a family member.");
 
         var family = await _db.Families
@@ -44,7 +44,8 @@ public class FamilyQueryHandlers :
         return new FamilyDto(
             family.Id, family.Name, family.TimeZone, family.Currency,
             family.Members.Where(m => m.IsActive).Select(m =>
-                new MemberDto(m.Id, m.UserId, m.DisplayName, m.Role, m.IsActive, m.AvatarUrl)).ToList());
+                new MemberDto(m.Id, m.UserId, m.DisplayName, m.Role, m.IsActive, m.AvatarUrl)).ToList(),
+            _current.MemberId.Value);
     }
 
     public async Task<List<DeclineReasonDto>> Handle(GetDeclineReasonsQuery query, CancellationToken ct)
