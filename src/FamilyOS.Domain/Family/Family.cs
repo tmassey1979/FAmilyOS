@@ -51,6 +51,16 @@ public class Family : Entity
         MarkUpdated();
     }
 
+    public void UpdateDetails(string name, string? timeZone, string? currency)
+    {
+        UpdateName(name);
+        if (!string.IsNullOrWhiteSpace(timeZone))
+            TimeZone = timeZone.Trim();
+        if (!string.IsNullOrWhiteSpace(currency))
+            Currency = currency.Trim().ToUpperInvariant();
+        MarkUpdated();
+    }
+
     private void SeedDefaultDeclineReasons()
     {
         var defaults = new[]
