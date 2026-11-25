@@ -6,18 +6,20 @@ namespace FamilyOS.Infrastructure.Seed;
 
 public static class EnsureAvatarSchema
 {
-    public static async Task RunAsync(FamilyOsDbContext db, ILogger logger, CancellationToken ct = default)
+    public static async Task RunAsync(FamilyOsDbContext db, ILogger logger)
     {
         try
         {
             await db.Database.ExecuteSqlRawAsync(
-                """ALTER TABLE familyos."FamilyMembers" ADD COLUMN IF NOT EXISTS "AvatarUrl" character varying(512) NULL;""",
-                ct);
-            logger.LogInformation("Ensured FamilyMembers.AvatarUrl column.");
+                """
+                ALTER TABLE familyos.\"FamilyMembers\"
+                    ADD COLUMN IF NOT EXISTS \"AvatarUrl\" character varying(500) NULL;
+                """);
+            logger.LogInformation("AvatarUrl column on FamilyMembers ensured");
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Could not ensure FamilyMembers.AvatarUrl column.");
+            logger.LogWarning(ex, "Ensure AvatarUrl schema failed");
         }
     }
 }
