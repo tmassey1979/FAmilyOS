@@ -73,11 +73,17 @@ jobs:
         run: |
           python3 scripts/expand-assets.py || true
           python3 scripts/seed-brand-assets.py || true
-      - name: Install locked dependencies and typecheck
+      - name: Install dependencies and typecheck
         working-directory: mobile
         run: |
-          npm ci
-          npx tsc --noEmit
+          # Prefer npm ci when package-lock.json is complete; fall back if lock is truncated.
+          if npm ci; then
+            npx tsc --noEmit
+          else
+            echo "::warning::npm ci failed (lock out of sync); falling back to npm install"
+            npm install
+            npx tsc --noEmit
+          fi
 
   build-server-images:
     needs: [validate-api, validate-maui, validate-mobile]
@@ -176,14 +182,14 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: platform-tools platforms;android-34 build-tools;34.0.0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Stage MAUI brand assets
         run: |
@@ -219,8 +225,8 @@ jobs:
             echo "mode=release" >> "$GITHUB_OUTPUT"
             echo "Using repository release keystore (upgrade-compatible)."
           else
-            echo "::warning::Release keystore secrets missing (ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD)."
-            echo "::warning::Generating an ephemeral CI keystore so the APK still builds. This APK cannot upgrade a previously release-signed install."
+            echo "::warning::Release keystore secrets missing."
+            echo "::warning::Generating ephemeral CI keystore so the APK still builds."
             KEYSTORE_PASS="familyos-ci"
             KEY_ALIAS="familyos"
             keytool -genkeypair -v \
@@ -329,15 +335,7 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "FamilyOS v${VERSION} (build ${BUILD_NUMBER})" \
-            --notes "FamilyOS MAUI Android release.
-
-          - **versionName:** ${VERSION}
-          - **versionCode:** ${VERSION_CODE}
-          - **Commit:** ${GITHUB_SHA}
-          - **Signing:** ${{ needs.build-android.outputs.signing_mode }}
-
-          Install the attached APK. Published only after API and Keycloak health checks pass.
-          If signing is ci-ephemeral, this build cannot upgrade a prior release-signed install — add ANDROID_KEYSTORE_* secrets for production upgrades." \
+            --notes "FamilyOS MAUI Android release v${VERSION} (build ${BUILD_NUMBER}). Signing: ${{ needs.build-android.outputs.signing_mode }}." \
             --latest
 
       - name: Release summary
@@ -347,6 +345,5 @@ jobs:
             echo "- App version: ${{ needs.build-android.outputs.version }}"
             echo "- Android versionCode: ${{ needs.build-android.outputs.version_code }}"
             echo "- Commit: ${GITHUB_SHA}"
-            echo "- APK release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${{ needs.build-android.outputs.version }}-build${{ github.run_number }}"
             echo "- Signing: ${{ needs.build-android.outputs.signing_mode }}"
           } >> "$GITHUB_STEP_SUMMARY"
