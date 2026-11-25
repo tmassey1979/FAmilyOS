@@ -146,6 +146,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.value }}
       version_code: ${{ steps.version.outputs.code }}
+      signing_mode: ${{ steps.signing.outputs.mode }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -198,31 +199,48 @@ jobs:
       - name: Restore MAUI Android project
         run: dotnet restore src/FamilyOS.Maui/FamilyOS.Maui.csproj -p:TargetFramework=net11.0-android
 
-      - name: Decode Android release keystore
+      - name: Prepare Android signing keystore
+        id: signing
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          set -euo pipefail
-          if [[ -z "${ANDROID_KEYSTORE_BASE64:-}" ]]; then
-            echo "::error::Missing secret ANDROID_KEYSTORE_BASE64. Add the release keystore (base64) so APKs can be signed for upgrades."
-            echo "Also set ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD."
-            exit 1
-          fi
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/familyos-release.jks"
-          ls -la "$RUNNER_TEMP/familyos-release.jks"
-          echo "KEYSTORE_PATH=$RUNNER_TEMP/familyos-release.jks" >> "$GITHUB_ENV"
-
-      - name: Publish signed MAUI Release APK
-        env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          if [[ -z "${ANDROID_KEYSTORE_PASSWORD:-}" || -z "${ANDROID_KEY_ALIAS:-}" || -z "${ANDROID_KEY_PASSWORD:-}" ]]; then
-            echo "::error::Missing ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD secrets."
-            exit 1
+          KEYSTORE_PATH="$RUNNER_TEMP/familyos-release.jks"
+          if [[ -n "${ANDROID_KEYSTORE_BASE64:-}" && -n "${ANDROID_KEYSTORE_PASSWORD:-}" && -n "${ANDROID_KEY_ALIAS:-}" && -n "${ANDROID_KEY_PASSWORD:-}" ]]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_PATH"
+            ls -la "$KEYSTORE_PATH"
+            echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+            echo "STORE_PASS=$ANDROID_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=$ANDROID_KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "KEY_PASS=$ANDROID_KEY_PASSWORD" >> "$GITHUB_ENV"
+            echo "mode=release" >> "$GITHUB_OUTPUT"
+            echo "Using repository release keystore (upgrade-compatible)."
+          else
+            echo "::warning::Release keystore secrets missing (ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD)."
+            echo "::warning::Generating an ephemeral CI keystore so the APK still builds. This APK cannot upgrade a previously release-signed install."
+            KEYSTORE_PASS="familyos-ci"
+            KEY_ALIAS="familyos"
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE_PATH" \
+              -storepass "$KEYSTORE_PASS" \
+              -keypass "$KEYSTORE_PASS" \
+              -alias "$KEY_ALIAS" \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=FamilyOS CI, OU=CI, O=FamilyOS, L=Local, S=NA, C=US"
+            ls -la "$KEYSTORE_PATH"
+            echo "KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
+            echo "STORE_PASS=$KEYSTORE_PASS" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "KEY_PASS=$KEYSTORE_PASS" >> "$GITHUB_ENV"
+            echo "mode=ci-ephemeral" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Publish signed MAUI Release APK
+        run: |
+          set -euo pipefail
           dotnet publish src/FamilyOS.Maui/FamilyOS.Maui.csproj \
             --configuration Release \
             --framework net11.0-android \
@@ -233,9 +251,9 @@ jobs:
             -p:InformationalVersion=${{ steps.version.outputs.value }}+${GITHUB_SHA::7} \
             -p:AndroidKeyStore=true \
             -p:AndroidSigningKeyStore="$KEYSTORE_PATH" \
-            -p:AndroidSigningStorePass="$ANDROID_KEYSTORE_PASSWORD" \
-            -p:AndroidSigningKeyAlias="$ANDROID_KEY_ALIAS" \
-            -p:AndroidSigningKeyPass="$ANDROID_KEY_PASSWORD"
+            -p:AndroidSigningStorePass="$STORE_PASS" \
+            -p:AndroidSigningKeyAlias="$KEY_ALIAS" \
+            -p:AndroidSigningKeyPass="$KEY_PASS"
 
       - name: Stage versioned APK
         id: apk
@@ -311,13 +329,15 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "FamilyOS v${VERSION} (build ${BUILD_NUMBER})" \
-            --notes "FamilyOS MAUI Android release (release-keystore signed for upgrades).
+            --notes "FamilyOS MAUI Android release.
 
           - **versionName:** ${VERSION}
           - **versionCode:** ${VERSION_CODE}
           - **Commit:** ${GITHUB_SHA}
+          - **Signing:** ${{ needs.build-android.outputs.signing_mode }}
 
-          Install the attached APK. Published only after API and Keycloak health checks pass." \
+          Install the attached APK. Published only after API and Keycloak health checks pass.
+          If signing is ci-ephemeral, this build cannot upgrade a prior release-signed install — add ANDROID_KEYSTORE_* secrets for production upgrades." \
             --latest
 
       - name: Release summary
@@ -328,4 +348,5 @@ jobs:
             echo "- Android versionCode: ${{ needs.build-android.outputs.version_code }}"
             echo "- Commit: ${GITHUB_SHA}"
             echo "- APK release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${{ needs.build-android.outputs.version }}-build${{ github.run_number }}"
+            echo "- Signing: ${{ needs.build-android.outputs.signing_mode }}"
           } >> "$GITHUB_STEP_SUMMARY"
