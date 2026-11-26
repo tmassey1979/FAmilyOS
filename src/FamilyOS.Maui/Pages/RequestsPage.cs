@@ -578,6 +578,8 @@ public sealed class RequestsPage : ContentPage
     {
         if (queue && status is "Submitted" or "PendingApproval" or "UnderReview" or "WaitingForInformation")
             return new[] { ("approve", "Approve", true), ("conditional-approve", "Approve with condition", false), ("deny", "Deny", false) };
+        if (queue && status == "ConditionallyApproved")
+            return new[] { ("add-condition", "Add condition", false) };
         if (!queue && status == "Draft")
             return new[] { ("submit", "Submit", true), ("cancel", "Withdraw", false) };
         if (!queue && status is "Submitted" or "PendingApproval" or "UnderReview" or "WaitingForInformation")
@@ -590,8 +592,10 @@ public sealed class RequestsPage : ContentPage
         _status.Text = "Saving request update…";
         try
         {
-            if (action == "conditional-approve")
+            if (action is "conditional-approve" or "add-condition")
             {
+                if (action == "conditional-approve")
+                    await _api.RunActionAsync(id, action);
                 var name = await DisplayPromptAsync("Add an approval condition", "What must happen before this request is fully approved?",
                     "Continue", "Cancel", maxLength: 120);
                 if (string.IsNullOrWhiteSpace(name)) return;
@@ -600,7 +604,8 @@ public sealed class RequestsPage : ContentPage
                 if (description is null) return;
                 await _api.CreateConditionAsync(id, name.Trim(), description.Trim());
             }
-            await _api.RunActionAsync(id, action);
+            else
+                await _api.RunActionAsync(id, action);
             await LoadAsync();
         }
         catch (FamilyApiException ex)
