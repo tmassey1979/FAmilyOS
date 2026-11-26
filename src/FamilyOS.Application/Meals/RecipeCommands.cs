@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace FamilyOS.Application.Meals;
 
 public record RecipeDto(
-    Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions);
+    Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions, bool IsBuiltIn = false);
 
 public record ListRecipesQuery() : IRequest<List<RecipeDto>>;
 public record GetRecipeQuery(Guid Id) : IRequest<RecipeDto>;
@@ -48,7 +48,7 @@ public class RecipeCommandHandlers :
     {
         await EnsureFamilyAsync(ct);
         var list = await _db.Recipes.AsNoTracking()
-            .Where(r => r.FamilyId == _current.FamilyId)
+            .Where(r => r.FamilyId == _current.FamilyId || r.FamilyId == Guid.Empty)
             .OrderBy(r => r.Name)
             .ToListAsync(ct);
         return list.Select(ToDto).ToList();
@@ -58,7 +58,7 @@ public class RecipeCommandHandlers :
     {
         await EnsureFamilyAsync(ct);
         var r = await _db.Recipes.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == query.Id && x.FamilyId == _current.FamilyId, ct)
+            .FirstOrDefaultAsync(x => x.Id == query.Id && (x.FamilyId == _current.FamilyId || x.FamilyId == Guid.Empty), ct)
             ?? throw new NotFoundException("Recipe", query.Id);
         return ToDto(r);
     }
@@ -101,7 +101,7 @@ public class RecipeCommandHandlers :
             throw new ValidationException("Slot", "Slot must be Breakfast, Lunch, Dinner, or Snack.");
 
         var recipe = await _db.Recipes.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == cmd.RecipeId && x.FamilyId == _current.FamilyId, ct)
+            .FirstOrDefaultAsync(x => x.Id == cmd.RecipeId && (x.FamilyId == _current.FamilyId || x.FamilyId == Guid.Empty), ct)
             ?? throw new NotFoundException("Recipe", cmd.RecipeId);
 
         var week = MealPlan.ToMonday(cmd.WeekStartUtc ?? cmd.DayUtc);
@@ -126,7 +126,7 @@ public class RecipeCommandHandlers :
     {
         await EnsureFamilyAsync(ct);
         var recipe = await _db.Recipes.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == cmd.RecipeId && x.FamilyId == _current.FamilyId, ct)
+            .FirstOrDefaultAsync(x => x.Id == cmd.RecipeId && (x.FamilyId == _current.FamilyId || x.FamilyId == Guid.Empty), ct)
             ?? throw new NotFoundException("Recipe", cmd.RecipeId);
 
         var names = cmd.TargetServings is int target && target != recipe.Servings
@@ -178,5 +178,5 @@ public class RecipeCommandHandlers :
     }
 
     private static RecipeDto ToDto(Recipe r) =>
-        new(r.Id, r.Name, r.Servings, r.IngredientsCsv, r.Instructions);
+        new(r.Id, r.Name, r.Servings, r.IngredientsCsv, r.Instructions, r.FamilyId == Guid.Empty);
 }
