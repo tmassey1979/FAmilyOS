@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate crisp monochrome menu icons for FamilyOS MAUI Shell tabs + More menu.
 
-Outputs 64x64 RGBA PNGs as Resources/Images/Menu/menu_{name}.png
+Outputs 64x64 RGBA PNGs as Resources/Images/menu_{name}.png
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ except ImportError:
         from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "src" / "FamilyOS.Maui" / "Resources" / "Images" / "Menu"
+OUT = ROOT / "src" / "FamilyOS.Maui" / "Resources" / "Images"
 SIZE = 64
 STROKE = (248, 250, 252, 255)
 WIDTH = 4
