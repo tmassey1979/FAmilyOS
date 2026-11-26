@@ -89,8 +89,10 @@ public partial class TaskCommandHandlers :
             cmd.Description, cmd.Priority, cmd.DueDate ?? recurrence?.NextOccurrenceUtc, cmd.Category,
             recurrenceDefinitionId: recurrence?.Id);
 
-        if (cmd.EstimatedDurationMinutes.HasValue)
-            task.SetPlannedTimes(null, null, cmd.EstimatedDurationMinutes);
+        var plannedStart = ParseTaskDateTime(cmd.PlannedStartTime);
+        var plannedEnd = ParseTaskDateTime(cmd.PlannedEndTime);
+        if (plannedStart.HasValue || plannedEnd.HasValue || cmd.EstimatedDurationMinutes.HasValue)
+            task.SetPlannedTimes(plannedStart, plannedEnd, cmd.EstimatedDurationMinutes);
 
         if (cmd.AssignToMemberId.HasValue)
         {
@@ -121,6 +123,15 @@ public partial class TaskCommandHandlers :
         if (cmd.AssignToMemberId.HasValue && cmd.AssignToMemberId.Value != _current.MemberId)
             await TryPushAsync(cmd.AssignToMemberId.Value, $"Assigned: {task.Title}", "You have a new task to accept.", task.Id, "Task", ct);
         return await ToDto(task, ct);
+    }
+
+    private static DateTime? ParseTaskDateTime(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (DateTimeOffset.TryParse(value, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AssumeUniversal, out var parsed))
+            return parsed.UtcDateTime;
+        throw new ValidationException("PlannedTime", "Planned start and end must be valid date/time values.");
     }
 
     private static void AdvanceDefinition(RecurrenceDefinition def, DateTime from)
