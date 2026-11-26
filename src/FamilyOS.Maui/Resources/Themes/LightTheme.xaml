@@ -12,7 +12,7 @@
     <Color x:Key="TextPrimary">#101A2B</Color>
     <Color x:Key="TextMuted">#60718A</Color>
     <Color x:Key="TextOnAccent">#081321</Color>
-    <Color x:Key="AccentPrimary">#007F9F</Color>
+    <Color x:Key="AccentPrimary">#008DA8</Color>
     <Color x:Key="AccentSecondary">#6D5CE7</Color>
     <Color x:Key="AccentDanger">#D83D5B</Color>
     <Color x:Key="AccentSuccess">#087F61</Color>
