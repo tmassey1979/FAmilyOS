@@ -281,6 +281,7 @@ try
         await EnsureRecipeSchema.RunAsync(db, schemaLog);
         await EnsureLocationSchema.RunAsync(db, schemaLog);
         await EnsureAvatarSchema.RunAsync(db, schemaLog);
+        await EnsureTaskSchema.RunAsync(db, schemaLog);
     }
 
     var avatarsRoot = Path.Combine(app.Environment.ContentRootPath, "avatars");
