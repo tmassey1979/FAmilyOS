@@ -11,38 +11,38 @@ public class ThemeTokenTests
     public static readonly IReadOnlyDictionary<string, string> ExpoDarkColors =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["bg"] = "#0F172A",
-            ["surface"] = "#1E293B",
-            ["surfaceAlt"] = "#334155",
-            ["border"] = "#475569",
-            ["primary"] = "#38BDF8",
-            ["text"] = "#F8FAFC",
-            ["textMuted"] = "#94A3B8",
-            ["danger"] = "#F87171",
-            ["success"] = "#4ADE80",
-            ["warning"] = "#FBBF24",
+            ["bg"] = "#080D1B",
+            ["surface"] = "#111B2E",
+            ["surfaceAlt"] = "#1B2940",
+            ["border"] = "#30445F",
+            ["primary"] = "#55E6FF",
+            ["text"] = "#F3F7FF",
+            ["textMuted"] = "#9BAFC9",
+            ["danger"] = "#FF718B",
+            ["success"] = "#53E6B1",
+            ["warning"] = "#FFC66D",
         };
 
     public static readonly IReadOnlyDictionary<string, string> MauiDarkSemantic =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["BgPage"] = "#0F172A",
-            ["BgSurface"] = "#1E293B",
-            ["BgSurfaceAlt"] = "#334155",
-            ["BorderSubtle"] = "#475569",
-            ["AccentPrimary"] = "#38BDF8",
-            ["TextPrimary"] = "#F8FAFC",
-            ["TextMuted"] = "#94A3B8",
-            ["AccentDanger"] = "#F87171",
-            ["AccentSuccess"] = "#4ADE80",
-            ["AccentWarning"] = "#FBBF24",
+            ["BgPage"] = "#080D1B",
+            ["BgSurface"] = "#111B2E",
+            ["BgSurfaceAlt"] = "#1B2940",
+            ["BorderSubtle"] = "#30445F",
+            ["AccentPrimary"] = "#55E6FF",
+            ["TextPrimary"] = "#F3F7FF",
+            ["TextMuted"] = "#9BAFC9",
+            ["AccentDanger"] = "#FF718B",
+            ["AccentSuccess"] = "#53E6B1",
+            ["AccentWarning"] = "#FFC66D",
         };
 
     public static readonly IReadOnlyList<string> RequiredSemanticKeys =
     [
-        "BgPage", "BgSurface", "BgSurfaceAlt", "BorderSubtle",
+        "BgPage", "BgSurface", "BgSurfaceAlt", "BgGlow", "BorderSubtle",
         "TextPrimary", "TextMuted", "TextOnAccent",
-        "AccentPrimary", "AccentDanger", "AccentSuccess", "AccentWarning",
+        "AccentPrimary", "AccentSecondary", "AccentDanger", "AccentSuccess", "AccentWarning",
         "OverlayScrim"
     ];
 
