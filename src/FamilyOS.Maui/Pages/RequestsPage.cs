@@ -460,6 +460,21 @@ public sealed class RequestsPage : ContentPage
         }
         if (actions.Children.Count > 0) stack.Children.Add(actions);
 
+        if (request.ExecutionPlanId.HasValue)
+        {
+            var reviewPlan = new Button { Text = "Review execution plan", FontSize = 13 };
+            reviewPlan.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+            reviewPlan.Clicked += async (_, _) => await ShowExecutionPlanAsync(request, false);
+            stack.Children.Add(reviewPlan);
+        }
+        else if (request.Status is "Approved" or "ConditionallyApproved" or "Executable")
+        {
+            var generatePlan = new Button { Text = "Prepare execution plan", FontSize = 13 };
+            generatePlan.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
+            generatePlan.Clicked += async (_, _) => await ShowExecutionPlanAsync(request, true);
+            stack.Children.Add(generatePlan);
+        }
+
         var border = new Border { Padding = 14, Content = stack };
         border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
         _items.Children.Add(border);
@@ -491,6 +506,119 @@ public sealed class RequestsPage : ContentPage
         catch (Exception)
         {
             _status.Text = "The request could not be updated. Refresh and try again.";
+        }
+    }
+
+    private async Task ShowExecutionPlanAsync(FamilyRequestDto request, bool generate)
+    {
+        _status.Text = generate ? "Preparing execution plan…" : "Loading execution plan…";
+        try
+        {
+            var plan = generate
+                ? await _api.GenerateExecutionPlanAsync(request.Id)
+                : request.ExecutionPlanId.HasValue
+                    ? await _api.GetExecutionPlanAsync(request.ExecutionPlanId.Value)
+                    : throw new InvalidOperationException("This request has no execution plan.");
+
+            var content = new VerticalStackLayout { Padding = 20, Spacing = 14 };
+            var heading = new Label { Text = "Review execution plan", FontSize = 23, FontAttributes = FontAttributes.Bold };
+            heading.SetDynamicResource(VisualElement.StyleProperty, "TextDisplay");
+            content.Children.Add(heading);
+            content.Children.Add(new Label { Text = $"Request: {request.Title}", FontSize = 14 });
+            var planStatus = new Label { Text = $"Status: {plan.Status}", FontSize = 13 };
+            planStatus.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+            content.Children.Add(planStatus);
+
+            var switches = new Dictionary<Guid, Switch>();
+            foreach (var item in plan.Items)
+            {
+                var toggle = new Switch { IsToggled = item.IsSelected, HorizontalOptions = LayoutOptions.End };
+                var title = new Label { Text = item.Title, FontAttributes = FontAttributes.Bold, FontSize = 15 };
+                var type = new Label { Text = item.Type, FontSize = 12 };
+                type.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+                var row = new VerticalStackLayout { Spacing = 3 };
+                var itemHeader = new Grid
+                {
+                    ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+                    Children = { title, toggle }
+                };
+                Grid.SetColumn(toggle, 1);
+                row.Children.Add(itemHeader);
+                row.Children.Add(type);
+                if (item.ResultingEntityId.HasValue)
+                {
+                    var result = new Label { Text = $"Created · {item.ResultingEntityId.Value}", FontSize = 11 };
+                    result.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+                    row.Children.Add(result);
+                }
+                var border = new Border { Padding = 12, Content = row };
+                border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
+                content.Children.Add(border);
+                switches[item.Id] = toggle;
+                if (plan.Status == "Committed") toggle.IsEnabled = false;
+            }
+
+            var message = new Label { FontSize = 13 };
+            message.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+            content.Children.Add(message);
+            var cancel = new Button { Text = plan.Status == "Committed" ? "Close" : "Not now" };
+            cancel.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+            cancel.Clicked += async (_, _) => await Navigation.PopModalAsync();
+            var buttons = new HorizontalStackLayout { Spacing = 10, Children = { cancel } };
+
+            if (plan.Status != "Committed")
+            {
+                var commit = new Button { Text = "Create selected items" };
+                commit.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
+                commit.Clicked += async (_, _) =>
+                {
+                    var deselected = switches.Where(pair => !pair.Value.IsToggled).Select(pair => pair.Key).ToList();
+                    if (switches.All(pair => !pair.Value.IsToggled))
+                    {
+                        message.Text = "Select at least one item to continue.";
+                        return;
+                    }
+                    commit.IsEnabled = false;
+                    message.Text = "Creating tasks, events and shopping items…";
+                    try
+                    {
+                        var committed = await _api.CommitExecutionPlanAsync(plan.Id, deselected);
+                        planStatus.Text = $"Status: {committed.Status}";
+                        foreach (var pair in switches) pair.Value.IsEnabled = false;
+                        message.Text = $"{committed.Items.Count(i => i.ResultingEntityId.HasValue)} item(s) created. Your plan is saved.";
+                        commit.IsVisible = false;
+                        cancel.Text = "Done";
+                    }
+                    catch (FamilyApiException ex)
+                    {
+                        message.Text = ex.Message;
+                        commit.IsEnabled = true;
+                    }
+                    catch (Exception)
+                    {
+                        message.Text = "Could not create the selected items. Refresh and try again.";
+                        commit.IsEnabled = true;
+                    }
+                };
+                buttons.Children.Add(commit);
+            }
+            else
+            {
+                message.Text = $"{plan.Items.Count(i => i.ResultingEntityId.HasValue)} item(s) were created from this plan.";
+            }
+
+            content.Children.Add(buttons);
+            var page = new ContentPage { Title = "Execution plan", Content = new ScrollView { Content = content } };
+            await Navigation.PushModalAsync(new NavigationPage(page));
+            _status.Text = "Execution plan ready.";
+        }
+        catch (FamilyApiException ex)
+        {
+            _status.Text = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            _status.Text = ex is InvalidOperationException ? ex.Message : "Could not open the execution plan. Refresh and try again.";
         }
     }
 
