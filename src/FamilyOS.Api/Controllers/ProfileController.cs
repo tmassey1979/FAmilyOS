@@ -50,7 +50,7 @@ public class ProfileController : ControllerBase
         if (file.Length > 2_000_000)
             return BadRequest(new { detail = "Image must be 2 MB or smaller." });
 
-        var contentType = file.ContentType ?? "";
+        var contentType = (file.ContentType ?? "").Split(';', 2)[0].Trim().ToLowerInvariant();
         if (!AllowedContentTypes.Contains(contentType))
             return BadRequest(new { detail = "Only JPEG, PNG, WebP, or GIF images are allowed." });
 
