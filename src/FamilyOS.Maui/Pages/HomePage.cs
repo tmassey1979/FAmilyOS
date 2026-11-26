@@ -145,6 +145,8 @@ public sealed class HomePage : ContentPage
             }
         };
         avatar.SetDynamicResource(Border.StrokeProperty, "AccentPrimary");
+        if (avatar.Content is Label avatarLabel)
+            avatarLabel.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
         avatar.SetDynamicResource(VisualElement.BackgroundColorProperty, "BgGlow");
 
         var name = new Label
@@ -308,7 +310,7 @@ public sealed class HomePage : ContentPage
             });
         }
 
-        var border = new Border { Padding = 0, Content = body };
+        var border = new Border { Padding = 0, MinimumHeightRequest = 124, Content = body };
         border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
 
         if (!_editMode)
