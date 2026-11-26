@@ -62,7 +62,7 @@ public static class EnsureRecipeCatalogSchema
 
     private static readonly string[] Tags =
     [
-        "Breakfast", "Lunch", "Dinner", "Snack", "Dessert", "Vegetarian", "Vegan", "Gluten-Free",
+        "Breakfast", "Lunch", "Dinner", "Side", "Snack", "Dessert", "No-Bake", "Vegetarian", "Vegan", "Gluten-Free",
         "Dairy-Free", "High-Protein", "Low-Carb", "Budget-Friendly", "Kid-Friendly", "Quick",
         "Under-30-Minutes", "One-Pot", "Slow-Cooker", "Air-Fryer", "Meal-Prep", "Freezer-Friendly",
         "Comfort-Food", "Italian", "Mexican", "American", "Asian-Inspired", "Mediterranean",
