@@ -155,7 +155,6 @@ public class RecipeCommandHandlers :
                 string.Join("; ", plan.Entries.Select(e => $"{e.Id}|{e.DayUtc:o}|{e.Slot}|deleted={e.IsDeleted}|recipe={e.RecipeId}")));
         }
 
-        var targetDay = cmd.DayUtc.Date;
         var entry = plan.AddEntry(
             cmd.DayUtc, slot, recipe.Name, notes: $"{recipe.Servings} servings", ingredientsCsv: recipe.IngredientsCsv, recipeId: recipe.Id);
 
