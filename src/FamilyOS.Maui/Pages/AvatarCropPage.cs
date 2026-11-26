@@ -160,7 +160,8 @@ public sealed class AvatarCropPage : ContentPage
             using (var canvas = new SKCanvas(output))
             {
                 canvas.Clear(SKColors.White);
-                canvas.DrawBitmap(_bitmap, sourceRect, new SKRect(0, 0, 640, 640), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
+                using var sourceImage = SKImage.FromBitmap(_bitmap);
+                canvas.DrawImage(sourceImage, sourceRect, new SKRect(0, 0, 640, 640), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
                 canvas.Flush();
             }
 
