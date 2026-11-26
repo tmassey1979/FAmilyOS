@@ -40,6 +40,15 @@ public sealed class MealsApiClient
         => SendAsync<List<IngredientCatalogDto>>(HttpMethod.Get,
             $"api/ingredients/search?q={Uri.EscapeDataString(query ?? string.Empty)}&limit={Math.Clamp(limit, 1, 50)}", null, ct);
 
+    public Task<IngredientCatalogDto> CreateIngredientAsync(CreateIngredientDto body, CancellationToken ct = default)
+        => SendAsync<IngredientCatalogDto>(HttpMethod.Post, "api/ingredients", JsonContent(body), ct);
+
+    public Task<StructuredRecipeDto> SaveStructuredRecipeAsync(StructuredRecipeWriteDto body, CancellationToken ct = default)
+        => SendAsync<StructuredRecipeDto>(HttpMethod.Post, "api/recipes/structured", JsonContent(body), ct);
+
+    public Task<StructuredRecipeDto> GetRecipeDetailsAsync(Guid id, CancellationToken ct = default)
+        => SendAsync<StructuredRecipeDto>(HttpMethod.Get, $"api/recipes/{id:D}/details", null, ct);
+
     public Task<RecipeDto> CreateRecipeAsync(RecipeWriteDto body, CancellationToken ct = default)
         => SendAsync<RecipeDto>(HttpMethod.Post, "api/recipes", JsonContent(body), ct);
 
@@ -123,3 +132,15 @@ public sealed record RecipeWriteDto(string Name, int? Servings = 4, string? Ingr
 public sealed record ApplyRecipeDto(DateTime DayUtc, string Slot, DateTime? WeekStartUtc = null);
 public sealed record RecipeShoppingDto(int? TargetServings = null);
 public sealed record MealShoppingResultDto(int Added, int? TargetServings = null);\npublic sealed record IngredientCatalogDto(Guid Id, string Name, string Category, string? AliasesCsv, bool IsBuiltIn);
+
+public sealed record CreateIngredientDto(string Name, string? Category = null, string? AliasesCsv = null);
+public sealed record StructuredRecipeIngredientWriteDto(Guid IngredientId, decimal? Quantity, string? Unit,
+    string? PreparationNote, string? Section, int SortOrder);
+public sealed record StructuredRecipeStepWriteDto(string Text, int? DurationMinutes = null);
+public sealed record StructuredRecipeWriteDto(Guid? Id, string Name, int Servings,
+    List<StructuredRecipeIngredientWriteDto> Ingredients, List<StructuredRecipeStepWriteDto> Steps, List<string> Tags);
+public sealed record StructuredRecipeDto(Guid Id, string Name, int Servings, bool IsBuiltIn, string? LegacyIngredientsCsv,
+    List<StructuredRecipeIngredientDto> Ingredients, List<StructuredRecipeStepDto> Steps, List<string> Tags);
+public sealed record StructuredRecipeIngredientDto(Guid IngredientId, string Name, string Category, decimal? Quantity,
+    string? Unit, string? PreparationNote, string? Section, int SortOrder);
+public sealed record StructuredRecipeStepDto(int StepNumber, string Text, int? DurationMinutes);
