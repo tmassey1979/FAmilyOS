@@ -368,6 +368,92 @@ public static class EnsureRecipeCatalogSchema
 (gen_random_uuid(), NULL, 'Mediterranean', 'mediterranean', now(), false),
 (gen_random_uuid(), NULL, 'Healthy', 'healthy', now(), false),
 (gen_random_uuid(), NULL, 'Family-Favorite', 'family-favorite', now(), false)", ""));
+
+        await db.Database.ExecuteSqlRawAsync("""
+            INSERT INTO familyos."Recipes"
+                ("Id", "FamilyId", "Name", "Servings", "IngredientsCsv", "Instructions", "CreatedAtUtc", "UpdatedAtUtc", "IsDeleted")
+            SELECT v."Id", v."FamilyId", v."Name", v."Servings", v."IngredientsCsv", v."Instructions", now(), NULL, false
+            FROM (VALUES
+            (gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Chicken fajita bowls', 4, '1 lb chicken breast, 2 bell peppers, 1 onion, 2 cups rice, 1 tbsp olive oil, 2 tsp chili powder, 1 tsp cumin, lime', 'Cook rice. Season and sauté sliced chicken in oil. Add peppers and onion; cook until tender. Serve over rice with lime.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Creamy garlic chicken pasta', 4, '1 lb chicken breast, 12 oz penne pasta, 3 cloves garlic, 1 cup heavy cream, 1/2 cup parmesan cheese, 1 tbsp olive oil', 'Cook pasta. Sauté chicken until cooked through; add garlic and cream. Simmer, stir in parmesan, and toss with pasta.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Beef tacos', 4, '1 lb ground beef, 8 tortillas, 1 packet taco seasoning, 1 cup shredded cheddar cheese, 1 tomato, 1 cup lettuce', 'Brown beef, drain, add seasoning and water per packet. Spoon into warm tortillas and add toppings.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Sheet-pan lemon chicken', 4, '1.5 lb chicken thighs, 1 lb potatoes, 3 carrots, 2 tbsp olive oil, 1 lemon, 1 tsp dried thyme', 'Heat oven to 425 F. Toss chopped vegetables with oil and thyme. Add chicken and lemon; roast 30-40 minutes until chicken reaches 165 F.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Slow cooker pulled pork', 4, '3 lb pork shoulder, 1 cup BBQ sauce, 1 onion, 1/2 cup chicken broth, 8 hamburger buns', 'Add pork, sliced onion, broth, and half the BBQ sauce to slow cooker. Cook low 8 hours, shred, and stir in remaining sauce.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Classic spaghetti and meat sauce', 4, '1 lb ground beef, 12 oz spaghetti, 24 oz marinara sauce, 1 onion, 2 cloves garlic, 1/4 cup parmesan cheese', 'Cook spaghetti. Brown beef with onion and garlic, drain, add marinara and simmer 15 minutes. Serve over pasta with parmesan.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'One-pot cheesy beef macaroni', 4, '1 lb ground beef, 2 cups macaroni, 2 cups beef broth, 1 cup milk, 1.5 cups shredded cheddar cheese, 1 tsp paprika', 'Brown beef in a pot. Add macaroni and broth; simmer until pasta is tender. Stir in milk and cheese until creamy.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Baked salmon with rice', 4, '4 salmon fillets, 1 cup white rice, 1 lemon, 1 tbsp olive oil, 1 tsp garlic, 1 tsp black pepper', 'Cook rice. Brush salmon with oil, garlic, pepper, and lemon. Bake at 400 F for 12-15 minutes or until flaky.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Chicken quesadillas', 4, '2 cups cooked chicken, 4 tortillas, 1.5 cups shredded cheddar cheese, 1 bell pepper, 1 tbsp olive oil', 'Fill tortillas with chicken, cheese, and sliced pepper. Fold and cook in oiled skillet until crisp and cheese melts.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Turkey meatballs', 4, '1 lb ground turkey, 1 egg, 1/2 cup breadcrumbs, 1/4 cup parmesan cheese, 2 cups marinara sauce', 'Mix turkey, egg, breadcrumbs, and parmesan. Form meatballs and bake at 400 F for 18-22 minutes. Warm in marinara.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Vegetable fried rice', 4, '3 cups cooked rice, 2 eggs, 1 cup frozen mixed vegetables, 2 tbsp soy sauce, 1 tbsp vegetable oil, 2 green onions', 'Scramble eggs and set aside. Stir-fry vegetables, add rice and soy sauce, then fold in eggs and green onions.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Creamy tomato soup', 4, '28 oz canned diced tomatoes, 1 onion, 2 cloves garlic, 1 cup vegetable broth, 1/2 cup heavy cream, 1 tbsp olive oil', 'Sauté onion and garlic. Add tomatoes and broth; simmer 20 minutes. Blend smooth and stir in cream.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'BBQ chicken sandwiches', 4, '2 lb chicken breast, 1 cup BBQ sauce, 6 hamburger buns, 1/2 onion, 1/2 cup chicken broth', 'Slow cook chicken with broth and half the BBQ sauce until shreddable. Shred, stir in remaining sauce, and serve on buns.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Breakfast egg muffins', 4, '8 eggs, 1/2 cup milk, 1 cup shredded cheddar cheese, 1 bell pepper, 1/2 cup spinach', 'Whisk eggs and milk. Stir in diced pepper, spinach, and cheese. Pour into greased muffin tin and bake at 350 F for 18-22 minutes.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Blueberry oatmeal', 4, '2 cups rolled oats, 3 cups milk, 1 cup blueberries, 1 tbsp honey, 1 tsp cinnamon', 'Simmer oats and milk until creamy. Stir in cinnamon and honey; top with blueberries.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Banana pancakes', 4, '1.5 cups all-purpose flour, 2 bananas, 1 egg, 1 cup milk, 2 tsp baking powder, 2 tbsp butter', 'Mash bananas. Whisk with egg and milk, then fold in flour and baking powder. Cook pancakes in buttered skillet until golden.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Greek chicken wraps', 4, '1 lb chicken breast, 4 pita bread, 1 cucumber, 1 tomato, 1 cup plain Greek yogurt, 1 lemon, 1 tsp garlic', 'Season and grill chicken. Mix yogurt, lemon, and garlic for sauce. Fill pita with chicken, cucumber, tomato, and sauce.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Black bean quesadillas', 4, '1 can black beans, 4 tortillas, 1 cup shredded cheddar cheese, 1/2 bell pepper, 1 tsp cumin', 'Mash half the beans. Spread on tortillas, add cheese and pepper, fold, and toast in skillet until crisp.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Honey garlic shrimp bowls', 4, '1 lb shrimp, 2 cups white rice, 3 cloves garlic, 2 tbsp honey, 2 tbsp soy sauce, 1 tbsp olive oil', 'Cook rice. Sauté shrimp in oil; add garlic, honey, and soy sauce. Simmer until shrimp are opaque and sauce thickens.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Loaded baked potatoes', 4, '4 russet potatoes, 1 cup sour cream, 1 cup shredded cheddar cheese, 4 slices bacon, 2 green onions', 'Bake potatoes at 425 F for 45-60 minutes until tender. Split and top with sour cream, cheese, bacon, and onions.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Chicken noodle soup', 4, '1 lb chicken breast, 8 oz linguine, 3 carrots, 3 celery stalks, 1 onion, 8 cups chicken broth, 1 tsp dried thyme', 'Simmer chicken and vegetables in broth until chicken is cooked. Remove and shred chicken. Add pasta and cook tender; return chicken.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Beef and broccoli stir-fry', 4, '1 lb steak, 4 cups broccoli, 2 tbsp soy sauce, 2 cloves garlic, 1 tbsp honey, 2 cups white rice', 'Cook rice. Sear thinly sliced steak, add broccoli with a splash of water, cover until tender. Stir in soy, garlic, and honey.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Spinach and cheese omelet', 4, '2 eggs, 1/4 cup shredded cheddar cheese, 1/2 cup spinach, 1 tsp butter', 'Whisk eggs. Melt butter in skillet, add eggs, then spinach and cheese. Fold when set.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Baked ziti', 4, '1 lb penne pasta, 24 oz marinara sauce, 2 cups mozzarella cheese, 1/2 cup parmesan cheese, 1 cup ricotta cheese', 'Cook pasta until just shy of tender. Mix with marinara and ricotta, top with mozzarella and parmesan. Bake at 375 F for 25 minutes.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Crispy chicken tenders', 4, '1.5 lb chicken breast, 1 cup breadcrumbs, 1 egg, 1/2 cup all-purpose flour, 1 tsp paprika', 'Cut chicken into strips. Coat in flour, beaten egg, then breadcrumbs with paprika. Bake at 425 F for 18-22 minutes, turning once.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Tuna pasta salad', 4, '12 oz penne pasta, 2 cans tuna, 1/2 cup mayonnaise, 2 celery stalks, 1/2 red onion, 1 tbsp lemon juice', 'Cook pasta and cool. Fold in drained tuna, mayonnaise, diced celery and onion, and lemon juice. Chill before serving.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Lentil vegetable curry', 4, '1.5 cups lentils, 1 onion, 2 carrots, 1 can diced tomatoes, 2 tbsp curry powder, 4 cups vegetable broth', 'Sauté onion and carrots. Add lentils, tomatoes, curry powder, and broth. Simmer 30-35 minutes until lentils are tender.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Caprese grilled cheese', 4, '4 slices sandwich bread, 4 slices mozzarella cheese, 1 tomato, 4 basil leaves, 2 tbsp butter', 'Layer mozzarella, tomato, and basil between bread. Butter outside and cook in skillet until golden and cheese melts.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Turkey chili', 4, '1 lb ground turkey, 1 can kidney beans, 1 can black beans, 1 can diced tomatoes, 1 onion, 2 tbsp chili powder', 'Brown turkey and onion. Add beans, tomatoes, chili powder, and 1 cup water. Simmer 25-30 minutes.', now(), NULL, false),
+(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Apple cinnamon overnight oats', 4, '1 cup rolled oats, 1 cup milk, 1 apple, 1/2 cup plain Greek yogurt, 1 tsp cinnamon, 1 tbsp honey', 'Combine oats, milk, yogurt, diced apple, cinnamon, and honey. Refrigerate overnight and stir before serving.', now(), NULL, false)
+            ) AS v("Id", "FamilyId", "Name", "Servings", "IngredientsCsv", "Instructions", "CreatedAtUtc", "UpdatedAtUtc", "IsDeleted")
+            WHERE NOT EXISTS (
+                SELECT 1 FROM familyos."Recipes" r
+                WHERE r."FamilyId" = '00000000-0000-0000-0000-000000000000'::uuid
+                  AND lower(r."Name") = lower(v."Name") AND r."IsDeleted" = false
+            );
+            """);
+        await db.Database.ExecuteSqlRawAsync("""
+            INSERT INTO familyos."RecipeTagLinks" ("Id", "RecipeId", "TagId", "CreatedAtUtc", "IsDeleted")
+            SELECT gen_random_uuid(), r."Id", t."Id", now(), false
+            FROM familyos."Recipes" r
+            JOIN (VALUES
+            ('Chicken fajita bowls', 'dinner', 'mexican', 'high-protein', 'family-favorite'),
+('Creamy garlic chicken pasta', 'dinner', 'italian', 'comfort-food', 'family-favorite'),
+('Beef tacos', 'dinner', 'mexican', 'budget-friendly', 'kid-friendly'),
+('Sheet-pan lemon chicken', 'dinner', 'one-pot', 'meal-prep', 'gluten-free'),
+('Slow cooker pulled pork', 'dinner', 'slow-cooker', 'budget-friendly', 'freezer-friendly'),
+('Classic spaghetti and meat sauce', 'dinner', 'italian', 'budget-friendly', 'family-favorite'),
+('One-pot cheesy beef macaroni', 'dinner', 'one-pot', 'kid-friendly', 'comfort-food'),
+('Baked salmon with rice', 'dinner', 'high-protein', 'gluten-free', 'quick'),
+('Chicken quesadillas', 'lunch', 'dinner', 'mexican', 'quick', 'kid-friendly'),
+('Turkey meatballs', 'dinner', 'high-protein', 'meal-prep', 'italian'),
+('Vegetable fried rice', 'lunch', 'dinner', 'vegetarian', 'budget-friendly', 'quick'),
+('Creamy tomato soup', 'lunch', 'vegetarian', 'comfort-food', 'budget-friendly'),
+('BBQ chicken sandwiches', 'dinner', 'slow-cooker', 'kid-friendly', 'meal-prep'),
+('Breakfast egg muffins', 'breakfast', 'high-protein', 'meal-prep', 'gluten-free'),
+('Blueberry oatmeal', 'breakfast', 'vegetarian', 'budget-friendly', 'kid-friendly'),
+('Banana pancakes', 'breakfast', 'kid-friendly', 'budget-friendly'),
+('Greek chicken wraps', 'lunch', 'dinner', 'mediterranean', 'high-protein'),
+('Black bean quesadillas', 'lunch', 'vegetarian', 'budget-friendly', 'quick'),
+('Honey garlic shrimp bowls', 'dinner', 'asian-inspired', 'quick', 'high-protein'),
+('Loaded baked potatoes', 'dinner', 'budget-friendly', 'gluten-free', 'comfort-food'),
+('Chicken noodle soup', 'lunch', 'dinner', 'comfort-food', 'freezer-friendly'),
+('Beef and broccoli stir-fry', 'dinner', 'asian-inspired', 'high-protein', 'quick'),
+('Spinach and cheese omelet', 'breakfast', 'vegetarian', 'quick', 'gluten-free'),
+('Baked ziti', 'dinner', 'italian', 'comfort-food', 'freezer-friendly'),
+('Crispy chicken tenders', 'dinner', 'kid-friendly', 'air-fryer', 'high-protein'),
+('Tuna pasta salad', 'lunch', 'budget-friendly', 'meal-prep'),
+('Lentil vegetable curry', 'dinner', 'vegetarian', 'vegan', 'budget-friendly', 'one-pot'),
+('Caprese grilled cheese', 'lunch', 'vegetarian', 'quick', 'kid-friendly'),
+('Turkey chili', 'dinner', 'one-pot', 'high-protein', 'freezer-friendly'),
+('Apple cinnamon overnight oats', 'breakfast', 'vegetarian', 'meal-prep', 'quick')
+            ) AS recipe_tags("RecipeName", "TagSlug")
+              ON lower(r."Name") = lower(recipe_tags."RecipeName")
+            CROSS JOIN LATERAL unnest(ARRAY[recipe_tags."TagSlug"]) AS tag_slug("Slug")
+            JOIN familyos."RecipeTags" t ON t."Slug" = tag_slug."Slug" AND t."FamilyId" IS NULL
+            WHERE r."FamilyId" = '00000000-0000-0000-0000-000000000000'::uuid
+              AND NOT EXISTS (SELECT 1 FROM familyos."RecipeTagLinks" l WHERE l."RecipeId" = r."Id" AND l."TagId" = t."Id" AND l."IsDeleted" = false);
+            """);
+
         logger.LogInformation("Recipe catalog schema ensured; seeded {IngredientCount} common ingredients and {TagCount} tags.",
             105, 28);
     }
