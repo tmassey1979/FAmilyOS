@@ -600,9 +600,18 @@ public sealed class RequestsPage : ContentPage
                 var description = await DisplayPromptAsync("Condition details", "Add details (optional)",
                     "Save condition", "Cancel", maxLength: 500);
                 if (description is null) return;
+                var existingConditions = action == "add-condition"
+                    ? await _api.GetConditionsAsync(id)
+                    : new List<RequestConditionDto>();
+                var logicGroup = existingConditions.Count > 0
+                    ? existingConditions[0].LogicGroup
+                    : await DisplayActionSheet("How should multiple conditions work?", "Cancel", null,
+                        "All conditions must be met", "Any one condition is enough");
+                if (logicGroup == "Cancel" || logicGroup is null) return;
+                logicGroup = logicGroup.StartsWith("Any", StringComparison.Ordinal) ? "Any" : "All";
                 if (action == "conditional-approve")
                     await _api.RunActionAsync(id, action);
-                await _api.CreateConditionAsync(id, name.Trim(), description.Trim());
+                await _api.CreateConditionAsync(id, name.Trim(), description.Trim(), logicGroup);
             }
             else
                 await _api.RunActionAsync(id, action);
