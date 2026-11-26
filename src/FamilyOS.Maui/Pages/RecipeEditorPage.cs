@@ -106,7 +106,6 @@ public sealed class RecipeEditorPage : ContentPage
                     Text = $"{item.Name}   ·   {item.Category}",
                     FontSize = 13,
                     HorizontalOptions = LayoutOptions.Fill,
-                    HorizontalTextAlignment = TextAlignment.Start
                 };
                 button.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
                 button.Clicked += async (_, _) => await SelectIngredientAsync(item);
