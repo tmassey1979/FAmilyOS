@@ -52,6 +52,7 @@ public interface IFamilyOsDbContext
     DbSet<RecipeTag> RecipeTags { get; }
     DbSet<RecipeTagLink> RecipeTagLinks { get; }
     DbSet<RecipeInstructionStep> RecipeInstructionSteps { get; }
+    DbSet<RecipeMemberPreference> RecipeMemberPreferences { get; }
     DbSet<MealNomination> MealNominations { get; }
     DbSet<MealNominationVote> MealNominationVotes { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
