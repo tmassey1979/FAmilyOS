@@ -122,7 +122,7 @@ public sealed class RecipeEditorPage : ContentPage
         }
 
         var quantityText = await DisplayPromptAsync(item.Name, "Quantity (for example 1, 1/2, or 1.5). Leave blank if not needed.",
-            placeholder: "1", maxLength: 12, keyboard: Keyboard.Numeric);
+            placeholder: "1", maxLength: 12);
         if (quantityText is null) return;
         decimal? quantity = null;
         if (!string.IsNullOrWhiteSpace(quantityText))
@@ -189,7 +189,7 @@ public sealed class RecipeEditorPage : ContentPage
                 ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
                 Children = { label, remove }
             };
-            row.SetColumn(remove, 1);
+            Grid.SetColumn(remove, 1);
             var card = new Border { Padding = 10, Content = row };
             card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
             _selected.Children.Add(card);
