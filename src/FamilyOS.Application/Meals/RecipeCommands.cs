@@ -164,7 +164,7 @@ public class RecipeCommandHandlers :
     {
         await EnsureFamilyAsync(ct);
         var recipe = await _db.Recipes.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == query.Id && x.FamilyId == _current.FamilyId, ct)
+            .FirstOrDefaultAsync(x => x.Id == query.Id && (x.FamilyId == _current.FamilyId || x.FamilyId == Guid.Empty), ct)
             ?? throw new NotFoundException("Recipe", query.Id);
         var ingredients = recipe.ScaleIngredientsForServings(query.TargetServings);
         return new ScaledRecipeDto(recipe.Id, recipe.Name, recipe.Servings, query.TargetServings, ingredients);
