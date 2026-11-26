@@ -561,7 +561,7 @@ public sealed class RequestsPage : ContentPage
             reviewPlan.Clicked += async (_, _) => await ShowExecutionPlanAsync(request, false);
             stack.Children.Add(reviewPlan);
         }
-        else if (request.Status is "Approved" or "ConditionallyApproved" or "Executable")
+        else if (request.Status is "Approved" or "Executable")
         {
             var generatePlan = new Button { Text = "Prepare execution plan", FontSize = 13 };
             generatePlan.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
