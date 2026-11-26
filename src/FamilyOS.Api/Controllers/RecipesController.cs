@@ -27,8 +27,13 @@ public class RecipesController : ControllerBase
 
     [HttpGet("page")]
     public async Task<ActionResult<RecipePageDto>> ListPage(
-        [FromQuery] int skip = 0, [FromQuery] int take = 24, CancellationToken ct = default)
-        => Ok(await _mediator.Send(new ListRecipesPageQuery(skip, take), ct));
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 24,
+        [FromQuery] string? q = null,
+        [FromQuery] string? tag = null,
+        [FromQuery] bool favoritesOnly = false,
+        CancellationToken ct = default)
+        => Ok(await _mediator.Send(new ListRecipesPageQuery(skip, take, q, tag, favoritesOnly), ct));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<RecipeDto>> Get(Guid id, CancellationToken ct)
