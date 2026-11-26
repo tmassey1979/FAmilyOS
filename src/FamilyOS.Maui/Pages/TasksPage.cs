@@ -271,19 +271,26 @@ public sealed class TasksPage : ContentPage
 
     private async Task SetPlannedTimesAsync(FamilyTaskDto task)
     {
-        var start = await DisplayPromptAsync("Plan task", "Planned start (24-hour HH:mm, optional)",
-            initialValue: task.PlannedStartTime ?? "", maxLength: 5, keyboard: Keyboard.Text);
-        if (start is null) return;
-        var end = await DisplayPromptAsync("Plan task", "Planned end (24-hour HH:mm, optional)",
-            initialValue: task.PlannedEndTime ?? "", maxLength: 5, keyboard: Keyboard.Text);
-        if (end is null) return;
+        var today = DateTime.Today;
+        var startInitial = task.PlannedStartTime is { Length: > 0 } startText && TimeOnly.TryParse(startText, out var startTime)
+            ? today.Add(startTime.ToTimeSpan()) : today.AddHours(9);
+        var endInitial = task.PlannedEndTime is { Length: > 0 } endText && TimeOnly.TryParse(endText, out var endTime)
+            ? today.Add(endTime.ToTimeSpan()) : today.AddHours(10);
+
+        var start = await PickDateTimeAsync("Planned start", startInitial, allowClear: true);
+        if (!start.Confirmed) return;
+        var end = await PickDateTimeAsync("Planned end", endInitial, allowClear: true);
+        if (!end.Confirmed) return;
+        if (start.Value.HasValue && end.Value.HasValue && end.Value <= start.Value)
+        {
+            await DisplayAlertAsync("Invalid schedule", "The planned end must be after the planned start.", "OK");
+            return;
+        }
+
         var estimateText = await DisplayPromptAsync("Time estimate", "Estimated minutes (optional)",
             initialValue: task.EstimatedDurationMinutes?.ToString(CultureInfo.InvariantCulture) ?? "",
             maxLength: 5, keyboard: Keyboard.Numeric);
         if (estimateText is null) return;
-
-        start = start.Trim();
-        end = end.Trim();
         int? estimate = task.EstimatedDurationMinutes;
         if (!string.IsNullOrWhiteSpace(estimateText))
         {
@@ -294,34 +301,68 @@ public sealed class TasksPage : ContentPage
             }
             estimate = minutes;
         }
-        if (start.Length > 0 && !TimeOnly.TryParseExact(start, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
-        {
-            await DisplayAlertAsync("Invalid time", "Use 24-hour time such as 09:30.", "OK");
-            return;
-        }
-        if (end.Length > 0 && !TimeOnly.TryParseExact(end, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
-        {
-            await DisplayAlertAsync("Invalid time", "Use 24-hour time such as 17:00.", "OK");
-            return;
-        }
-        if (start.Length > 0 && end.Length > 0
-            && TimeOnly.ParseExact(end, "HH:mm", CultureInfo.InvariantCulture) <= TimeOnly.ParseExact(start, "HH:mm", CultureInfo.InvariantCulture))
-        {
-            await DisplayAlertAsync("Invalid schedule", "The planned end must be later than the planned start.", "OK");
-            return;
-        }
 
         try
         {
             await _tasks.SetPlannedTimesAsync(task.Id, new PlannedTimesBody(
-                string.IsNullOrEmpty(start) ? null : start,
-                string.IsNullOrEmpty(end) ? null : end,
+                start.Value?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+                end.Value?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
                 estimate));
             _status.Text = "Task schedule updated.";
             await LoadAsync();
         }
         catch (FamilyApiException ex) { _status.Text = ex.Message; }
         catch (Exception) { _status.Text = "Could not update the task schedule."; }
+    }
+
+    private async Task<(bool Confirmed, DateTime? Value)> PickDateTimeAsync(
+        string title, DateTime initialValue, bool allowClear)
+    {
+        var completion = new TaskCompletionSource<(bool Confirmed, DateTime? Value)>();
+        var date = new DatePicker { Date = initialValue.Date, Format = "ddd, MMM d, yyyy" };
+        var time = new TimePicker { Time = initialValue.TimeOfDay, Format = "h:mm tt" };
+        var page = new ContentPage { Title = title, BackgroundColor = Colors.Transparent };
+        var cancel = new Button { Text = "Cancel" };
+        cancel.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+        cancel.Clicked += async (_, _) =>
+        {
+            completion.TrySetResult((false, null));
+            await Navigation.PopModalAsync();
+        };
+        var save = new Button { Text = "Use this time" };
+        save.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
+        save.Clicked += async (_, _) =>
+        {
+            completion.TrySetResult((true, date.Date.Date + time.Time));
+            await Navigation.PopModalAsync();
+        };
+        var buttons = new HorizontalStackLayout { Spacing = 10, Children = { cancel, save } };
+        if (allowClear)
+        {
+            var clear = new Button { Text = "Clear" };
+            clear.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+            clear.Clicked += async (_, _) =>
+            {
+                completion.TrySetResult((true, null));
+                await Navigation.PopModalAsync();
+            };
+            buttons.Children.Insert(1, clear);
+        }
+        page.Content = new VerticalStackLayout
+        {
+            Padding = 24,
+            Spacing = 18,
+            VerticalOptions = LayoutOptions.Center,
+            Children =
+            {
+                new Label { Text = title, FontSize = 22, FontAttributes = FontAttributes.Bold },
+                new Label { Text = "Choose a date" }, date,
+                new Label { Text = "Choose a time" }, time,
+                buttons
+            }
+        };
+        await Navigation.PushModalAsync(new NavigationPage(page));
+        return await completion.Task;
     }
 
     private Button MakeAssignButton(FamilyTaskDto task)
@@ -341,20 +382,11 @@ public sealed class TasksPage : ContentPage
         var priority = await DisplayActionSheetAsync("Priority", "Keep current", null, "Low", "Normal", "High", "Urgent");
         if (priority is null or "Cancel") return;
         if (priority == "Keep current") priority = task.Priority;
-        var dueText = await DisplayPromptAsync("Due date", "YYYY-MM-DD, or leave blank to clear the due date",
-            initialValue: task.DueDate?.ToLocalTime().ToString("yyyy-MM-dd") ?? "", maxLength: 10);
-        DateTime? dueDate = null;
-        var clearDueDate = string.IsNullOrWhiteSpace(dueText);
-        if (!clearDueDate)
-        {
-            if (!DateTime.TryParseExact(dueText.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture,
-                    DateTimeStyles.None, out var parsedDate))
-            {
-                await DisplayAlertAsync("Invalid date", "Enter the due date as YYYY-MM-DD.", "OK");
-                return;
-            }
-            dueDate = DateTime.SpecifyKind(parsedDate.Date.AddHours(23).AddMinutes(59), DateTimeKind.Local).ToUniversalTime();
-        }
+        var duePick = await PickDateTimeAsync("Due date and time",
+            task.DueDate?.ToLocalTime() ?? DateTime.Today.AddHours(17), allowClear: true);
+        if (!duePick.Confirmed) return;
+        DateTime? dueDate = duePick.Value?.ToUniversalTime();
+        var clearDueDate = !dueDate.HasValue;
 
         try
         {
@@ -436,6 +468,8 @@ public sealed class TasksPage : ContentPage
             else
             {
                 await _tasks.RunActionAsync(taskId, action);
+                if (action == "accept")
+                    await ConfigureAcceptedTaskScheduleAsync(taskId);
             }
 
             _status.Text = action switch
@@ -461,6 +495,28 @@ public sealed class TasksPage : ContentPage
         {
             _status.Text = $"Could not {action} that task.";
         }
+    }
+
+    private async Task ConfigureAcceptedTaskScheduleAsync(Guid taskId)
+    {
+        var configure = await DisplayAlertAsync("Task accepted",
+            "Would you like to choose when you'll work on this task?", "Set schedule", "Not now");
+        if (!configure) return;
+
+        var start = await PickDateTimeAsync("Planned start", DateTime.Today.AddHours(9), allowClear: false);
+        if (!start.Confirmed || !start.Value.HasValue) return;
+        var end = await PickDateTimeAsync("Planned end", start.Value.Value.AddHours(1), allowClear: false);
+        if (!end.Confirmed || !end.Value.HasValue) return;
+        if (end.Value <= start.Value)
+        {
+            await DisplayAlertAsync("Invalid schedule", "The planned end must be after the planned start.", "OK");
+            return;
+        }
+
+        await _tasks.SetPlannedTimesAsync(taskId, new PlannedTimesBody(
+            start.Value.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+            end.Value.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+            null));
     }
 
     private async Task ShowHistoryAsync(Guid taskId, string title)
@@ -505,19 +561,10 @@ public sealed class TasksPage : ContentPage
         if (string.IsNullOrWhiteSpace(priority) || priority == "Cancel") return;
 
         var category = await DisplayPromptAsync("Category", "Optional category (for example: Chores, School, Home):", "Next", "Skip", maxLength: 60);
-        var dueText = await DisplayPromptAsync("Due date", "Optional date in YYYY-MM-DD format:", "Next", "Skip", maxLength: 10);
-        DateTime? dueDate = null;
-        if (!string.IsNullOrWhiteSpace(dueText))
-        {
-            if (!DateTime.TryParseExact(dueText.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture,
-                    DateTimeStyles.None, out var parsedDate))
-            {
-                await DisplayAlertAsync("Invalid date", "Enter the due date as YYYY-MM-DD, or leave it blank.", "OK");
-                return;
-            }
-
-            dueDate = DateTime.SpecifyKind(parsedDate.Date.AddHours(23).AddMinutes(59), DateTimeKind.Local).ToUniversalTime();
-        }
+        var duePick = await PickDateTimeAsync("Due date and time",
+            DateTime.Today.AddDays(1).AddHours(17), allowClear: true);
+        if (!duePick.Confirmed) return;
+        DateTime? dueDate = duePick.Value?.ToUniversalTime();
 
         var estimateText = await DisplayPromptAsync("Time estimate", "Estimated minutes (optional):", "Create", "Skip", maxLength: 5, keyboard: Keyboard.Numeric);
         int? estimate = null;
