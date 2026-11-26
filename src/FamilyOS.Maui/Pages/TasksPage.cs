@@ -210,6 +210,7 @@ public sealed class TasksPage : ContentPage
         "Assigned" or "Reassigned" => new[]
         {
             ("accept", "Accept", true),
+            ("decline", "Decline", false),
             ("defer", "Defer", false),
             ("cancel", "Cancel", false)
         },
@@ -217,6 +218,7 @@ public sealed class TasksPage : ContentPage
         {
             ("start", "Start", true),
             ("complete", "Complete", false),
+            ("decline", "Decline", false),
             ("defer", "Defer", false),
             ("skip", "Skip", false),
             ("cancel", "Cancel", false)
@@ -390,29 +392,26 @@ public sealed class TasksPage : ContentPage
     {
         try
         {
-            if (action is "defer" or "skip" or "cancel")
+            if (action is "defer" or "skip" or "cancel" or "decline")
             {
                 var prompt = action switch
                 {
                     "defer" => "Optional note for deferring this task:",
                     "skip" => "Optional note for skipping this instance:",
+                    "decline" => "Why are you declining this task? (optional)",
                     _ => "Optional reason for cancelling:"
                 };
                 var note = await DisplayPromptAsync(action[..1].ToUpper() + action[1..], prompt, "Confirm", "Cancel", maxLength: 200);
                 // null = user cancelled dialog
-                if (note is null && action == "cancel")
+                if (note is null)
                     return;
-                if (note is null && action is "defer" or "skip")
-                {
-                    // Allow empty note via blank confirm is DisplayPrompt returns "" on empty — null means cancel.
-                    return;
-                }
 
                 _ = action switch
                 {
                     "defer" => await _tasks.DeferAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
                     "skip" => await _tasks.SkipAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
                     "cancel" => await _tasks.CancelAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
+                    "decline" => await _tasks.DeclineAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
                     _ => throw new InvalidOperationException()
                 };
             }
@@ -421,7 +420,19 @@ public sealed class TasksPage : ContentPage
                 await _tasks.RunActionAsync(taskId, action);
             }
 
-            _status.Text = $"Task {action}ed.";
+            _status.Text = action switch
+            {
+                "accept" => "Task accepted.",
+                "start" => "Task started.",
+                "pause" => "Task paused.",
+                "resume" => "Task resumed.",
+                "complete" => "Task completed.",
+                "defer" => "Task deferred.",
+                "skip" => "Task instance skipped.",
+                "cancel" => "Task cancelled.",
+                "decline" => "Task declined.",
+                _ => "Task updated."
+            };
             await LoadAsync();
         }
         catch (FamilyApiException ex)
