@@ -19,17 +19,11 @@ public sealed class AvatarCropPage : ContentPage
     private double _pinchStartScale = 1;
     private bool _saving;
 
-    public AvatarCropPage(FileResult file, Func<Stream, string, Task> save)
+    public AvatarCropPage(byte[] sourceBytes, Func<Stream, string, Task> save)
     {
         _save = save;
         Title = "Edit profile photo";
-        using (var input = file.OpenReadAsync().GetAwaiter().GetResult())
-        using (var memory = new MemoryStream())
-        {
-            input.CopyTo(memory);
-            _sourceBytes = memory.ToArray();
-        }
-
+        _sourceBytes = sourceBytes;
         using var decode = new MemoryStream(_sourceBytes);
         _bitmap = SKBitmap.Decode(decode) ?? throw new InvalidOperationException("This image format could not be opened.");
         if (_bitmap.Width < 2 || _bitmap.Height < 2)
@@ -91,7 +85,7 @@ public sealed class AvatarCropPage : ContentPage
             }
         };
         Content = new ScrollView { Content = content };
-        BackgroundColor = (Color)Application.Current!.Resources["BgBase"];
+        BackgroundColor = Colors.Black;
     }
 
     private void OnPanUpdated(object? sender, PanUpdatedEventArgs e)
@@ -166,7 +160,7 @@ public sealed class AvatarCropPage : ContentPage
             using (var canvas = new SKCanvas(output))
             {
                 canvas.Clear(SKColors.White);
-                canvas.DrawBitmap(_bitmap, sourceRect, new SKRect(0, 0, 640, 640), new SKPaint { FilterQuality = SKFilterQuality.High });
+                canvas.DrawBitmap(_bitmap, sourceRect, new SKRect(0, 0, 640, 640), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
                 canvas.Flush();
             }
 
