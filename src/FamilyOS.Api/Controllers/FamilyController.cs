@@ -17,12 +17,14 @@ public class FamilyController : ControllerBase
     private readonly IMediator _mediator;
     private readonly FamilyOsDbContext _db;
     private readonly ICurrentUserService _current;
+    private readonly ILogger<FamilyController> _logger;
 
-    public FamilyController(IMediator mediator, FamilyOsDbContext db, ICurrentUserService current)
+    public FamilyController(IMediator mediator, FamilyOsDbContext db, ICurrentUserService current, ILogger<FamilyController> logger)
     {
         _mediator = mediator;
         _db = db;
         _current = current;
+        _logger = logger;
     }
 
     /// <summary>Onboarding: create a new household. Requires auth but not existing family membership.</summary>
@@ -54,6 +56,8 @@ public class FamilyController : ControllerBase
             return Forbid();
 
         var familyId = _current.FamilyId.Value;
+        var resetOperationId = Guid.NewGuid();
+        _logger.LogWarning("Family reset {ResetOperationId} started. FamilyId={FamilyId}, OwnerUserId={UserId}", resetOperationId, familyId, _current.UserId);
         await using var tx = await _db.Database.BeginTransactionAsync(ct);
         var users = await _db.Users.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ToListAsync(ct);
         foreach (var user in users) user.ClearFamilyAssociation();
@@ -88,8 +92,13 @@ public class FamilyController : ControllerBase
         await _db.Carts.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
         await _db.Notifications.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
         await _db.DeviceRegistrations.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
-        await _db.MealEntries.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
-        await _db.MealPlans.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        var mealEntryCount = await _db.MealEntries.IgnoreQueryFilters().CountAsync(x => x.FamilyId == familyId, ct);
+        _logger.LogWarning("Family reset {ResetOperationId}: deleting {MealEntryCount} MealEntry rows for FamilyId={FamilyId}", resetOperationId, mealEntryCount, familyId);
+        var deletedMealEntries = await _db.MealEntries.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        _logger.LogWarning("Family reset {ResetOperationId}: physically deleted {DeletedMealEntryCount} MealEntry rows", resetOperationId, deletedMealEntries);
+        var mealPlanCount = await _db.MealPlans.IgnoreQueryFilters().CountAsync(x => x.FamilyId == familyId, ct);
+        var deletedMealPlans = await _db.MealPlans.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        _logger.LogWarning("Family reset {ResetOperationId}: physically deleted {DeletedMealPlanCount}/{MealPlanCount} MealPlan rows", resetOperationId, deletedMealPlans, mealPlanCount);
         await _db.Recipes.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
         await _db.Tasks.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
         await _db.Requests.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
@@ -98,6 +107,7 @@ public class FamilyController : ControllerBase
 
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
+        _logger.LogWarning("Family reset {ResetOperationId} committed successfully for FamilyId={FamilyId}", resetOperationId, familyId);
         return NoContent();
     }
 
