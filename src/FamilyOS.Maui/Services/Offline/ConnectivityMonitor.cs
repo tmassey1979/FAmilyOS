@@ -9,14 +9,12 @@ public sealed class ConnectivityMonitor
 {
     private readonly OfflineStore _store;
     private readonly OfflineFlushService _flush;
-    private readonly IDispatcher _dispatcher;
     private int _started;
 
-    public ConnectivityMonitor(OfflineStore store, OfflineFlushService flush, IDispatcher dispatcher)
+    public ConnectivityMonitor(OfflineStore store, OfflineFlushService flush)
     {
         _store = store;
         _flush = flush;
-        _dispatcher = dispatcher;
     }
 
     public void Start()
@@ -36,7 +34,7 @@ public sealed class ConnectivityMonitor
     }
 
     private void OnConnectivityChanged(object? sender, ConnectivityChangedEventArgs e) =>
-        _dispatcher.Dispatch(ApplyCurrent);
+        MainThread.BeginInvokeOnMainThread(ApplyCurrent);
 
     private void ApplyCurrent()
     {
