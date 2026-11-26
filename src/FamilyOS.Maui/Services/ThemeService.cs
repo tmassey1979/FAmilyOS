@@ -42,18 +42,18 @@ public sealed class ThemeService : IThemeService
 
     private static readonly Dictionary<string, Color> Dark = new(StringComparer.Ordinal)
     {
-        ["BgPage"] = Color.FromArgb("#080D1B"),
-        ["BgSurface"] = Color.FromArgb("#111B2E"),
-        ["BgSurfaceAlt"] = Color.FromArgb("#1B2940"),
-        ["BgGlow"] = Color.FromArgb("#102A42"),
-        ["BorderSubtle"] = Color.FromArgb("#30445F"),
-        ["TextPrimary"] = Color.FromArgb("#F3F7FF"),
-        ["TextMuted"] = Color.FromArgb("#9BAFC9"),
-        ["TextOnAccent"] = Color.FromArgb("#081321"),
-        ["AccentPrimary"] = Color.FromArgb("#55E6FF"),
-        ["AccentSecondary"] = Color.FromArgb("#A78BFA"),
-        ["AccentDanger"] = Color.FromArgb("#FF718B"),
-        ["AccentSuccess"] = Color.FromArgb("#53E6B1"),
+        ["BgPage"] = Color.FromArgb("#030712"),
+        ["BgSurface"] = Color.FromArgb("#0A1020"),
+        ["BgSurfaceAlt"] = Color.FromArgb("#0E1A2E"),
+        ["BgGlow"] = Color.FromArgb("#071A2C"),
+        ["BorderSubtle"] = Color.FromArgb("#1B3552"),
+        ["TextPrimary"] = Color.FromArgb("#EAF6FF"),
+        ["TextMuted"] = Color.FromArgb("#8CA7C5"),
+        ["TextOnAccent"] = Color.FromArgb("#04101A"),
+        ["AccentPrimary"] = Color.FromArgb("#45F3FF"),
+        ["AccentSecondary"] = Color.FromArgb("#B18CFF"),
+        ["AccentDanger"] = Color.FromArgb("#FF5D7D"),
+        ["AccentSuccess"] = Color.FromArgb("#47F0B2"),
         ["AccentWarning"] = Color.FromArgb("#FFC66D"),
         ["OverlayScrim"] = Color.FromArgb("#000000B3"),
     };
@@ -64,7 +64,7 @@ public sealed class ThemeService : IThemeService
 
     public ThemeService()
     {
-        var stored = Preferences.Default.Get(PreferenceKey, nameof(AppThemePreference.System));
+        var stored = Preferences.Default.Get(PreferenceKey, nameof(AppThemePreference.Dark));
         Preference = Enum.TryParse<AppThemePreference>(stored, out var p)
             ? p
             : AppThemePreference.System;
