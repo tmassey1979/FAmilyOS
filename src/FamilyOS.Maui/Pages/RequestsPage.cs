@@ -287,14 +287,14 @@ public sealed class RequestsPage : ContentPage
                         var dateTimeGrid = (Grid)field.Control;
                         var pickedDate = (DatePicker)dateTimeGrid.Children[0];
                         var pickedTime = field.Time!;
-                        var dateTime = pickedDate.Date + pickedTime.Time;
+                        var dateTime = pickedDate.Date.GetValueOrDefault(DateTime.Today) + pickedTime.Time.GetValueOrDefault(TimeSpan.Zero);
                         value = dateTime.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture);
                         if (field.Key.Equals("when", StringComparison.OrdinalIgnoreCase)
                             || field.Key.Equals("leave", StringComparison.OrdinalIgnoreCase))
                             neededBy = dateTime.ToUniversalTime();
                         break;
                     case 10:
-                        var date = ((DatePicker)field.Control).Date;
+                        var date = ((DatePicker)field.Control).Date.GetValueOrDefault(DateTime.Today);
                         value = date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
                         if (field.Key.Equals("due", StringComparison.OrdinalIgnoreCase))
                             neededBy = date.ToUniversalTime();
