@@ -322,12 +322,13 @@ public sealed class TasksPage : ContentPage
         var date = new DatePicker { Date = initialValue.Date, Format = "ddd, MMM d, yyyy" };
         var time = new TimePicker { Time = initialValue.TimeOfDay, Format = "h:mm tt" };
         var page = new ContentPage { Title = title, BackgroundColor = Colors.Transparent };
+        var modal = new NavigationPage(page);
         var cancel = new Button { Text = "Cancel" };
         cancel.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
         cancel.Clicked += async (_, _) =>
         {
             completion.TrySetResult((false, null));
-            await Navigation.PopModalAsync();
+            await modal.Navigation.PopModalAsync();
         };
         var save = new Button { Text = "Use this time" };
         save.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
@@ -363,7 +364,7 @@ public sealed class TasksPage : ContentPage
                 buttons
             }
         };
-        await Navigation.PushModalAsync(new NavigationPage(page));
+        await Navigation.PushModalAsync(modal);
         return await completion.Task;
     }
 
