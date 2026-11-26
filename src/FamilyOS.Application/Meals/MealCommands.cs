@@ -138,7 +138,7 @@ public class MealCommandHandlers :
                 var uses = recipeUseCounts[row.RecipeId];
                 var unit = NormalizeShoppingUnit(row.Unit);
                 var key = (row.IngredientId, unit);
-                var quantity = row.Quantity is null ? null : ToBaseShoppingQuantity(row.Quantity.Value, row.Unit) * uses;
+                decimal? quantity = row.Quantity is null ? null : ToBaseShoppingQuantity(row.Quantity.Value, row.Unit) * uses;
                 if (aggregate.TryGetValue(key, out var current))
                     aggregate[key] = (current.Name, current.Quantity is null || quantity is null
                         ? null : current.Quantity.Value + quantity.Value, current.Unit);
