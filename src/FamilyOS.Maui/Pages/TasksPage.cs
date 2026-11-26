@@ -277,9 +277,23 @@ public sealed class TasksPage : ContentPage
         var end = await DisplayPromptAsync("Plan task", "Planned end (24-hour HH:mm, optional)",
             initialValue: task.PlannedEndTime ?? "", maxLength: 5, keyboard: Keyboard.Text);
         if (end is null) return;
+        var estimateText = await DisplayPromptAsync("Time estimate", "Estimated minutes (optional)",
+            initialValue: task.EstimatedDurationMinutes?.ToString(CultureInfo.InvariantCulture) ?? "",
+            maxLength: 5, keyboard: Keyboard.Numeric);
+        if (estimateText is null) return;
 
         start = start.Trim();
         end = end.Trim();
+        int? estimate = task.EstimatedDurationMinutes;
+        if (!string.IsNullOrWhiteSpace(estimateText))
+        {
+            if (!int.TryParse(estimateText, NumberStyles.None, CultureInfo.InvariantCulture, out var minutes) || minutes is < 1 or > 10080)
+            {
+                await DisplayAlertAsync("Invalid estimate", "Enter a whole number from 1 to 10080 minutes, or leave it blank.", "OK");
+                return;
+            }
+            estimate = minutes;
+        }
         if (start.Length > 0 && !TimeOnly.TryParseExact(start, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
         {
             await DisplayAlertAsync("Invalid time", "Use 24-hour time such as 09:30.", "OK");
@@ -302,7 +316,7 @@ public sealed class TasksPage : ContentPage
             await _tasks.SetPlannedTimesAsync(task.Id, new PlannedTimesBody(
                 string.IsNullOrEmpty(start) ? null : start,
                 string.IsNullOrEmpty(end) ? null : end,
-                task.EstimatedDurationMinutes));
+                estimate));
             _status.Text = "Task schedule updated.";
             await LoadAsync();
         }
@@ -324,6 +338,9 @@ public sealed class TasksPage : ContentPage
         if (string.IsNullOrWhiteSpace(title)) return;
         var description = await DisplayPromptAsync("Description", "Task details (optional)", initialValue: task.Description ?? "", maxLength: 1000);
         var category = await DisplayPromptAsync("Category", "Category (optional)", initialValue: task.Category ?? "", maxLength: 60);
+        var priority = await DisplayActionSheetAsync("Priority", "Keep current", null, "Low", "Normal", "High", "Urgent");
+        if (priority is null or "Cancel") return;
+        if (priority == "Keep current") priority = task.Priority;
         var dueText = await DisplayPromptAsync("Due date", "YYYY-MM-DD, or leave blank to clear the due date",
             initialValue: task.DueDate?.ToLocalTime().ToString("yyyy-MM-dd") ?? "", maxLength: 10);
         DateTime? dueDate = null;
@@ -344,6 +361,7 @@ public sealed class TasksPage : ContentPage
             await _tasks.UpdateDetailsAsync(task.Id, new UpdateTaskDetailsBody(
                 Title: title.Trim(),
                 Description: string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+                Priority: priority,
                 Category: string.IsNullOrWhiteSpace(category) ? null : category.Trim(),
                 DueDate: dueDate,
                 ClearDueDate: clearDueDate));
