@@ -542,8 +542,10 @@ public sealed class RequestsPage : ContentPage
         foreach (var action in ActionsFor(request.Status, _showQueue))
         {
             var button = new Button { Text = action.Label, FontSize = 13, Margin = new Thickness(0, 0, 8, 0) };
-            button.SetDynamicResource(VisualElement.StyleProperty,
-                action.Primary ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle");
+            var buttonStyle = action.Name is "deny" or "cancel"
+                ? "FoDangerButtonStyle"
+                : action.Primary ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle";
+            button.SetDynamicResource(VisualElement.StyleProperty, buttonStyle);
             button.Clicked += async (_, _) => await ExecuteAsync(request.Id, action.Name);
             actions.Children.Add(button);
         }
