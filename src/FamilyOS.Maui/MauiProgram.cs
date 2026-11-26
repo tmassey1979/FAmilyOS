@@ -61,6 +61,8 @@ public static class MauiProgram
         builder.Services.AddTransient<DesignSystemGalleryPage>();
         builder.Services.AddTransient<RequestsPage>();
         builder.Services.AddTransient<MealsPage>();
+        builder.Services.AddTransient<RecipesPage>();
+        builder.Services.AddTransient<IngredientsPage>();
         builder.Services.AddTransient<ShoppingPage>();
         builder.Services.AddTransient<RecipeEditorPage>();
         builder.Services.AddTransient<ChatPage>();
