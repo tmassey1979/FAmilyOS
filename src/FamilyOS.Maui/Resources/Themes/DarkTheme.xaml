@@ -3,20 +3,20 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
-    <!-- Midnight interface with cool luminous accents; glow is used sparingly. -->
-    <Color x:Key="BgPage">#080D1B</Color>
-    <Color x:Key="BgSurface">#111B2E</Color>
-    <Color x:Key="BgSurfaceAlt">#1B2940</Color>
-    <Color x:Key="BgGlow">#102A42</Color>
-    <Color x:Key="BorderSubtle">#30445F</Color>
-    <Color x:Key="TextPrimary">#F3F7FF</Color>
-    <Color x:Key="TextMuted">#9BAFC9</Color>
-    <Color x:Key="TextOnAccent">#081321</Color>
-    <Color x:Key="AccentPrimary">#55E6FF</Color>
-    <Color x:Key="AccentSecondary">#A78BFA</Color>
-    <Color x:Key="AccentDanger">#FF718B</Color>
-    <Color x:Key="AccentSuccess">#53E6B1</Color>
+    <!-- Deep-space interface: near-black surfaces, ion-cyan focus, and restrained ultraviolet. -->
+    <Color x:Key="BgPage">#030712</Color>
+    <Color x:Key="BgSurface">#0A1020</Color>
+    <Color x:Key="BgSurfaceAlt">#0E1A2E</Color>
+    <Color x:Key="BgGlow">#071A2C</Color>
+    <Color x:Key="BorderSubtle">#1B3552</Color>
+    <Color x:Key="TextPrimary">#EAF6FF</Color>
+    <Color x:Key="TextMuted">#8CA7C5</Color>
+    <Color x:Key="TextOnAccent">#04101A</Color>
+    <Color x:Key="AccentPrimary">#45F3FF</Color>
+    <Color x:Key="AccentSecondary">#B18CFF</Color>
+    <Color x:Key="AccentDanger">#FF5D7D</Color>
+    <Color x:Key="AccentSuccess">#47F0B2</Color>
     <Color x:Key="AccentWarning">#FFC66D</Color>
-    <Color x:Key="OverlayScrim">#000000B3</Color>
+    <Color x:Key="OverlayScrim">#000000D9</Color>
 
 </ResourceDictionary>
