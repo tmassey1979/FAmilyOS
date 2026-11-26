@@ -578,67 +578,144 @@ public sealed class TasksPage : ContentPage
 
     private async Task CreateTaskAsync()
     {
-        var title = await DisplayPromptAsync("New task", "What needs to get done?", "Next", "Cancel", maxLength: 120);
-        if (string.IsNullOrWhiteSpace(title)) return;
-
-        var description = await DisplayPromptAsync("Task details", "Add instructions or context (optional):", "Next", "Skip", maxLength: 1000);
-        var priority = await DisplayActionSheetAsync("Priority", "Cancel", null, "Low", "Normal", "High", "Urgent");
-        if (string.IsNullOrWhiteSpace(priority) || priority == "Cancel") return;
-
-        var category = await DisplayPromptAsync("Category", "Optional category (for example: Chores, School, Home):", "Next", "Skip", maxLength: 60);
-        var duePick = await PickDateTimeAsync("Due date and time",
-            DateTime.Today.AddDays(1).AddHours(17), allowClear: true);
-        if (!duePick.Confirmed) return;
-        DateTime? dueDate = duePick.Value?.ToUniversalTime();
-
-        var estimateText = await DisplayPromptAsync("Time estimate", "Estimated minutes (optional):", "Create", "Skip", maxLength: 5, keyboard: Keyboard.Numeric);
-        int? estimate = null;
-        if (!string.IsNullOrWhiteSpace(estimateText))
-        {
-            if (!int.TryParse(estimateText, NumberStyles.None, CultureInfo.InvariantCulture, out var minutes) || minutes is < 1 or > 10080)
-            {
-                await DisplayAlertAsync("Invalid estimate", "Enter a whole number from 1 to 10080 minutes, or leave it blank.", "OK");
-                return;
-            }
-
-            estimate = minutes;
-        }
-
-        Guid? assigneeId = null;
         try
         {
             var family = await _family.GetFamilyAsync();
             var members = family.Members.Where(m => m.IsActive).OrderBy(m => m.DisplayName).ToList();
-            if (members.Count > 0)
+
+            var title = new Entry { Placeholder = "Task title", MaxLength = 120 };
+            var description = new Editor { Placeholder = "Instructions or context (optional)", AutoSize = EditorAutoSizeOption.TextChanges, HeightRequest = 88, MaxLength = 1000 };
+            var category = new Entry { Placeholder = "e.g. Chores, School, Home", MaxLength = 60 };
+            var priority = new Picker { Title = "Priority", ItemsSource = new List<string> { "Low", "Normal", "High", "Urgent" }, SelectedIndex = 1 };
+            var assignee = new Picker { Title = "Assign to", ItemsSource = new List<string> { "Leave unassigned" }.Concat(members.Select(m => m.DisplayName)).ToList(), SelectedIndex = 0 };
+            var estimate = new Entry { Placeholder = "Estimated minutes (optional)", Keyboard = Keyboard.Numeric, MaxLength = 5 };
+            var dueEnabled = new Switch { IsToggled = false };
+            var dueDate = new DatePicker { Date = DateTime.Today.AddDays(1), Format = "ddd, MMM d, yyyy" };
+            var dueTime = new TimePicker { Time = new TimeSpan(17, 0, 0), Format = "h:mm tt" };
+            var plannedStartEnabled = new Switch { IsToggled = false };
+            var plannedStartDate = new DatePicker { Date = DateTime.Today, Format = "ddd, MMM d, yyyy" };
+            var plannedStartTime = new TimePicker { Time = new TimeSpan(9, 0, 0), Format = "h:mm tt" };
+            var plannedEndEnabled = new Switch { IsToggled = false };
+            var plannedEndDate = new DatePicker { Date = DateTime.Today, Format = "ddd, MMM d, yyyy" };
+            var plannedEndTime = new TimePicker { Time = new TimeSpan(10, 0, 0), Format = "h:mm tt" };
+
+            static View Field(string label, View control)
             {
-                var memberChoices = members.Select((m, i) => $"{i + 1}. {m.DisplayName} ({m.Role})").ToArray();
-                var choices = new[] { "Leave unassigned" }.Concat(memberChoices).ToArray();
-                var selected = await DisplayActionSheetAsync("Assign to", "Cancel", null, choices);
-                if (selected == "Cancel") return;
-                var selectedIndex = Array.IndexOf(memberChoices, selected);
-                if (selectedIndex >= 0)
-                    assigneeId = members[selectedIndex].Id;
+                var stack = new VerticalStackLayout { Spacing = 4, Children = { new Label { Text = label, FontSize = 12 }, control } };
+                return stack;
+            }
+            static View DateTimeField(string label, Switch enabled, DatePicker date, TimePicker time)
+            {
+                var header = new Grid
+                {
+                    ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+                    Children = { new Label { Text = label, FontAttributes = FontAttributes.Bold, VerticalOptions = LayoutOptions.Center }, enabled }
+                };
+                var controls = new Grid
+                {
+                    ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Star) },
+                    ColumnSpacing = 10,
+                    Children = { date, time }
+                };
+                date.SetBinding(VisualElement.IsEnabledProperty, new Binding(nameof(Switch.IsToggled), source: enabled));
+                time.SetBinding(VisualElement.IsEnabledProperty, new Binding(nameof(Switch.IsToggled), source: enabled));
+                return new VerticalStackLayout { Spacing = 6, Children = { header, controls } };
             }
 
-            await _tasks.CreateTaskAsync(new CreateTaskBody(
-                title.Trim(),
-                Description: string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
-                Priority: priority,
-                Category: string.IsNullOrWhiteSpace(category) ? null : category.Trim(),
-                DueDate: dueDate,
-                EstimatedDurationMinutes: estimate,
-                AssignToMemberId: assigneeId));
-            _status.Text = "Task created.";
-            await LoadAsync();
+            var completion = new TaskCompletionSource<bool>();
+            var page = new ContentPage { Title = "New task" };
+            var cancel = new Button { Text = "Cancel" };
+            cancel.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+            cancel.Clicked += async (_, _) => { completion.TrySetResult(false); await Navigation.PopModalAsync(); };
+            var save = new Button { Text = "Create task" };
+            save.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
+            save.Clicked += async (_, _) =>
+            {
+                if (string.IsNullOrWhiteSpace(title.Text))
+                {
+                    await DisplayAlertAsync("Task title required", "Enter a title for this task.", "OK");
+                    return;
+                }
+                if (!int.TryParse(estimate.Text, NumberStyles.None, CultureInfo.InvariantCulture, out var minutes) && !string.IsNullOrWhiteSpace(estimate.Text))
+                {
+                    await DisplayAlertAsync("Invalid estimate", "Enter a whole number of minutes.", "OK");
+                    return;
+                }
+                if (!string.IsNullOrWhiteSpace(estimate.Text) && minutes is < 1 or > 10080)
+                {
+                    await DisplayAlertAsync("Invalid estimate", "Estimated minutes must be from 1 to 10080.", "OK");
+                    return;
+                }
+                DateTime? startAt = plannedStartEnabled.IsToggled ? plannedStartDate.Date + plannedStartTime.Time : null;
+                DateTime? endAt = plannedEndEnabled.IsToggled ? plannedEndDate.Date + plannedEndTime.Time : null;
+                if (startAt.HasValue != endAt.HasValue)
+                {
+                    await DisplayAlertAsync("Incomplete schedule", "Choose both a planned start and end, or leave both off.", "OK");
+                    return;
+                }
+                if (startAt.HasValue && endAt <= startAt)
+                {
+                    await DisplayAlertAsync("Invalid schedule", "The planned end must be after the planned start.", "OK");
+                    return;
+                }
+
+                var selectedMemberIndex = assignee.SelectedIndex - 1;
+                Guid? assigneeId = selectedMemberIndex >= 0 && selectedMemberIndex < members.Count
+                    ? members[selectedMemberIndex].Id : null;
+                try
+                {
+                    await _tasks.CreateTaskAsync(new CreateTaskBody(
+                        title.Text.Trim(),
+                        Description: string.IsNullOrWhiteSpace(description.Text) ? null : description.Text.Trim(),
+                        Priority: priority.SelectedItem?.ToString() ?? "Normal",
+                        Category: string.IsNullOrWhiteSpace(category.Text) ? null : category.Text.Trim(),
+                        DueDate: dueEnabled.IsToggled ? (dueDate.Date + dueTime.Time).ToUniversalTime() : null,
+                        EstimatedDurationMinutes: string.IsNullOrWhiteSpace(estimate.Text) ? null : minutes,
+                        AssignToMemberId: assigneeId,
+                        PlannedStartTime: startAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+                        PlannedEndTime: endAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)));
+                    completion.TrySetResult(true);
+                    await Navigation.PopModalAsync();
+                }
+                catch (FamilyApiException ex)
+                {
+                    await DisplayAlertAsync("Couldn't create task", ex.Message, "OK");
+                }
+                catch (Exception)
+                {
+                    await DisplayAlertAsync("Couldn't create task", "Please check your connection and try again.", "OK");
+                }
+            };
+
+            var content = new VerticalStackLayout
+            {
+                Padding = 20,
+                Spacing = 14,
+                Children =
+                {
+                    Field("Title", title),
+                    Field("Description", description),
+                    new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Star) }, ColumnSpacing = 10,
+                        Children = { Field("Priority", priority), Field("Category", category) } },
+                    DateTimeField("Due date and time", dueEnabled, dueDate, dueTime),
+                    DateTimeField("Planned start", plannedStartEnabled, plannedStartDate, plannedStartTime),
+                    DateTimeField("Planned end", plannedEndEnabled, plannedEndDate, plannedEndTime),
+                    Field("Estimated duration (minutes)", estimate),
+                    Field("Assign to", assignee),
+                    new HorizontalStackLayout { Spacing = 10, Children = { cancel, save } }
+                }
+            };
+            page.Content = new ScrollView { Content = content };
+            await Navigation.PushModalAsync(new NavigationPage(page));
+            var created = await completion.Task;
+            if (created)
+            {
+                _status.Text = "Task created.";
+                await LoadAsync();
+            }
         }
-        catch (FamilyApiException ex)
-        {
-            _status.Text = ex.Message;
-        }
-        catch (Exception)
-        {
-            _status.Text = "Could not create the task.";
-        }
+        catch (FamilyApiException ex) { _status.Text = ex.Message; }
+        catch (Exception) { _status.Text = "Could not open the new task form."; }
     }
 
     private Button CreateRecurrenceButton()
