@@ -22,6 +22,19 @@ public class MealEntryTests
     }
 
     [Fact]
+    public void Meal_entry_keeps_recipe_reference_when_created_and_updated()
+    {
+        var recipeId = Guid.NewGuid();
+        var entry = MealEntry.Create(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow,
+            MealSlot.Dinner, "Pasta", recipeId: recipeId);
+        entry.RecipeId.Should().Be(recipeId);
+
+        var replacementId = Guid.NewGuid();
+        entry.Update("Tacos", null, null, replacementId);
+        entry.RecipeId.Should().Be(replacementId);
+    }
+
+    [Fact]
     public void Update_rejects_blank_dish()
     {
         var e = MealEntry.Create(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow, MealSlot.Lunch, "Soup");
