@@ -155,7 +155,7 @@ public sealed record RequestTypeOptionDto(Guid Id, string Code, string Name, str
 public sealed record ExecutionPlanDto(Guid Id, Guid RequestId, string Status, List<ExecutionItemDto> Items);
 public sealed record ExecutionItemDto(Guid Id, string Type, string Title, Guid? AssigneeMemberId, bool IsSelected, Guid? ResultingEntityId);
 
-public sealed record RequestHistoryEntryDto(Guid Id, string Status, Guid ActorMemberId, string Detail, DateTime TimestampUtc);
+public sealed record RequestHistoryEntryDto(Guid Id, string Status, Guid ActorMemberId, string ActorName, string Detail, DateTime TimestampUtc);
 public sealed record RequestConditionDto(Guid Id, Guid? RequestId, Guid? TaskId, string Name, string? Description,
     string Type, string Status, string LogicGroup, int GroupOrder, DateTime? DeadlineUtc,
     Guid? SatisfiedByMemberId, DateTime? SatisfiedAtUtc);
