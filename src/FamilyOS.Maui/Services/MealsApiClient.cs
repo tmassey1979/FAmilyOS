@@ -62,9 +62,15 @@ public sealed class MealsApiClient
     public Task<List<RecipeDto>> GetRecipesAsync(CancellationToken ct = default)
         => SendAsync<List<RecipeDto>>(HttpMethod.Get, "api/recipes", null, ct);
 
-    public Task<RecipePageDto> GetRecipesPageAsync(int skip = 0, int take = 24, CancellationToken ct = default)
-        => SendAsync<RecipePageDto>(HttpMethod.Get,
-            $"api/recipes/page?skip={Math.Max(0, skip)}&take={Math.Clamp(take, 1, 48)}", null, ct);
+    public Task<RecipePageDto> GetRecipesPageAsync(int skip = 0, int take = 24, CancellationToken ct = default,
+        string? search = null, string? tag = null, bool favoritesOnly = false)
+    {
+        var path = $"api/recipes/page?skip={Math.Max(0, skip)}&take={Math.Clamp(take, 1, 48)}";
+        if (!string.IsNullOrWhiteSpace(search)) path += $"&q={Uri.EscapeDataString(search.Trim())}";
+        if (!string.IsNullOrWhiteSpace(tag)) path += $"&tag={Uri.EscapeDataString(tag.Trim())}";
+        if (favoritesOnly) path += "&favoritesOnly=true";
+        return SendAsync<RecipePageDto>(HttpMethod.Get, path, null, ct);
+    }
 
     public Task<List<RecipeMemberPreferenceDto>> GetRecipePreferencesAsync(IEnumerable<Guid> recipeIds, CancellationToken ct = default)
     {
