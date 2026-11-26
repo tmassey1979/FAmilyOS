@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace FamilyOS.Application.Meals;
 
 public record RecipeDto(
-    Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions, bool IsBuiltIn = false, List<string>? Tags = null, string? Description = null, string? ImageUrl = null, string? SourceUrl = null, int? PrepMinutes = null, int? CookMinutes = null, string? Cuisine = null, string? Difficulty = null);
+    Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions, bool IsBuiltIn = false, List<string>? Tags = null, string? Description = null, string? ImageUrl = null, string? SourceUrl = null, int? PrepMinutes = null, int? CookMinutes = null, string? Cuisine = null, string? Difficulty = null, List<string>? IngredientNames = null);
 
 public record ListRecipesQuery() : IRequest<List<RecipeDto>>;
 public record GetRecipeQuery(Guid Id) : IRequest<RecipeDto>;
@@ -182,9 +182,16 @@ public class RecipeCommandHandlers :
                              select new { link.RecipeId, tag.Name }).ToListAsync(ct);
         var tagsByRecipe = tagRows.GroupBy(x => x.RecipeId)
             .ToDictionary(g => g.Key, g => g.Select(x => x.Name).OrderBy(x => x).ToList());
+        var ingredientRows = await (from row in _db.RecipeIngredients.AsNoTracking()
+                                    join ingredient in _db.IngredientCatalog.AsNoTracking() on row.IngredientId equals ingredient.Id
+                                    where ids.Contains(row.RecipeId)
+                                    select new { row.RecipeId, ingredient.Name }).ToListAsync(ct);
+        var ingredientsByRecipe = ingredientRows.GroupBy(x => x.RecipeId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Name).Distinct().OrderBy(x => x).ToList());
         return recipes.Select(r => ToDto(r) with
         {
-            Tags = tagsByRecipe.TryGetValue(r.Id, out var tags) ? tags : new List<string>()
+            Tags = tagsByRecipe.TryGetValue(r.Id, out var tags) ? tags : new List<string>(),
+            IngredientNames = ingredientsByRecipe.TryGetValue(r.Id, out var ingredientNames) ? ingredientNames : new List<string>()
         }).ToList();
     }
 
