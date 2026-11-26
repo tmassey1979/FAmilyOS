@@ -102,8 +102,8 @@ public sealed class FamilyApiClient
     {
         var path = $"api/location/history/{memberId:D}";
         var query = new List<string>();
-        if (fromUtc.HasValue) query.Add($"fromUtc={Uri.EscapeDataString(fromUtc.Value.ToString(\"O\"))}");
-        if (toUtc.HasValue) query.Add($"toUtc={Uri.EscapeDataString(toUtc.Value.ToString(\"O\"))}");
+        if (fromUtc.HasValue) query.Add("fromUtc=" + Uri.EscapeDataString(fromUtc.Value.ToString("O")));
+        if (toUtc.HasValue) query.Add("toUtc=" + Uri.EscapeDataString(toUtc.Value.ToString("O")));
         if (query.Count > 0) path += "?" + string.Join("&", query);
         return SendAsync<List<LocationHistoryPointDto>>(HttpMethod.Get, path, null, ct);
     }
@@ -113,8 +113,8 @@ public sealed class FamilyApiClient
     {
         var path = $"api/location/trips/{memberId:D}";
         var query = new List<string>();
-        if (fromUtc.HasValue) query.Add($"fromUtc={Uri.EscapeDataString(fromUtc.Value.ToString(\"O\"))}");
-        if (toUtc.HasValue) query.Add($"toUtc={Uri.EscapeDataString(toUtc.Value.ToString(\"O\"))}");
+        if (fromUtc.HasValue) query.Add("fromUtc=" + Uri.EscapeDataString(fromUtc.Value.ToString("O")));
+        if (toUtc.HasValue) query.Add("toUtc=" + Uri.EscapeDataString(toUtc.Value.ToString("O")));
         if (query.Count > 0) path += "?" + string.Join("&", query);
         return SendAsync<List<LocationTripDto>>(HttpMethod.Get, path, null, ct);
     }
