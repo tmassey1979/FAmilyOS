@@ -25,7 +25,9 @@ public class Recipe : Entity
         string name,
         int servings = 4,
         string? ingredientsCsv = null,
-        string? instructions = null,\n        string? description = null, string? imageUrl = null, string? sourceUrl = null,\n        int? prepMinutes = null, int? cookMinutes = null, string? cuisine = null, string? difficulty = null)
+        string? instructions = null,
+        string? description = null, string? imageUrl = null, string? sourceUrl = null,
+        int? prepMinutes = null, int? cookMinutes = null, string? cuisine = null, string? difficulty = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Recipe name required.", nameof(name));
@@ -49,7 +51,9 @@ public class Recipe : Entity
         };
     }
 
-    public void Update(string name, int servings, string? ingredientsCsv, string? instructions,\n        string? description = null, string? imageUrl = null, string? sourceUrl = null,\n        int? prepMinutes = null, int? cookMinutes = null, string? cuisine = null, string? difficulty = null)
+    public void Update(string name, int servings, string? ingredientsCsv, string? instructions,
+        string? description = null, string? imageUrl = null, string? sourceUrl = null,
+        int? prepMinutes = null, int? cookMinutes = null, string? cuisine = null, string? difficulty = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Recipe name required.", nameof(name));
@@ -60,6 +64,13 @@ public class Recipe : Entity
         Servings = servings;
         IngredientsCsv = NormalizeCsv(ingredientsCsv);
         Instructions = string.IsNullOrWhiteSpace(instructions) ? null : instructions.Trim();
+        Description = Clean(description, 1000);
+        ImageUrl = Clean(imageUrl, 1000);
+        SourceUrl = Clean(sourceUrl, 1000);
+        PrepMinutes = prepMinutes is >= 0 ? prepMinutes : null;
+        CookMinutes = cookMinutes is >= 0 ? cookMinutes : null;
+        Cuisine = Clean(cuisine, 100);
+        Difficulty = Clean(difficulty, 40);
         MarkUpdated();
     }
 
