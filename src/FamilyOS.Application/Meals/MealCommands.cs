@@ -93,12 +93,49 @@ public class MealCommandHandlers :
             .FirstOrDefaultAsync(p => p.FamilyId == _current.FamilyId && p.WeekStartUtc == week, ct);
         if (plan is null) return 0;
 
-        var names = plan.Entries
-            .Where(e => !e.IsDeleted)
-            .SelectMany(e => e.IngredientList())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var plannedEntries = plan.Entries.Where(e => !e.IsDeleted).ToList();
+        var names = plannedEntries.SelectMany(e => e.IngredientList()).ToList();
 
+        var recipeIds = plannedEntries.Where(e => e.RecipeId.HasValue)
+            .Select(e => e.RecipeId!.Value).Distinct().ToArray();
+        if (recipeIds.Length > 0)
+        {
+            var recipeRows = await (from row in _db.RecipeIngredients.AsNoTracking()
+                                    join ingredient in _db.IngredientCatalog.AsNoTracking()
+                                        on row.IngredientId equals ingredient.Id
+                                    where recipeIds.Contains(row.RecipeId)
+                                    select new
+                                    {
+                                        row.RecipeId, row.IngredientId, ingredient.Name,
+                                        row.Quantity, row.Unit
+                                    }).ToListAsync(ct);
+
+            var recipeUseCounts = plannedEntries.Where(e => e.RecipeId.HasValue)
+                .GroupBy(e => e.RecipeId!.Value)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            var aggregate = new Dictionary<(Guid IngredientId, string Unit), (string Name, decimal? Quantity, string Unit)>();
+            foreach (var row in recipeRows)
+            {
+                var uses = recipeUseCounts[row.RecipeId];
+                var unit = NormalizeShoppingUnit(row.Unit);
+                var key = (row.IngredientId, unit);
+                var quantity = row.Quantity is null ? null : row.Quantity.Value * uses;
+                if (aggregate.TryGetValue(key, out var current))
+                    aggregate[key] = (current.Name, current.Quantity is null || quantity is null
+                        ? null : current.Quantity.Value + quantity.Value);
+                else
+                    aggregate[key] = (row.Name, quantity, unit);
+            }
+
+            foreach (var item in aggregate.Values)
+                names.Add(item.Quantity is null
+                    ? item.Name
+                    : $"{FormatShoppingQuantity(item.Quantity.Value)} {item.UnitForDisplay()} {item.Name}".Replace("  ", " ").Trim());
+        }
+
+        names = names.Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (names.Count == 0) return 0;
 
         var existing = await _db.ProcurementItems
@@ -126,6 +163,26 @@ public class MealCommandHandlers :
             await _db.SaveChangesAsync(ct);
         return added;
     }
+
+
+    private static string NormalizeShoppingUnit(string? unit)
+        => string.IsNullOrWhiteSpace(unit) ? "" : unit.Trim().ToLowerInvariant() switch
+        {
+            "tsp" or "teaspoon" or "teaspoons" => "tsp",
+            "tbsp" or "tablespoon" or "tablespoons" => "tbsp",
+            "cup" or "cups" => "cup",
+            "oz" or "ounce" or "ounces" => "oz",
+            "lb" or "lbs" or "pound" or "pounds" => "lb",
+            "g" or "gram" or "grams" => "g",
+            "kg" or "kilogram" or "kilograms" => "kg",
+            "ml" or "milliliter" or "milliliters" => "ml",
+            "l" or "liter" or "liters" => "l",
+            "each" or "ea" or "item" or "items" => "each",
+            var other => other
+        };
+
+    private static string FormatShoppingQuantity(decimal quantity)
+        => quantity.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
 
     private async Task<MealPlan> LoadOrCreateAsync(DateTime weekStart, CancellationToken ct)
     {
