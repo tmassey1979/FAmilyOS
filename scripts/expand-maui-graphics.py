@@ -16,7 +16,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MAUI_RES = ROOT / "src" / "FamilyOS.Maui" / "Resources"
 DATA_DIR = ROOT / "scripts" / "maui-graphics"
-NAVY = (69, 243, 255, 255)  # High-contrast cyan for dark Shell tab bar
+NAVY = (15, 23, 42, 255)
+MENU_ICON = (69, 243, 255, 255)  # High-contrast cyan for dark Shell tab bar
 SIZE = 128
 
 
@@ -61,73 +62,73 @@ def generate_menu_icons() -> int:
 
     # home
     im = blank(); d = ImageDraw.Draw(im)
-    d.polygon([(64, 20), (108, 56), (96, 56), (96, 100), (32, 100), (32, 56), (20, 56)], fill=NAVY)
+    d.polygon([(64, 20), (108, 56), (96, 56), (96, 100), (32, 100), (32, 56), (20, 56)], fill=MENU_ICON)
     save("menu_home.png", im)
 
     # tasks
     im = blank(); d = ImageDraw.Draw(im)
-    d.rounded_rectangle([28, 24, 100, 104], radius=10, outline=NAVY, width=6)
-    d.line([(44, 48), (56, 60), (76, 40)], fill=NAVY, width=6)
-    d.line([(44, 72), (80, 72)], fill=NAVY, width=6)
-    d.line([(44, 88), (70, 88)], fill=NAVY, width=6)
+    d.rounded_rectangle([28, 24, 100, 104], radius=10, outline=MENU_ICON, width=6)
+    d.line([(44, 48), (56, 60), (76, 40)], fill=MENU_ICON, width=6)
+    d.line([(44, 72), (80, 72)], fill=MENU_ICON, width=6)
+    d.line([(44, 88), (70, 88)], fill=MENU_ICON, width=6)
     save("menu_tasks.png", im)
 
     # calendar
     im = blank(); d = ImageDraw.Draw(im)
-    d.rounded_rectangle([28, 32, 100, 104], radius=10, outline=NAVY, width=6)
-    d.rectangle([28, 32, 100, 52], fill=NAVY)
-    d.line([(48, 22), (48, 42)], fill=NAVY, width=6)
-    d.line([(80, 22), (80, 42)], fill=NAVY, width=6)
+    d.rounded_rectangle([28, 32, 100, 104], radius=10, outline=MENU_ICON, width=6)
+    d.rectangle([28, 32, 100, 52], fill=MENU_ICON)
+    d.line([(48, 22), (48, 42)], fill=MENU_ICON, width=6)
+    d.line([(80, 22), (80, 42)], fill=MENU_ICON, width=6)
     for x, y in [(44, 68), (64, 68), (84, 68), (44, 86), (64, 86)]:
-        d.ellipse([x - 4, y - 4, x + 4, y + 4], fill=NAVY)
+        d.ellipse([x - 4, y - 4, x + 4, y + 4], fill=MENU_ICON)
     save("menu_calendar.png", im)
 
     # family
     im = blank(); d = ImageDraw.Draw(im)
-    d.ellipse([44, 24, 84, 64], outline=NAVY, width=6)
-    d.arc([28, 64, 100, 120], 200, 340, fill=NAVY, width=6)
+    d.ellipse([44, 24, 84, 64], outline=MENU_ICON, width=6)
+    d.arc([28, 64, 100, 120], 200, 340, fill=MENU_ICON, width=6)
     save("menu_family.png", im)
 
     # more
     im = blank(); d = ImageDraw.Draw(im)
     for x in (36, 64, 92):
-        d.ellipse([x - 10, 54, x + 10, 74], fill=NAVY)
+        d.ellipse([x - 10, 54, x + 10, 74], fill=MENU_ICON)
     save("menu_more.png", im)
 
     # requests
     im = blank(); d = ImageDraw.Draw(im)
-    d.rounded_rectangle([24, 28, 104, 84], radius=14, outline=NAVY, width=6)
-    d.polygon([(48, 84), (40, 108), (68, 84)], fill=NAVY)
+    d.rounded_rectangle([24, 28, 104, 84], radius=14, outline=MENU_ICON, width=6)
+    d.polygon([(48, 84), (40, 108), (68, 84)], fill=MENU_ICON)
     save("menu_requests.png", im)
 
     # meals
     im = blank(); d = ImageDraw.Draw(im)
-    d.ellipse([28, 40, 100, 100], outline=NAVY, width=6)
-    d.arc([40, 28, 88, 60], 0, 180, fill=NAVY, width=5)
+    d.ellipse([28, 40, 100, 100], outline=MENU_ICON, width=6)
+    d.arc([40, 28, 88, 60], 0, 180, fill=MENU_ICON, width=5)
     save("menu_meals.png", im)
 
     # chat
     im = blank(); d = ImageDraw.Draw(im)
-    d.rounded_rectangle([24, 30, 100, 82], radius=12, outline=NAVY, width=6)
-    d.rounded_rectangle([40, 58, 104, 100], radius=12, outline=NAVY, width=5)
+    d.rounded_rectangle([24, 30, 100, 82], radius=12, outline=MENU_ICON, width=6)
+    d.rounded_rectangle([40, 58, 104, 100], radius=12, outline=MENU_ICON, width=5)
     save("menu_chat.png", im)
 
     # notifications
     im = blank(); d = ImageDraw.Draw(im)
-    d.arc([36, 28, 92, 88], 0, 180, fill=NAVY, width=6)
-    d.line([(36, 70), (92, 70)], fill=NAVY, width=6)
-    d.ellipse([56, 88, 72, 104], outline=NAVY, width=5)
+    d.arc([36, 28, 92, 88], 0, 180, fill=MENU_ICON, width=6)
+    d.line([(36, 70), (92, 70)], fill=MENU_ICON, width=6)
+    d.ellipse([56, 88, 72, 104], outline=MENU_ICON, width=5)
     save("menu_notifications.png", im)
 
     # settings
     im = blank(); d = ImageDraw.Draw(im)
-    d.ellipse([40, 40, 88, 88], outline=NAVY, width=8)
-    d.ellipse([54, 54, 74, 74], fill=NAVY)
+    d.ellipse([40, 40, 88, 88], outline=MENU_ICON, width=8)
+    d.ellipse([54, 54, 74, 74], fill=MENU_ICON)
     for ang in range(0, 360, 45):
         a = math.radians(ang)
         x1, y1 = 64 + 34 * math.cos(a), 64 + 34 * math.sin(a)
         x2, y2 = 64 + 48 * math.cos(a), 64 + 48 * math.sin(a)
-        d.line([(x1, y1), (x2, y2)], fill=NAVY, width=8)
+        d.line([(x1, y1), (x2, y2)], fill=MENU_ICON, width=8)
     save("menu_settings.png", im)
 
     # outcomes
@@ -138,29 +139,29 @@ def generate_menu_icons() -> int:
         pts.append((64 + 40 * math.cos(a), 64 + 40 * math.sin(a)))
         a2 = math.radians(-90 + i * 72 + 36)
         pts.append((64 + 18 * math.cos(a2), 64 + 18 * math.sin(a2)))
-    d.polygon(pts, fill=NAVY)
+    d.polygon(pts, fill=MENU_ICON)
     save("menu_outcomes.png", im)
 
     # gallery
     im = blank(); d = ImageDraw.Draw(im)
-    d.rounded_rectangle([24, 32, 104, 100], radius=10, outline=NAVY, width=6)
-    d.ellipse([40, 48, 60, 68], outline=NAVY, width=4)
-    d.polygon([(48, 92), (72, 60), (100, 92)], fill=NAVY)
+    d.rounded_rectangle([24, 32, 104, 100], radius=10, outline=MENU_ICON, width=6)
+    d.ellipse([40, 48, 60, 68], outline=MENU_ICON, width=4)
+    d.polygon([(48, 92), (72, 60), (100, 92)], fill=MENU_ICON)
     save("menu_gallery.png", im)
 
     # map pin
     im = blank(); d = ImageDraw.Draw(im)
-    d.ellipse([40, 24, 88, 72], outline=NAVY, width=6)
-    d.polygon([(40, 56), (64, 108), (88, 56)], fill=NAVY)
-    d.ellipse([54, 40, 74, 60], fill=NAVY)
+    d.ellipse([40, 24, 88, 72], outline=MENU_ICON, width=6)
+    d.polygon([(40, 56), (64, 108), (88, 56)], fill=MENU_ICON)
+    d.ellipse([54, 40, 74, 60], fill=MENU_ICON)
     save("menu_map.png", im)
 
     # shopping
     im = blank(); d = ImageDraw.Draw(im)
-    d.line([(28, 36), (40, 36), (52, 80), (96, 80)], fill=NAVY, width=6)
-    d.line([(52, 80), (52, 48), (100, 48), (96, 80)], fill=NAVY, width=6)
-    d.ellipse([56, 92, 68, 104], fill=NAVY)
-    d.ellipse([84, 92, 96, 104], fill=NAVY)
+    d.line([(28, 36), (40, 36), (52, 80), (96, 80)], fill=MENU_ICON, width=6)
+    d.line([(52, 80), (52, 48), (100, 48), (96, 80)], fill=MENU_ICON, width=6)
+    d.ellipse([56, 92, 68, 104], fill=MENU_ICON)
+    d.ellipse([84, 92, 96, 104], fill=MENU_ICON)
     save("menu_shopping.png", im)
 
     return written
