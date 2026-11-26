@@ -72,6 +72,8 @@ public class MealCommandHandlers :
         var plan = await LoadOrCreateAsync(week, ct);
         var prior = plan.Entries.FirstOrDefault(e => !e.IsDeleted && e.DayUtc.Date == cmd.DayUtc.Date && e.Slot == slot);
         var entry = plan.UpsertEntry(cmd.DayUtc, slot, cmd.DishName, cmd.Notes, cmd.IngredientsCsv, cmd.RecipeId);
+        if (prior is null)
+            _db.MealEntries.Add(entry);
         _logger.LogInformation(
             "Meal upsert {OperationId} aggregate updated. MealPlanId={MealPlanId}, EntryId={EntryId}, WasExisting={WasExisting}, EntryCount={EntryCount}",
             operationId, plan.Id, entry.Id, prior is not null, plan.Entries.Count);
