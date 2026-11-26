@@ -55,16 +55,16 @@ public class ThemeTokenTests
     [Fact]
     public void FamilyOS_dark_palette_matches_MAUI_semantic_tokens()
     {
-        Assert.Equal(ExpoDarkColors["bg"], MauiDarkSemantic["BgPage"]);
-        Assert.Equal(ExpoDarkColors["surface"], MauiDarkSemantic["BgSurface"]);
-        Assert.Equal(ExpoDarkColors["surfaceAlt"], MauiDarkSemantic["BgSurfaceAlt"]);
-        Assert.Equal(ExpoDarkColors["border"], MauiDarkSemantic["BorderSubtle"]);
-        Assert.Equal(ExpoDarkColors["primary"], MauiDarkSemantic["AccentPrimary"]);
-        Assert.Equal(ExpoDarkColors["text"], MauiDarkSemantic["TextPrimary"]);
-        Assert.Equal(ExpoDarkColors["textMuted"], MauiDarkSemantic["TextMuted"]);
-        Assert.Equal(ExpoDarkColors["danger"], MauiDarkSemantic["AccentDanger"]);
-        Assert.Equal(ExpoDarkColors["success"], MauiDarkSemantic["AccentSuccess"]);
-        Assert.Equal(ExpoDarkColors["warning"], MauiDarkSemantic["AccentWarning"]);
+        Assert.Equal(FamilyOsDarkColors["bg"], MauiDarkSemantic["BgPage"]);
+        Assert.Equal(FamilyOsDarkColors["surface"], MauiDarkSemantic["BgSurface"]);
+        Assert.Equal(FamilyOsDarkColors["surfaceAlt"], MauiDarkSemantic["BgSurfaceAlt"]);
+        Assert.Equal(FamilyOsDarkColors["border"], MauiDarkSemantic["BorderSubtle"]);
+        Assert.Equal(FamilyOsDarkColors["primary"], MauiDarkSemantic["AccentPrimary"]);
+        Assert.Equal(FamilyOsDarkColors["text"], MauiDarkSemantic["TextPrimary"]);
+        Assert.Equal(FamilyOsDarkColors["textMuted"], MauiDarkSemantic["TextMuted"]);
+        Assert.Equal(FamilyOsDarkColors["danger"], MauiDarkSemantic["AccentDanger"]);
+        Assert.Equal(FamilyOsDarkColors["success"], MauiDarkSemantic["AccentSuccess"]);
+        Assert.Equal(FamilyOsDarkColors["warning"], MauiDarkSemantic["AccentWarning"]);
     }
 
     [Fact]
