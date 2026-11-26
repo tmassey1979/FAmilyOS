@@ -47,5 +47,10 @@ public interface IFamilyOsDbContext
     DbSet<MealPlan> MealPlans { get; }
     DbSet<MealEntry> MealEntries { get; }
     DbSet<Recipe> Recipes { get; }
+    DbSet<IngredientCatalogItem> IngredientCatalog { get; }
+    DbSet<RecipeIngredient> RecipeIngredients { get; }
+    DbSet<RecipeTag> RecipeTags { get; }
+    DbSet<RecipeTagLink> RecipeTagLinks { get; }
+    DbSet<RecipeInstructionStep> RecipeInstructionSteps { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
