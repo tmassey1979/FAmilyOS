@@ -36,6 +36,10 @@ public sealed class MealsApiClient
     public Task<List<RecipeDto>> GetRecipesAsync(CancellationToken ct = default)
         => SendAsync<List<RecipeDto>>(HttpMethod.Get, "api/recipes", null, ct);
 
+    public Task<List<IngredientCatalogDto>> SearchIngredientsAsync(string query, int limit = 25, CancellationToken ct = default)
+        => SendAsync<List<IngredientCatalogDto>>(HttpMethod.Get,
+            $"api/ingredients/search?q={Uri.EscapeDataString(query ?? string.Empty)}&limit={Math.Clamp(limit, 1, 50)}", null, ct);
+
     public Task<RecipeDto> CreateRecipeAsync(RecipeWriteDto body, CancellationToken ct = default)
         => SendAsync<RecipeDto>(HttpMethod.Post, "api/recipes", JsonContent(body), ct);
 
@@ -114,8 +118,8 @@ public sealed class MealsApiClient
 public sealed record MealPlanDto(Guid Id, DateTime WeekStartUtc, string? Notes, List<MealEntryDto> Entries);
 public sealed record MealEntryDto(Guid Id, DateTime DayUtc, string Slot, string DishName, string? Notes, string? IngredientsCsv);
 public sealed record MealEntryWriteDto(DateTime DayUtc, string Slot, string DishName, string? Notes = null, string? IngredientsCsv = null, DateTime? WeekStartUtc = null);
-public sealed record RecipeDto(Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions);
+public sealed record RecipeDto(Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions, bool IsBuiltIn = false);
 public sealed record RecipeWriteDto(string Name, int? Servings = 4, string? IngredientsCsv = null, string? Instructions = null);
 public sealed record ApplyRecipeDto(DateTime DayUtc, string Slot, DateTime? WeekStartUtc = null);
 public sealed record RecipeShoppingDto(int? TargetServings = null);
-public sealed record MealShoppingResultDto(int Added, int? TargetServings = null);
+public sealed record MealShoppingResultDto(int Added, int? TargetServings = null);\npublic sealed record IngredientCatalogDto(Guid Id, string Name, string Category, string? AliasesCsv, bool IsBuiltIn);
