@@ -40,7 +40,7 @@ public sealed class IngredientCatalogItem : Entity
     {
         var key = Normalize(query);
         return SearchKey.Contains(key, StringComparison.Ordinal)
-            || (AliasesCsv?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            || (AliasesCsv?.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Any(x => Normalize(x).Contains(key, StringComparison.Ordinal)) ?? false);
     }
 
