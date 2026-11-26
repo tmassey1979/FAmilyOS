@@ -266,9 +266,12 @@ public sealed class SettingsPage : ContentPage
             {
                 var file = choice == "Take photo" ? await MediaPicker.Default.CapturePhotoAsync() : await MediaPicker.Default.PickPhotoAsync();
                 if (file is null) return;
-                await using var stream = await file.OpenReadAsync();
-                var contentType = string.IsNullOrWhiteSpace(file.ContentType) ? "image/jpeg" : file.ContentType;
-                await _me.UploadAvatarAsync(stream, file.FileName ?? "profile.jpg", contentType);
+                await Navigation.PushModalAsync(new AvatarCropPage(file, async (cropped, name) =>
+                {
+                    await _me.UploadAvatarAsync(cropped, name, "image/jpeg");
+                }));
+                await LoadAsync();
+                return;
             }
             _status.Text = "Profile picture updated.";
             await LoadAsync();
