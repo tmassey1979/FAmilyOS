@@ -162,6 +162,18 @@ try
         await DatabaseStartup.RunAsync(migrationDb, migrationLogger, applyMigrations);
     }
 
+    // Keep API documentation available in production during the current rollout.
+    // Set Swagger:Enabled=false (environment variable Swagger__Enabled=false) at launch to disable it.
+    if (app.Configuration.GetValue("Swagger:Enabled", true))
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI(options =>
+        {
+            options.SwaggerEndpoint("/swagger/v1/swagger.json", "FamilyOS API v1");
+            options.RoutePrefix = "swagger";
+        });
+    }
+
     var fwd = new ForwardedHeadersOptions
     {
         ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost
