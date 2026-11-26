@@ -9,14 +9,14 @@ using Microsoft.EntityFrameworkCore;
 namespace FamilyOS.Application.Meals;
 
 public record RecipeDto(
-    Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions, bool IsBuiltIn = false, List<string>? Tags = null);
+    Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions, bool IsBuiltIn = false, List<string>? Tags = null, string? Description = null, string? ImageUrl = null, string? SourceUrl = null, int? PrepMinutes = null, int? CookMinutes = null, string? Cuisine = null, string? Difficulty = null);
 
 public record ListRecipesQuery() : IRequest<List<RecipeDto>>;
 public record GetRecipeQuery(Guid Id) : IRequest<RecipeDto>;
 public record CreateRecipeCommand(
-    string Name, int Servings = 4, string? IngredientsCsv = null, string? Instructions = null) : IRequest<RecipeDto>;
+    string Name, int Servings = 4, string? IngredientsCsv = null, string? Instructions = null, string? Description = null, string? ImageUrl = null, string? SourceUrl = null, int? PrepMinutes = null, int? CookMinutes = null, string? Cuisine = null, string? Difficulty = null) : IRequest<RecipeDto>;
 public record UpdateRecipeCommand(
-    Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions) : IRequest<RecipeDto>;
+    Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions, string? Description = null, string? ImageUrl = null, string? SourceUrl = null, int? PrepMinutes = null, int? CookMinutes = null, string? Cuisine = null, string? Difficulty = null) : IRequest<RecipeDto>;
 public record DeleteRecipeCommand(Guid Id) : IRequest;
 public record ApplyRecipeToMealCommand(
     Guid RecipeId, DateTime DayUtc, string Slot, DateTime? WeekStartUtc = null) : IRequest<MealEntryDto>;
@@ -68,7 +68,7 @@ public class RecipeCommandHandlers :
     {
         await EnsureFamilyAsync(ct);
         var recipe = Recipe.Create(
-            _current.FamilyId!.Value, cmd.Name, cmd.Servings, cmd.IngredientsCsv, cmd.Instructions);
+            _current.FamilyId!.Value, cmd.Name, cmd.Servings, cmd.IngredientsCsv, cmd.Instructions, cmd.Description, cmd.ImageUrl, cmd.SourceUrl, cmd.PrepMinutes, cmd.CookMinutes, cmd.Cuisine, cmd.Difficulty);
         _db.Recipes.Add(recipe);
         await _db.SaveChangesAsync(ct);
         return ToDto(recipe);
@@ -80,7 +80,7 @@ public class RecipeCommandHandlers :
         var recipe = await _db.Recipes
             .FirstOrDefaultAsync(x => x.Id == cmd.Id && x.FamilyId == _current.FamilyId, ct)
             ?? throw new NotFoundException("Recipe", cmd.Id);
-        recipe.Update(cmd.Name, cmd.Servings, cmd.IngredientsCsv, cmd.Instructions);
+        recipe.Update(cmd.Name, cmd.Servings, cmd.IngredientsCsv, cmd.Instructions, cmd.Description, cmd.ImageUrl, cmd.SourceUrl, cmd.PrepMinutes, cmd.CookMinutes, cmd.Cuisine, cmd.Difficulty);
         await _db.SaveChangesAsync(ct);
         return ToDto(recipe);
     }
@@ -196,5 +196,5 @@ public class RecipeCommandHandlers :
     }
 
     private static RecipeDto ToDto(Recipe r) =>
-        new(r.Id, r.Name, r.Servings, r.IngredientsCsv, r.Instructions, r.FamilyId == Guid.Empty);
+        new(r.Id, r.Name, r.Servings, r.IngredientsCsv, r.Instructions, r.FamilyId == Guid.Empty, null, r.Description, r.ImageUrl, r.SourceUrl, r.PrepMinutes, r.CookMinutes, r.Cuisine, r.Difficulty);
 }
