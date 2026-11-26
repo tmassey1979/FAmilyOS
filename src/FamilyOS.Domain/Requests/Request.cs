@@ -76,7 +76,7 @@ public class Request : Entity
 
     public void AskQuestion(Guid askerMemberId, string questionText)
     {
-        if (Status is not (RequestStatus.Submitted or RequestStatus.UnderReview or RequestStatus.WaitingForInformation))
+        if (Status is not (RequestStatus.Submitted or RequestStatus.PendingApproval or RequestStatus.UnderReview or RequestStatus.WaitingForInformation))
             throw new InvalidOperationException($"Cannot ask question in status {Status}.");
 
         var q = RequestQuestionInstance.Create(Id, askerMemberId, questionText);
@@ -107,6 +107,8 @@ public class Request : Entity
 
     public void Approve(Guid approverMemberId, bool conditional = false)
     {
+        if (Status is not (RequestStatus.Submitted or RequestStatus.PendingApproval or RequestStatus.UnderReview or RequestStatus.WaitingForInformation))
+            throw new InvalidOperationException($"Cannot approve request in status {Status}.");
         if (RequesterMemberId == approverMemberId)
             throw new UnauthorizedAccessException("Requester cannot approve their own request.");
 
@@ -118,6 +120,8 @@ public class Request : Entity
 
     public void Deny(Guid approverMemberId, string reason)
     {
+        if (Status is not (RequestStatus.Submitted or RequestStatus.PendingApproval or RequestStatus.UnderReview or RequestStatus.WaitingForInformation))
+            throw new InvalidOperationException($"Cannot deny request in status {Status}.");
         if (RequesterMemberId == approverMemberId)
             throw new UnauthorizedAccessException("Requester cannot deny their own request.");
 
@@ -142,8 +146,8 @@ public class Request : Entity
 
     public void MarkExecutable()
     {
-        if (Status is not (RequestStatus.Approved or RequestStatus.ConditionallyApproved))
-            throw new InvalidOperationException("Request must be approved first.");
+        if (Status != RequestStatus.Approved)
+            throw new InvalidOperationException("All approval conditions must be satisfied before execution.");
         Status = RequestStatus.Executable;
         AddHistory(RequestStatus.Executable, CurrentApproverMemberId ?? Guid.Empty, "Ready for execution");
         MarkUpdated();
@@ -151,6 +155,8 @@ public class Request : Entity
 
     public void LinkExecutionPlan(Guid planId)
     {
+        if (Status is not (RequestStatus.Approved or RequestStatus.Executable))
+            throw new InvalidOperationException("Request must be fully approved before an execution plan can be linked.");
         ExecutionPlanId = planId;
         Status = RequestStatus.InExecution;
         AddHistory(RequestStatus.InExecution, CurrentApproverMemberId ?? Guid.Empty, "Execution plan linked");
