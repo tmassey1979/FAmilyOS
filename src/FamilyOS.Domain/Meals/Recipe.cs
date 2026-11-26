@@ -10,6 +10,13 @@ public class Recipe : Entity
     public int Servings { get; private set; } = 4;
     public string? IngredientsCsv { get; private set; }
     public string? Instructions { get; private set; }
+    public string? Description { get; private set; }
+    public string? ImageUrl { get; private set; }
+    public string? SourceUrl { get; private set; }
+    public int? PrepMinutes { get; private set; }
+    public int? CookMinutes { get; private set; }
+    public string? Cuisine { get; private set; }
+    public string? Difficulty { get; private set; }
 
     private Recipe() { }
 
@@ -18,7 +25,7 @@ public class Recipe : Entity
         string name,
         int servings = 4,
         string? ingredientsCsv = null,
-        string? instructions = null)
+        string? instructions = null,\n        string? description = null, string? imageUrl = null, string? sourceUrl = null,\n        int? prepMinutes = null, int? cookMinutes = null, string? cuisine = null, string? difficulty = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Recipe name required.", nameof(name));
@@ -31,11 +38,18 @@ public class Recipe : Entity
             Name = name.Trim(),
             Servings = servings,
             IngredientsCsv = NormalizeCsv(ingredientsCsv),
-            Instructions = string.IsNullOrWhiteSpace(instructions) ? null : instructions.Trim()
+            Instructions = string.IsNullOrWhiteSpace(instructions) ? null : instructions.Trim(),
+            Description = Clean(description, 1000),
+            ImageUrl = Clean(imageUrl, 1000),
+            SourceUrl = Clean(sourceUrl, 1000),
+            PrepMinutes = prepMinutes is >= 0 ? prepMinutes : null,
+            CookMinutes = cookMinutes is >= 0 ? cookMinutes : null,
+            Cuisine = Clean(cuisine, 100),
+            Difficulty = Clean(difficulty, 40)
         };
     }
 
-    public void Update(string name, int servings, string? ingredientsCsv, string? instructions)
+    public void Update(string name, int servings, string? ingredientsCsv, string? instructions,\n        string? description = null, string? imageUrl = null, string? sourceUrl = null,\n        int? prepMinutes = null, int? cookMinutes = null, string? cuisine = null, string? difficulty = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Recipe name required.", nameof(name));
@@ -99,6 +113,9 @@ public class Recipe : Entity
             : Math.Round(scaled, 2).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
         return string.IsNullOrEmpty(rest) ? qtyStr : $"{qtyStr} {rest}";
     }
+
+    private static string? Clean(string? value, int maxLength)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim()[..Math.Min(value.Trim().Length, maxLength)];
 
     private static string? NormalizeCsv(string? csv)
     {
