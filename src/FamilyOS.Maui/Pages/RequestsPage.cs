@@ -389,6 +389,56 @@ public sealed class RequestsPage : ContentPage
                 .Select(x => x.GetString() ?? string.Empty).Where(x => x.Length > 0).ToArray()
             : Array.Empty<string>();
 
+    private async Task AskQuestionAsync(Guid requestId)
+    {
+        var question = await DisplayPromptAsync("Ask for more information", "What would you like the requester to clarify?",
+            "Send question", "Cancel", maxLength: 1000);
+        if (string.IsNullOrWhiteSpace(question)) return;
+        try
+        {
+            await _api.AskQuestionAsync(requestId, question.Trim());
+            await LoadAsync();
+        }
+        catch (FamilyApiException ex) { _status.Text = ex.Message; }
+        catch (Exception) { _status.Text = "Could not send that question. Try again."; }
+    }
+
+    private async Task ShowHistoryAsync(Guid requestId, string requestTitle)
+    {
+        try
+        {
+            var history = await _api.GetHistoryAsync(requestId);
+            var content = new VerticalStackLayout { Padding = 20, Spacing = 12 };
+            var heading = new Label { Text = "Request history", FontSize = 23, FontAttributes = FontAttributes.Bold };
+            heading.SetDynamicResource(VisualElement.StyleProperty, "TextDisplay");
+            content.Children.Add(heading);
+            content.Children.Add(new Label { Text = requestTitle, FontSize = 15, FontAttributes = FontAttributes.Bold });
+            if (history.Count == 0)
+                content.Children.Add(new Label { Text = "No history has been recorded yet." });
+            foreach (var entry in history.OrderByDescending(x => x.TimestampUtc))
+            {
+                var detail = new Label { Text = entry.Detail, FontSize = 14 };
+                detail.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
+                var meta = new Label { Text = $"{entry.Status}  ·  {entry.TimestampUtc.ToLocalTime():MMM d, yyyy h:mm tt}", FontSize = 12 };
+                meta.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+                var row = new VerticalStackLayout { Spacing = 4, Children = { detail, meta } };
+                var card = new Border { Padding = 12, Content = row };
+                card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
+                content.Children.Add(card);
+            }
+            var close = new Button { Text = "Close" };
+            close.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
+            close.Clicked += async (_, _) => await Navigation.PopModalAsync();
+            content.Children.Add(close);
+            await Navigation.PushModalAsync(new NavigationPage(new ContentPage
+            {
+                Title = "History", Content = new ScrollView { Content = content }
+            }));
+        }
+        catch (FamilyApiException ex) { _status.Text = ex.Message; }
+        catch (Exception) { _status.Text = "Could not load request history. Try again."; }
+    }
+
     private async Task AnswerQuestionAsync(Guid requestId, Guid questionId, string prompt)
     {
         var answer = await DisplayPromptAsync("Request information", prompt, "Send answer", "Cancel",
@@ -449,6 +499,14 @@ public sealed class RequestsPage : ContentPage
             }
         }
 
+        if (_showQueue && request.Status is "Submitted" or "PendingApproval" or "UnderReview" or "WaitingForInformation")
+        {
+            var askButton = new Button { Text = "Ask a question", FontSize = 13, HorizontalOptions = LayoutOptions.Start };
+            askButton.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+            askButton.Clicked += async (_, _) => await AskQuestionAsync(request.Id);
+            stack.Children.Add(askButton);
+        }
+
         var actions = new FlexLayout { Wrap = FlexWrap.Wrap, Direction = FlexDirection.Row };
         foreach (var action in ActionsFor(request.Status, _showQueue))
         {
@@ -459,6 +517,11 @@ public sealed class RequestsPage : ContentPage
             actions.Children.Add(button);
         }
         if (actions.Children.Count > 0) stack.Children.Add(actions);
+
+        var historyButton = new Button { Text = "View history", FontSize = 13, HorizontalOptions = LayoutOptions.Start };
+        historyButton.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+        historyButton.Clicked += async (_, _) => await ShowHistoryAsync(request.Id, request.Title);
+        stack.Children.Add(historyButton);
 
         if (request.ExecutionPlanId.HasValue)
         {
