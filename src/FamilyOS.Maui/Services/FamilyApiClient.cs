@@ -19,58 +19,53 @@ public sealed class FamilyApiClient
         _auth = auth;
     }
 
+    public async Task<FamilyDto> GetMyFamilyAsync(CancellationToken ct = default)
+        => await GetFamilyAsync(ct);
+
     public async Task<List<FamilyInviteDto>> GetInvitesAsync(CancellationToken ct = default)
         => await SendAsync<List<FamilyInviteDto>>(HttpMethod.Get, "api/invites", null, ct);
 
-    public async Task<FamilyInviteDto> CreateInviteAsync(string role, string? emailHint, CancellationToken ct = default)
+    public async Task<FamilyInviteDto> CreateInviteAsync(string role, string? emailHint = null, CancellationToken ct = default)
         => await SendAsync<FamilyInviteDto>(HttpMethod.Post, "api/invites",
-            JsonContent.Create(new { role, emailHint, validDays = 14 }, options: JsonOptions), ct);
+            JsonContent.Create(new { role, emailHint }, options: JsonOptions), ct);
 
-    public async Task RevokeInviteAsync(Guid inviteId, CancellationToken ct = default)
-        => await SendNoContentAsync(HttpMethod.Post, $"api/invites/{inviteId:D}/revoke", null, ct);
+    public Task UpdateHouseholdAsync(string? name, string? timeZone, string? currency, CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Put, "api/family", JsonContent.Create(new { name, timeZone, currency }, options: JsonOptions), ct);
 
-    public Task ChangeMemberRoleAsync(Guid memberId, string role, CancellationToken ct = default)
+    public Task UpdateMemberRoleAsync(Guid memberId, string role, CancellationToken ct = default)
         => SendNoContentAsync(HttpMethod.Put, $"api/family/members/{memberId:D}/role",
             JsonContent.Create(new { role }, options: JsonOptions), ct);
 
-    public Task DeactivateMemberAsync(Guid memberId, CancellationToken ct = default)
+    public Task RemoveMemberAsync(Guid memberId, CancellationToken ct = default)
         => SendNoContentAsync(HttpMethod.Delete, $"api/family/members/{memberId:D}", null, ct);
 
-    public Task UpdateFamilyAsync(string name, string? timeZone, string? currency, CancellationToken ct = default)
-        => SendNoContentAsync(HttpMethod.Put, "api/family",
-            JsonContent.Create(new { name, timeZone, currency }, options: JsonOptions), ct);
-
-    public Task<List<CheckInDto>> GetCheckInsAsync(bool includeCompleted = true, CancellationToken ct = default)
+    public Task<List<CheckInDto>> GetCheckInsAsync(bool includeCompleted = false, CancellationToken ct = default)
         => SendAsync<List<CheckInDto>>(HttpMethod.Get, $"api/checkins?includeCompleted={includeCompleted.ToString().ToLowerInvariant()}", null, ct);
 
-    public Task<CheckInDto> CreateCheckInAsync(Guid targetMemberId, DateTimeOffset dueAtUtc, CancellationToken ct = default)
+    public Task<CheckInDto> RequestCheckInAsync(Guid targetMemberId, int dueInMinutes = 30, CancellationToken ct = default)
         => SendAsync<CheckInDto>(HttpMethod.Post, "api/checkins",
-            JsonContent.Create(new { targetMemberId, dueAtUtc }, options: JsonOptions), ct);
+            JsonContent.Create(new { targetMemberId, dueInMinutes }, options: JsonOptions), ct);
 
-    public Task RespondToCheckInAsync(Guid id, string? message = null, CancellationToken ct = default)
-        => SendNoContentAsync(HttpMethod.Post, $"api/checkins/{id:D}/respond",
+    public Task RespondToCheckInAsync(Guid checkInId, string? message = null, CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Post, $"api/checkins/{checkInId:D}/respond",
             JsonContent.Create(new { message }, options: JsonOptions), ct);
 
-    public Task CancelCheckInAsync(Guid id, CancellationToken ct = default)
-        => SendNoContentAsync(HttpMethod.Post, $"api/checkins/{id:D}/cancel", null, ct);
-
-    public Task<SosResultDto> SendSosAsync(string? message, double? latitude, double? longitude, CancellationToken ct = default)
+    public Task<SosResultDto> TriggerSosAsync(double? latitude = null, double? longitude = null, double? accuracyMeters = null, CancellationToken ct = default)
         => SendAsync<SosResultDto>(HttpMethod.Post, "api/location/sos", JsonContent.Create(new
         {
-            Message = message,
-            IncludeLocation = latitude.HasValue && longitude.HasValue,
-            Latitude = latitude,
-            Longitude = longitude
-        }), ct);
+            latitude,
+            longitude,
+            accuracyMeters
+        }, options: JsonOptions), ct);
 
     public Task<BatteryConsentDto> GetBatteryConsentAsync(CancellationToken ct = default)
         => SendAsync<BatteryConsentDto>(HttpMethod.Get, "api/location/battery/consent", null, ct);
 
-    public Task<BatteryConsentDto> SetBatterySharingAsync(bool enabled, CancellationToken ct = default)
+    public Task<BatteryConsentDto> SetBatteryConsentAsync(bool enabled, CancellationToken ct = default)
         => SendAsync<BatteryConsentDto>(HttpMethod.Put, "api/location/battery/consent", JsonContent.Create(new { enabled }, options: JsonOptions), ct);
 
-    public Task ShareBatteryStatusAsync(int percent, bool charging, CancellationToken ct = default)
-        => SendNoContentAsync(HttpMethod.Post, "api/location/battery/current", JsonContent.Create(new { batteryPercent = percent, isCharging = charging }, options: JsonOptions), ct);
+    public Task ReportBatteryAsync(int batteryPercent, bool isCharging, CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Post, "api/location/battery", JsonContent.Create(new { batteryPercent, isCharging }, options: JsonOptions), ct);
 
     public Task<List<FamilyBatteryDto>> GetFamilyBatteryAsync(CancellationToken ct = default)
         => SendAsync<List<FamilyBatteryDto>>(HttpMethod.Get, "api/location/battery/family", null, ct);
@@ -78,13 +73,12 @@ public sealed class FamilyApiClient
     public Task<LocationConsentDto> GetLocationConsentAsync(CancellationToken ct = default)
         => SendAsync<LocationConsentDto>(HttpMethod.Get, "api/location/consent", null, ct);
 
-    public Task<LocationConsentDto> SetLocationSharingAsync(bool enabled, CancellationToken ct = default)
+    public Task<LocationConsentDto> SetLocationConsentAsync(bool enabled, CancellationToken ct = default)
         => SendAsync<LocationConsentDto>(HttpMethod.Put, "api/location/consent",
             JsonContent.Create(new { enabled }, options: JsonOptions), ct);
 
-    public Task ShareLocationAsync(double latitude, double longitude, double accuracyMeters, DateTime measuredAtUtc, CancellationToken ct = default)
-        => SendNoContentAsync(HttpMethod.Post, "api/location/current",
-            JsonContent.Create(new { latitude, longitude, accuracyMeters, measuredAtUtc }, options: JsonOptions), ct);
+    public Task ReportLocationAsync(double latitude, double longitude, double? accuracyMeters = null, CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Post, "api/location", JsonContent.Create(new { latitude, longitude, accuracyMeters }, options: JsonOptions), ct);
 
     public Task<List<FamilyLocationDto>> GetFamilyLocationsAsync(CancellationToken ct = default)
         => SendAsync<List<FamilyLocationDto>>(HttpMethod.Get, "api/location/family", null, ct);
@@ -92,9 +86,9 @@ public sealed class FamilyApiClient
     public Task<List<LocationViewerDto>> GetLocationViewersAsync(CancellationToken ct = default)
         => SendAsync<List<LocationViewerDto>>(HttpMethod.Get, "api/location/viewers", null, ct);
 
-    public Task SetLocationViewerAsync(Guid viewerMemberId, bool enabled, CancellationToken ct = default)
-        => SendNoContentAsync(HttpMethod.Put, $"api/location/viewers/{viewerMemberId:D}",
-            JsonContent.Create(new { enabled }, options: JsonOptions), ct);
+    public Task SetLocationViewerAsync(Guid memberId, bool canView, CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Put, $"api/location/viewers/{memberId:D}",
+            JsonContent.Create(new { canView }, options: JsonOptions), ct);
 
     public Task<LocationHistoryConsentDto> GetLocationHistoryConsentAsync(CancellationToken ct = default)
         => SendAsync<LocationHistoryConsentDto>(HttpMethod.Get, "api/location/history/consent", null, ct);
@@ -136,69 +130,62 @@ public sealed class FamilyApiClient
         => SendAsync<SavedPlaceDto>(HttpMethod.Post, "api/location/places",
             JsonContent.Create(new { name, latitude, longitude, radiusMeters, alertOnArrival, alertOnDeparture }, options: JsonOptions), ct);
 
-    public Task UpdateSavedPlaceAsync(Guid placeId, string name, double latitude, double longitude,
-        double radiusMeters, bool alertOnArrival, bool alertOnDeparture, CancellationToken ct = default)
-        => SendNoContentAsync(HttpMethod.Put, $"api/location/places/{placeId:D}",
-            JsonContent.Create(new { name, latitude, longitude, radiusMeters, alertOnArrival, alertOnDeparture }, options: JsonOptions), ct);
-
     public Task DeleteSavedPlaceAsync(Guid placeId, CancellationToken ct = default)
         => SendNoContentAsync(HttpMethod.Delete, $"api/location/places/{placeId:D}", null, ct);
 
     private async Task<T> SendAsync<T>(HttpMethod method, string path, HttpContent? content, CancellationToken ct)
     {
-        var token = await _auth.GetAccessTokenAsync(ct);
-        if (string.IsNullOrWhiteSpace(token))
-            throw new FamilyApiException(HttpStatusCode.Unauthorized, "Sign in to manage family invitations.");
-        using var request = new HttpRequestMessage(method, new Uri(ApiBaseUri, path)) { Content = content };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        request.Headers.Accept.ParseAdd("application/json");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        using var request = new HttpRequestMessage(method, new Uri(ApiBaseUri, path));
+        if (content is not null) request.Content = content;
+        await ApplyAuthAsync(request, timeout.Token);
         using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
         if (!response.IsSuccessStatusCode)
-            throw new FamilyApiException(response.StatusCode, response.StatusCode switch
-            {
-                HttpStatusCode.Unauthorized => "Your session has expired. Sign in again.",
-                HttpStatusCode.Forbidden => "Only household adults can manage invitations.",
-                _ => $"FamilyOS could not complete that action (HTTP {(int)response.StatusCode})."
-            });
+        {
+            var body = await response.Content.ReadAsStringAsync(timeout.Token);
+            throw new FamilyApiException(response.StatusCode, string.IsNullOrWhiteSpace(body) ? response.ReasonPhrase ?? "Request failed" : body);
+        }
         await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
         return await JsonSerializer.DeserializeAsync<T>(stream, JsonOptions, timeout.Token)
-            ?? throw new InvalidOperationException("The FamilyOS API returned an empty response.");
+            ?? throw new InvalidOperationException("Empty API response.");
     }
 
     private async Task SendNoContentAsync(HttpMethod method, string path, HttpContent? content, CancellationToken ct)
     {
-        var token = await _auth.GetAccessTokenAsync(ct);
-        if (string.IsNullOrWhiteSpace(token))
-            throw new FamilyApiException(HttpStatusCode.Unauthorized, "Sign in to manage family invitations.");
-        using var request = new HttpRequestMessage(method, new Uri(ApiBaseUri, path)) { Content = content };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        using var request = new HttpRequestMessage(method, new Uri(ApiBaseUri, path));
+        if (content is not null) request.Content = content;
+        await ApplyAuthAsync(request, timeout.Token);
         using var response = await _http.SendAsync(request, timeout.Token);
         if (!response.IsSuccessStatusCode)
-            throw new FamilyApiException(response.StatusCode, $"FamilyOS could not complete that request (HTTP {(int)response.StatusCode}).");
+        {
+            var body = await response.Content.ReadAsStringAsync(timeout.Token);
+            throw new FamilyApiException(response.StatusCode, string.IsNullOrWhiteSpace(body) ? response.ReasonPhrase ?? "Request failed" : body);
+        }
     }
 
-    public async Task<FamilyDto> GetFamilyAsync(CancellationToken ct = default)
+    private async Task ApplyAuthAsync(HttpRequestMessage request, CancellationToken ct)
     {
         var token = await _auth.GetAccessTokenAsync(ct);
-        if (string.IsNullOrWhiteSpace(token))
-            throw new FamilyApiException(HttpStatusCode.Unauthorized, "Sign in to view your family.");
+        if (!string.IsNullOrWhiteSpace(token))
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+    }
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(ApiBaseUri, "api/family"));
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        request.Headers.Accept.ParseAdd("application/json");
+    private async Task<FamilyDto> GetFamilyAsync(CancellationToken ct)
+    {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(ApiBaseUri, "api/family"));
+        await ApplyAuthAsync(request, timeout.Token);
         using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
         if (!response.IsSuccessStatusCode)
         {
             var message = response.StatusCode switch
             {
-                HttpStatusCode.Unauthorized => "Your session has expired. Sign in again.",
-                HttpStatusCode.Forbidden => "Your account is not currently linked to a family.",
+                HttpStatusCode.Unauthorized => "Sign in to view your family.",
+                HttpStatusCode.Forbidden => "You are not currently linked to a family.",
                 HttpStatusCode.NotFound => "Your family could not be found.",
                 _ => $"FamilyOS could not load your family (HTTP {(int)response.StatusCode})."
             };
