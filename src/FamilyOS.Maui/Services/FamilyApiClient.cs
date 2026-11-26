@@ -43,17 +43,32 @@ public sealed class FamilyApiClient
         => SendNoContentAsync(HttpMethod.Delete, $"api/family/members/{memberId:D}", null, ct);
 
     // Aliases used by pages / background services
-    public Task SetLocationSharingAsync(bool enabled, CancellationToken ct = default)
+    public Task<LocationConsentDto> SetLocationSharingAsync(bool enabled, CancellationToken ct = default)
         => SetLocationConsentAsync(enabled, ct);
 
-    public Task SetBatterySharingAsync(bool enabled, CancellationToken ct = default)
+    public Task<BatteryConsentDto> SetBatterySharingAsync(bool enabled, CancellationToken ct = default)
         => SetBatteryConsentAsync(enabled, ct);
 
     public Task ShareBatteryStatusAsync(int batteryPercent, bool isCharging, CancellationToken ct = default)
         => ReportBatteryAsync(batteryPercent, isCharging, ct);
 
+    public Task ShareLocationAsync(double latitude, double longitude, double accuracyMeters, DateTime recordedAtUtc, CancellationToken ct = default)
+        => ReportLocationAsync(latitude, longitude, accuracyMeters, ct);
+
+    public Task<SosResultDto> SendSosAsync(string? message, double? latitude = null, double? longitude = null, CancellationToken ct = default)
+        => TriggerSosAsync(latitude, longitude, null, ct);
+
+    public Task CancelCheckInAsync(Guid checkInId, CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Post, $"api/checkins/{checkInId:D}/cancel", null, ct);
+
     public Task<CheckInDto> CreateCheckInAsync(Guid targetMemberId, int dueInMinutes = 30, CancellationToken ct = default)
         => RequestCheckInAsync(targetMemberId, dueInMinutes, ct);
+
+    public Task<CheckInDto> CreateCheckInAsync(Guid targetMemberId, DateTimeOffset dueAtUtc, CancellationToken ct = default)
+    {
+        var minutes = Math.Max(1, (int)Math.Ceiling((dueAtUtc - DateTimeOffset.UtcNow).TotalMinutes));
+        return RequestCheckInAsync(targetMemberId, minutes, ct);
+    }
 
     public Task<List<CheckInDto>> GetCheckInsAsync(bool includeCompleted = false, CancellationToken ct = default)
         => SendAsync<List<CheckInDto>>(HttpMethod.Get, $"api/checkins?includeCompleted={includeCompleted.ToString().ToLowerInvariant()}", null, ct);
