@@ -254,15 +254,40 @@ try
         Results.Ok(new { changed = await mediator.Send(new TriggerGoogleCalendarSyncCommand(), ct) }))
         .RequireAuthorization(FamilyAuthPolicies.FamilyMember);
 
-    app.MapGet("/api/integrations/google/callback", async (string? code, string? state, string? error, IMediator mediator, ICurrentUserService current, CancellationToken ct) =>
+    app.MapGet("/api/integrations/google/callback", async (
+        string? code,
+        string? state,
+        string? error,
+        IMediator mediator,
+        Microsoft.AspNetCore.DataProtection.IDataProtectionProvider dataProtectionProvider,
+        CancellationToken ct) =>
     {
         if (!string.IsNullOrWhiteSpace(error))
             return Results.BadRequest(new { error });
         if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(state))
             return Results.BadRequest(new { error = "missing code or state" });
-        await current.EnsureLoadedAsync(ct);
-        var memberId = current.MemberId ?? Guid.Empty;
-        var familyId = current.FamilyId ?? Guid.Empty;
+
+        Guid memberId;
+        Guid familyId;
+        try
+        {
+            var protector = dataProtectionProvider.CreateProtector("FamilyOS.GoogleCalendar.OAuthState.v1");
+            var parts = protector.Unprotect(state).Split('|');
+            if (parts.Length != 4
+                || !Guid.TryParseExact(parts[0], "N", out memberId)
+                || !Guid.TryParseExact(parts[1], "N", out familyId)
+                || !long.TryParse(parts[2], out var issuedAt))
+                return Results.BadRequest(new { error = "invalid OAuth state" });
+
+            var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            if (issuedAt > now + 60 || now - issuedAt > 600)
+                return Results.BadRequest(new { error = "OAuth state expired" });
+        }
+        catch (System.Security.Cryptography.CryptographicException)
+        {
+            return Results.BadRequest(new { error = "invalid OAuth state" });
+        }
+
         var status = await mediator.Send(new CompleteGoogleCalendarOAuthCommand(code, memberId, familyId), ct);
         return Results.Ok(new { ok = true, status });
     }).AllowAnonymous();
