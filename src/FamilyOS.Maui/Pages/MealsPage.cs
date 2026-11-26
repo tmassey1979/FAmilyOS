@@ -202,7 +202,7 @@ public sealed class MealsPage : ContentPage
         {
             await _api.UpsertEntryAsync(new MealEntryWriteDto(
                 DateTime.SpecifyKind(day.Date, DateTimeKind.Utc), slot, dish.Trim(),
-                existing?.Notes, string.IsNullOrWhiteSpace(ingredients) ? null : ingredients.Trim(), _weekStart));
+                existing?.Notes, string.IsNullOrWhiteSpace(ingredients) ? null : ingredients.Trim(), _weekStart, existing?.RecipeId));
             await LoadAsync();
         }
         catch (Exception ex)
