@@ -178,19 +178,11 @@ public sealed class CalendarPage : ContentPage
     {
         var title = await DisplayPromptAsync("New event", "Event title");
         if (string.IsNullOrWhiteSpace(title)) return;
-        var startInput = await DisplayPromptAsync("Start time", "Use local time: YYYY-MM-DD HH:MM", "Continue", "Cancel",
-            _rangeStart.AddHours(18).ToString("yyyy-MM-dd HH:mm"), 16, Keyboard.Text);
-        if (string.IsNullOrWhiteSpace(startInput)) return;
-        if (!DateTime.TryParseExact(startInput.Trim(), "yyyy-MM-dd HH:mm",
-                System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.None, out var localStart))
-        {
-            await DisplayAlertAsync("Invalid date", "Enter the start as YYYY-MM-DD HH:MM.", "OK");
-            return;
-        }
+        var pickedStart = await PickEventDateTimeAsync("Event start", _rangeStart.AddHours(18));
+        if (!pickedStart.HasValue) return;
         var location = await DisplayPromptAsync("Location", "Optional location", "Save", "Skip", maxLength: 160);
-        var body = new CalendarEventWriteDto(title.Trim(), DateTime.SpecifyKind(localStart, DateTimeKind.Local).ToUniversalTime(),
-            DateTime.SpecifyKind(localStart.AddHours(1), DateTimeKind.Local).ToUniversalTime(), false,
+        var start = pickedStart.Value.ToUniversalTime();
+        var body = new CalendarEventWriteDto(title.Trim(), start, start.AddHours(1), false,
             string.IsNullOrWhiteSpace(location) ? null : location.Trim());
         await SaveAsync(() => _calendar.CreateAsync(body), "Event created.");
     }
@@ -199,24 +191,46 @@ public sealed class CalendarPage : ContentPage
     {
         var title = await DisplayPromptAsync("Edit event", "Event title", initialValue: item.Title, maxLength: 160);
         if (string.IsNullOrWhiteSpace(title)) return;
-        var localStart = item.StartUtc.ToLocalTime();
-        var input = await DisplayPromptAsync("Start time", "Use local time: YYYY-MM-DD HH:MM",
-            initialValue: localStart.ToString("yyyy-MM-dd HH:mm"), maxLength: 16, keyboard: Keyboard.Text);
-        if (string.IsNullOrWhiteSpace(input)) return;
-        if (!DateTime.TryParseExact(input.Trim(), "yyyy-MM-dd HH:mm",
-                System.Globalization.CultureInfo.InvariantCulture,
-                System.Globalization.DateTimeStyles.None, out var parsed))
-        {
-            await DisplayAlertAsync("Invalid date", "Enter the start as YYYY-MM-DD HH:MM.", "OK");
-            return;
-        }
+        var pickedStart = await PickEventDateTimeAsync("Event start", item.StartUtc.ToLocalTime());
+        if (!pickedStart.HasValue) return;
         var location = await DisplayPromptAsync("Location", "Optional location", initialValue: item.Location ?? "", maxLength: 160);
-        var start = DateTime.SpecifyKind(parsed, DateTimeKind.Local).ToUniversalTime();
+        var start = pickedStart.Value.ToUniversalTime();
         var duration = item.EndUtc is null ? TimeSpan.FromHours(1) : item.EndUtc.Value - item.StartUtc;
         if (duration <= TimeSpan.Zero) duration = TimeSpan.FromHours(1);
         var body = new CalendarEventWriteDto(title.Trim(), start, start.Add(duration), item.AllDay,
             string.IsNullOrWhiteSpace(location) ? null : location.Trim());
         await SaveAsync(() => _calendar.UpdateAsync(item.Id, body), "Event updated.");
+    }
+
+    private async Task<DateTime?> PickEventDateTimeAsync(string title, DateTime initialValue)
+    {
+        var completion = new TaskCompletionSource<DateTime?>();
+        var date = new DatePicker { Date = initialValue.Date, Format = "ddd, MMM d, yyyy" };
+        var time = new TimePicker { Time = initialValue.TimeOfDay, Format = "h:mm tt" };
+        var page = new ContentPage { Title = title };
+        var cancel = new Button { Text = "Cancel" };
+        cancel.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+        cancel.Clicked += async (_, _) => { completion.TrySetResult(null); await Navigation.PopModalAsync(); };
+        var save = new Button { Text = "Use this time" };
+        save.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
+        save.Clicked += async (_, _) =>
+        {
+            completion.TrySetResult(date.Date.Date + time.Time);
+            await Navigation.PopModalAsync();
+        };
+        page.Content = new VerticalStackLayout
+        {
+            Padding = 24, Spacing = 16, VerticalOptions = LayoutOptions.Center,
+            Children =
+            {
+                new Label { Text = title, FontSize = 20, FontAttributes = FontAttributes.Bold },
+                new Label { Text = "Date" }, date,
+                new Label { Text = "Time" }, time,
+                new HorizontalStackLayout { Spacing = 10, Children = { cancel, save } }
+            }
+        };
+        await Navigation.PushModalAsync(new NavigationPage(page));
+        return await completion.Task;
     }
 
     private async Task CancelEventAsync(CalendarEventDto item)
