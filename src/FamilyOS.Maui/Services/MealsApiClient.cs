@@ -62,6 +62,10 @@ public sealed class MealsApiClient
     public Task<List<RecipeDto>> GetRecipesAsync(CancellationToken ct = default)
         => SendAsync<List<RecipeDto>>(HttpMethod.Get, "api/recipes", null, ct);
 
+    public Task<RecipePageDto> GetRecipesPageAsync(int skip = 0, int take = 24, CancellationToken ct = default)
+        => SendAsync<RecipePageDto>(HttpMethod.Get,
+            $"api/recipes/page?skip={Math.Max(0, skip)}&take={Math.Clamp(take, 1, 48)}", null, ct);
+
     public Task<List<IngredientCatalogDto>> SearchIngredientsAsync(string query, int limit = 25, CancellationToken ct = default)
         => SendAsync<List<IngredientCatalogDto>>(HttpMethod.Get,
             $"api/ingredients/search?q={Uri.EscapeDataString(query ?? string.Empty)}&limit={Math.Clamp(limit, 1, 50)}", null, ct);
@@ -158,6 +162,7 @@ public sealed record MealPlanDto(Guid Id, DateTime WeekStartUtc, string? Notes, 
 public sealed record MealEntryDto(Guid Id, DateTime DayUtc, string Slot, string DishName, string? Notes, string? IngredientsCsv, Guid? RecipeId = null);
 public sealed record MealEntryWriteDto(DateTime DayUtc, string Slot, string DishName, string? Notes = null, string? IngredientsCsv = null, DateTime? WeekStartUtc = null, Guid? RecipeId = null);
 public sealed record RecipeDto(Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions, bool IsBuiltIn = false, List<string>? Tags = null, string? Description = null, string? ImageUrl = null, string? SourceUrl = null, int? PrepMinutes = null, int? CookMinutes = null, string? Cuisine = null, string? Difficulty = null, List<string>? IngredientNames = null);
+public sealed record RecipePageDto(List<RecipeDto> Items, int TotalCount, int Skip, int Take);
 public sealed record RecipeWriteDto(string Name, int? Servings = 4, string? IngredientsCsv = null, string? Instructions = null);
 public sealed record ApplyRecipeDto(DateTime DayUtc, string Slot, DateTime? WeekStartUtc = null);
 public sealed record RecipeShoppingDto(int? TargetServings = null);
