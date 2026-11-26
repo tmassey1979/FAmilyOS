@@ -156,8 +156,16 @@ public partial class TaskCommandHandlers :
         await _current.EnsureLoadedAsync(ct);
         EnsureAuthenticated();
         var task = await GetTaskForFamily(query.TaskId, ct);
+        var actorIds = task.History.Select(h => h.ActorMemberId).Where(id => id != Guid.Empty).Distinct().ToList();
+        var actorNames = await _db.FamilyMembers.AsNoTracking()
+            .Where(m => m.FamilyId == _current.FamilyId && actorIds.Contains(m.Id))
+            .ToDictionaryAsync(m => m.Id, m => m.DisplayName, ct);
         return task.History.OrderBy(h => h.TimestampUtc)
-            .Select(h => new TaskHistoryDto(h.Id, h.Status, h.ActorMemberId, h.Detail, h.TimestampUtc))
+            .Select(h => new TaskHistoryDto(
+                h.Id, h.Status, h.ActorMemberId,
+                h.ActorMemberId == Guid.Empty ? "FamilyOS" :
+                    actorNames.GetValueOrDefault(h.ActorMemberId, "Family member"),
+                h.Detail, h.TimestampUtc))
             .ToList();
     }
 
