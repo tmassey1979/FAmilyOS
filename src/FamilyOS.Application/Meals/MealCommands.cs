@@ -24,7 +24,8 @@ public record UpsertMealEntryCommand(
     string? Notes = null,
     string? IngredientsCsv = null,
     DateTime? WeekStartUtc = null,
-    Guid? RecipeId = null
+    Guid? RecipeId = null,
+    Guid? EntryId = null
 ) : IRequest<MealEntryDto>;
 
 public record RemoveMealEntryCommand(Guid EntryId) : IRequest;
@@ -70,13 +71,14 @@ public class MealCommandHandlers :
             "Meal upsert {OperationId} started. FamilyId={FamilyId}, MemberId={MemberId}, DayUtc={DayUtc:o}, WeekStartUtc={WeekStartUtc:o}, Slot={Slot}, RecipeId={RecipeId}",
             operationId, _current.FamilyId, _current.MemberId, cmd.DayUtc, week, slot, cmd.RecipeId);
         var plan = await LoadOrCreateAsync(week, ct);
-        var prior = plan.Entries.FirstOrDefault(e => !e.IsDeleted && e.DayUtc.Date == cmd.DayUtc.Date && e.Slot == slot);
-        var entry = plan.UpsertEntry(cmd.DayUtc, slot, cmd.DishName, cmd.Notes, cmd.IngredientsCsv, cmd.RecipeId);
-        if (prior is null)
+        var entry = cmd.EntryId is Guid entryId
+            ? plan.UpdateEntry(entryId, cmd.DishName, cmd.Notes, cmd.IngredientsCsv, cmd.RecipeId)
+            : plan.AddEntry(cmd.DayUtc, slot, cmd.DishName, cmd.Notes, cmd.IngredientsCsv, cmd.RecipeId);
+        if (cmd.EntryId is null)
             _db.MealEntries.Add(entry);
         _logger.LogInformation(
             "Meal upsert {OperationId} aggregate updated. MealPlanId={MealPlanId}, EntryId={EntryId}, WasExisting={WasExisting}, EntryCount={EntryCount}",
-            operationId, plan.Id, entry.Id, prior is not null, plan.Entries.Count);
+            operationId, plan.Id, entry.Id, cmd.EntryId is not null, plan.Entries.Count);
         try
         {
             await _db.SaveChangesAsync(ct);
@@ -86,7 +88,7 @@ public class MealCommandHandlers :
         {
             _logger.LogError(ex,
                 "Meal upsert {OperationId} concurrency failure. MealPlanId={MealPlanId}, EntryId={EntryId}, WasExisting={WasExisting}, FailedEntries={FailedEntries}",
-                operationId, plan.Id, entry.Id, prior is not null,
+                operationId, plan.Id, entry.Id, cmd.EntryId is not null,
                 string.Join("; ", ex.Entries.Select(e => $"{e.Metadata.ClrType.Name}:{e.State}")));
             throw;
         }
