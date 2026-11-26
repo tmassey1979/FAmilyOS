@@ -95,13 +95,23 @@ public sealed class MealsPage : ContentPage
             _recipeFilters.Children.Add(chip);
         }
 
+        var browse = new HorizontalStackLayout { Spacing = 8 };
+        var recipesLink = new Button { Text = "Recipe library", FontSize = 12 };
+        recipesLink.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+        recipesLink.Clicked += async (_, _) => await Shell.Current.GoToAsync(nameof(RecipesPage));
+        var ingredientsLink = new Button { Text = "Ingredients", FontSize = 12 };
+        ingredientsLink.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+        ingredientsLink.Clicked += async (_, _) => await Shell.Current.GoToAsync(nameof(IngredientsPage));
+        browse.Children.Add(recipesLink);
+        browse.Children.Add(ingredientsLink);
+
         var content = new VerticalStackLayout
         {
             Padding = new Thickness(18, 12),
             Spacing = 14,
             Children =
             {
-                heading, range, _today, _shopping, _status, _planItems,
+                heading, range, browse, _today, _shopping, _status, _planItems,
                 new BoxView { HeightRequest = 1, Opacity = 0.25 },
                 nominationHeading, new Label { Text = "Everyone can suggest and vote. Parents make the final plan.", FontSize = 12 }, nominateMeal, _nominationItems,
             }
