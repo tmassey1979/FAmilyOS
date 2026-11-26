@@ -88,7 +88,7 @@ public sealed class RequestsPage : ContentPage
             {
                 _status.Text = $"{rows.Count} request{(rows.Count == 1 ? "" : "s")}";
                 foreach (var request in rows.OrderByDescending(x => x.CreatedAtUtc))
-                    AddRequest(request);
+                    await AddRequestAsync(request);
             }
             UpdateTabs();
         }
@@ -459,7 +459,7 @@ public sealed class RequestsPage : ContentPage
         _queueButton.Opacity = _showQueue ? 1 : 0.65;
     }
 
-    private void AddRequest(FamilyRequestDto request)
+    private async Task AddRequestAsync(FamilyRequestDto request)
     {
         var stack = new VerticalStackLayout { Spacing = 7 };
         var title = new Label { Text = request.Title, FontSize = 17, FontAttributes = FontAttributes.Bold };
@@ -507,6 +507,37 @@ public sealed class RequestsPage : ContentPage
             stack.Children.Add(askButton);
         }
 
+        if (request.Status == "ConditionallyApproved")
+        {
+            try
+            {
+                var conditions = await _api.GetConditionsAsync(request.Id);
+                foreach (var condition in conditions)
+                {
+                    var conditionLabel = new Label
+                    {
+                        Text = $"{condition.Name} · {condition.Status}" + (string.IsNullOrWhiteSpace(condition.Description) ? "" : $"\n{condition.Description}"),
+                        FontSize = 13
+                    };
+                    conditionLabel.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
+                    stack.Children.Add(conditionLabel);
+                    if (condition.Status == "Pending" && !_showQueue)
+                    {
+                        var satisfy = new Button { Text = "Mark condition complete", FontSize = 13, HorizontalOptions = LayoutOptions.Start };
+                        satisfy.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+                        satisfy.Clicked += async (_, _) =>
+                        {
+                            try { await _api.SatisfyConditionAsync(condition.Id); await LoadAsync(); }
+                            catch (FamilyApiException ex) { _status.Text = ex.Message; }
+                            catch (Exception) { _status.Text = "Could not update that condition. Try again."; }
+                        };
+                        stack.Children.Add(satisfy);
+                    }
+                }
+            }
+            catch (Exception) { /* Keep the request visible if condition details are temporarily unavailable. */ }
+        }
+
         var actions = new FlexLayout { Wrap = FlexWrap.Wrap, Direction = FlexDirection.Row };
         foreach (var action in ActionsFor(request.Status, _showQueue))
         {
@@ -546,7 +577,7 @@ public sealed class RequestsPage : ContentPage
     private static IReadOnlyList<(string Name, string Label, bool Primary)> ActionsFor(string status, bool queue)
     {
         if (queue && status is "Submitted" or "PendingApproval" or "UnderReview" or "WaitingForInformation")
-            return new[] { ("approve", "Approve", true), ("deny", "Deny", false) };
+            return new[] { ("approve", "Approve", true), ("conditional-approve", "Approve with condition", false), ("deny", "Deny", false) };
         if (!queue && status == "Draft")
             return new[] { ("submit", "Submit", true), ("cancel", "Withdraw", false) };
         if (!queue && status is "Submitted" or "PendingApproval" or "UnderReview" or "WaitingForInformation")
@@ -559,6 +590,16 @@ public sealed class RequestsPage : ContentPage
         _status.Text = "Saving request update…";
         try
         {
+            if (action == "conditional-approve")
+            {
+                var name = await DisplayPromptAsync("Add an approval condition", "What must happen before this request is fully approved?",
+                    "Continue", "Cancel", maxLength: 120);
+                if (string.IsNullOrWhiteSpace(name)) return;
+                var description = await DisplayPromptAsync("Condition details", "Add details (optional)",
+                    "Save condition", "Cancel", maxLength: 500);
+                if (description is null) return;
+                await _api.CreateConditionAsync(id, name.Trim(), description.Trim());
+            }
             await _api.RunActionAsync(id, action);
             await LoadAsync();
         }
