@@ -93,7 +93,8 @@ public class MealCommandHandlers :
             .FirstOrDefaultAsync(p => p.FamilyId == _current.FamilyId && p.WeekStartUtc == week, ct);
         if (plan is null) return 0;
 
-        var plannedEntries = plan.Entries.Where(e => !e.IsDeleted\n            && (cmd.DayUtc is null || e.DayUtc.Date == cmd.DayUtc.Value.Date)).ToList();
+        var plannedEntries = plan.Entries.Where(e => !e.IsDeleted
+            && (cmd.DayUtc is null || e.DayUtc.Date == cmd.DayUtc.Value.Date)).ToList();
         var names = plannedEntries.SelectMany(e => e.IngredientList()).ToList();
 
         var recipeIds = plannedEntries.Where(e => e.RecipeId.HasValue)
