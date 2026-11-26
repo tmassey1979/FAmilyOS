@@ -3,6 +3,9 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="FamilyOS.Maui.Controls.FoStatusBanner">
     <Border x:Name="BannerBorder" StrokeThickness="0" Padding="16,12">
+        <Border.StrokeShape>
+            <RoundRectangle CornerRadius="14" />
+        </Border.StrokeShape>
         <Label x:Name="MessageLabel" Style="{StaticResource TextBody}"
                TextColor="{AppThemeBinding Light={StaticResource TextOnAccent}, Dark={StaticResource TextOnAccent}}" />
     </Border>
