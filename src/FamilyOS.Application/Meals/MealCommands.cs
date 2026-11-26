@@ -96,7 +96,7 @@ public class MealCommandHandlers :
 
         var plannedEntries = plan.Entries.Where(e => !e.IsDeleted
             && (cmd.DayUtc is null || e.DayUtc.Date == cmd.DayUtc.Value.Date)).ToList();
-        var names = plannedEntries.SelectMany(e => e.IngredientList()).ToList();
+        var names = plannedEntries.Where(e => e.RecipeId is null).SelectMany(e => e.IngredientList()).ToList();
 
         var recipeIds = plannedEntries.Where(e => e.RecipeId.HasValue)
             .Select(e => e.RecipeId!.Value).Distinct().ToArray();
@@ -112,6 +112,22 @@ public class MealCommandHandlers :
                                         row.Quantity, row.Unit
                                     }).ToListAsync(ct);
 
+            var structuredRecipeIds = recipeRows.Select(x => x.RecipeId).ToHashSet();
+            var legacyRecipeIds = recipeIds.Where(id => !structuredRecipeIds.Contains(id)).ToArray();
+            if (legacyRecipeIds.Length > 0)
+            {
+                var legacyRecipes = await _db.Recipes.AsNoTracking()
+                    .Where(x => legacyRecipeIds.Contains(x.Id))
+                    .Select(x => new { x.Id, x.IngredientsCsv }).ToListAsync(ct);
+                var legacyById = legacyRecipes.ToDictionary(x => x.Id, x => x.IngredientsCsv);
+                foreach (var entry in plannedEntries.Where(x => x.RecipeId.HasValue && legacyById.ContainsKey(x.RecipeId.Value)))
+                {
+                    var csv = legacyById[entry.RecipeId!.Value];
+                    if (!string.IsNullOrWhiteSpace(csv))
+                        names.AddRange(csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+                }
+            }
+
             var recipeUseCounts = plannedEntries.Where(e => e.RecipeId.HasValue)
                 .GroupBy(e => e.RecipeId!.Value)
                 .ToDictionary(g => g.Key, g => g.Count());
@@ -122,7 +138,7 @@ public class MealCommandHandlers :
                 var uses = recipeUseCounts[row.RecipeId];
                 var unit = NormalizeShoppingUnit(row.Unit);
                 var key = (row.IngredientId, unit);
-                var quantity = row.Quantity is null ? null : row.Quantity.Value * uses;
+                var quantity = row.Quantity is null ? null : ToBaseShoppingQuantity(row.Quantity.Value, row.Unit) * uses;
                 if (aggregate.TryGetValue(key, out var current))
                     aggregate[key] = (current.Name, current.Quantity is null || quantity is null
                         ? null : current.Quantity.Value + quantity.Value, current.Unit);
@@ -131,9 +147,7 @@ public class MealCommandHandlers :
             }
 
             foreach (var item in aggregate.Values)
-                names.Add(item.Quantity is null
-                    ? item.Name
-                    : $"{FormatShoppingQuantity(item.Quantity.Value)} {item.Unit} {item.Name}".Replace("  ", " ").Trim());
+                names.Add(item.Quantity is null ? item.Name : FormatShoppingLine(item.Quantity.Value, item.Unit, item.Name));
         }
 
         names = names.Where(x => !string.IsNullOrWhiteSpace(x))
@@ -168,20 +182,60 @@ public class MealCommandHandlers :
 
 
     private static string NormalizeShoppingUnit(string? unit)
-        => string.IsNullOrWhiteSpace(unit) ? "" : unit.Trim().ToLowerInvariant() switch
+    {
+        if (string.IsNullOrWhiteSpace(unit)) return "";
+        return unit.Trim().ToLowerInvariant() switch
         {
-            "tsp" or "teaspoon" or "teaspoons" => "tsp",
-            "tbsp" or "tablespoon" or "tablespoons" => "tbsp",
-            "cup" or "cups" => "cup",
-            "oz" or "ounce" or "ounces" => "oz",
-            "lb" or "lbs" or "pound" or "pounds" => "lb",
-            "g" or "gram" or "grams" => "g",
-            "kg" or "kilogram" or "kilograms" => "kg",
-            "ml" or "milliliter" or "milliliters" => "ml",
-            "l" or "liter" or "liters" => "l",
+            "tsp" or "teaspoon" or "teaspoons" or "tbsp" or "tablespoon" or "tablespoons" or "cup" or "cups" or "fl oz" or "fluid ounce" or "fluid ounces" or "ml" or "milliliter" or "milliliters" or "l" or "liter" or "liters" => "tsp",
+            "oz" or "ounce" or "ounces" or "lb" or "lbs" or "pound" or "pounds" or "g" or "gram" or "grams" or "kg" or "kilogram" or "kilograms" => "g",
             "each" or "ea" or "item" or "items" => "each",
             var other => other
         };
+    }
+
+    private static decimal ToBaseShoppingQuantity(decimal quantity, string? rawUnit)
+    {
+        var unit = rawUnit?.Trim().ToLowerInvariant() ?? "";
+        return unit switch
+        {
+            "tbsp" or "tablespoon" or "tablespoons" => quantity * 3m,
+            "cup" or "cups" => quantity * 48m,
+            "fl oz" or "fluid ounce" or "fluid ounces" => quantity * 6m,
+            "ml" or "milliliter" or "milliliters" => quantity * 0.202884m,
+            "l" or "liter" or "liters" => quantity * 202.884m,
+            "oz" or "ounce" or "ounces" => quantity * 28.3495m,
+            "lb" or "lbs" or "pound" or "pounds" => quantity * 453.592m,
+            "kg" or "kilogram" or "kilograms" => quantity * 1000m,
+            _ => quantity
+        };
+    }
+
+    private static string FormatShoppingLine(decimal quantity, string unit, string name)
+    {
+        string displayUnit;
+        decimal displayQuantity;
+        if (unit == "tsp")
+        {
+            if (quantity >= 48m) { displayUnit = "cup"; displayQuantity = quantity / 48m; }
+            else if (quantity >= 3m) { displayUnit = "tbsp"; displayQuantity = quantity / 3m; }
+            else { displayUnit = "tsp"; displayQuantity = quantity; }
+        }
+        else if (unit == "g")
+        {
+            if (quantity >= 453.592m) { displayUnit = "lb"; displayQuantity = quantity / 453.592m; }
+            else if (quantity >= 28.3495m) { displayUnit = "oz"; displayQuantity = quantity / 28.3495m; }
+            else { displayUnit = "g"; displayQuantity = quantity; }
+        }
+        else if (unit == "ml")
+        {
+            if (quantity >= 1000m) { displayUnit = "l"; displayQuantity = quantity / 1000m; }
+            else { displayUnit = "ml"; displayQuantity = quantity; }
+        }
+        else { displayUnit = unit; displayQuantity = quantity; }
+
+        return string.Join(" ", new[] { FormatShoppingQuantity(displayQuantity), displayUnit, name }
+            .Where(x => !string.IsNullOrWhiteSpace(x)));
+    }
 
     private static string FormatShoppingQuantity(decimal quantity)
         => quantity.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
