@@ -21,7 +21,7 @@ public record TaskDto(
     bool IsRecurring = false,
     string? RecurrenceFrequency = null);
 
-public record TaskHistoryDto(Guid Id, FamilyTaskStatus Status, Guid ActorMemberId, string Detail, DateTime TimestampUtc);
+public record TaskHistoryDto(Guid Id, FamilyTaskStatus Status, Guid ActorMemberId, string ActorName, string Detail, DateTime TimestampUtc);
 
 public record RecurrenceDto(
     Guid Id, string Title, string? Description, RecurrenceFrequency Frequency, int Interval,
