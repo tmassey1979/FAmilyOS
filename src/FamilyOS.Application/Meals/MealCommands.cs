@@ -5,6 +5,7 @@ using FamilyOS.Domain.Meals;
 using FamilyOS.Domain.Procurement;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace FamilyOS.Application.Meals;
 
@@ -38,11 +39,13 @@ public class MealCommandHandlers :
 {
     private readonly IFamilyOsDbContext _db;
     private readonly ICurrentUserService _current;
+    private readonly ILogger<MealCommandHandlers> _logger;
 
-    public MealCommandHandlers(IFamilyOsDbContext db, ICurrentUserService current)
+    public MealCommandHandlers(IFamilyOsDbContext db, ICurrentUserService current, ILogger<MealCommandHandlers> logger)
     {
         _db = db;
         _current = current;
+        _logger = logger;
     }
 
     public async Task<MealPlanDto> Handle(GetMealPlanWeekQuery query, CancellationToken ct)
@@ -61,10 +64,30 @@ public class MealCommandHandlers :
         if (!Enum.TryParse<MealSlot>(cmd.Slot, ignoreCase: true, out var slot))
             throw new ValidationException("Slot", "Slot must be Breakfast, Lunch, Dinner, or Snack.");
 
+        var operationId = Guid.NewGuid();
         var week = MealPlan.ToMonday(cmd.WeekStartUtc ?? cmd.DayUtc);
+        _logger.LogInformation(
+            "Meal upsert {OperationId} started. FamilyId={FamilyId}, MemberId={MemberId}, DayUtc={DayUtc:o}, WeekStartUtc={WeekStartUtc:o}, Slot={Slot}, RecipeId={RecipeId}",
+            operationId, _current.FamilyId, _current.MemberId, cmd.DayUtc, week, slot, cmd.RecipeId);
         var plan = await LoadOrCreateAsync(week, ct);
+        var prior = plan.Entries.FirstOrDefault(e => !e.IsDeleted && e.DayUtc.Date == cmd.DayUtc.Date && e.Slot == slot);
         var entry = plan.UpsertEntry(cmd.DayUtc, slot, cmd.DishName, cmd.Notes, cmd.IngredientsCsv, cmd.RecipeId);
-        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation(
+            "Meal upsert {OperationId} aggregate updated. MealPlanId={MealPlanId}, EntryId={EntryId}, WasExisting={WasExisting}, EntryCount={EntryCount}",
+            operationId, plan.Id, entry.Id, prior is not null, plan.Entries.Count);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            _logger.LogInformation("Meal upsert {OperationId} saved. EntryId={EntryId}", operationId, entry.Id);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            _logger.LogError(ex,
+                "Meal upsert {OperationId} concurrency failure. MealPlanId={MealPlanId}, EntryId={EntryId}, WasExisting={WasExisting}, FailedEntries={FailedEntries}",
+                operationId, plan.Id, entry.Id, prior is not null,
+                string.Join("; ", ex.Entries.Select(e => $"{e.Metadata.ClrType.Name}:{e.State}")));
+            throw;
+        }
         return ToEntryDto(entry);
     }
 
@@ -72,15 +95,34 @@ public class MealCommandHandlers :
     {
         await _current.EnsureLoadedAsync(ct);
         EnsureAuth();
+        var operationId = Guid.NewGuid();
+        _logger.LogInformation("Meal remove {OperationId} started. EntryId={EntryId}, FamilyId={FamilyId}, MemberId={MemberId}",
+            operationId, cmd.EntryId, _current.FamilyId, _current.MemberId);
         var entry = await _db.MealEntries
             .FirstOrDefaultAsync(e => e.Id == cmd.EntryId && e.FamilyId == _current.FamilyId, ct)
             ?? throw new NotFoundException("MealEntry", cmd.EntryId);
+        _logger.LogInformation(
+            "Meal remove {OperationId}: entry loaded. EntryId={EntryId}, MealPlanId={MealPlanId}, DayUtc={DayUtc:o}, Slot={Slot}, IsDeleted={IsDeleted}",
+            operationId, entry.Id, entry.MealPlanId, entry.DayUtc, entry.Slot, entry.IsDeleted);
         var plan = await _db.MealPlans
             .Include(p => p.Entries)
             .FirstOrDefaultAsync(p => p.Id == entry.MealPlanId, ct)
             ?? throw new NotFoundException("MealPlan", entry.MealPlanId);
+        _logger.LogInformation("Meal remove {OperationId}: plan loaded. MealPlanId={MealPlanId}, EntryCount={EntryCount}, TargetInAggregate={TargetInAggregate}",
+            operationId, plan.Id, plan.Entries.Count, plan.Entries.Any(e => e.Id == cmd.EntryId));
         plan.RemoveEntry(cmd.EntryId);
-        await _db.SaveChangesAsync(ct);
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            _logger.LogInformation("Meal remove {OperationId} saved. EntryId={EntryId}", operationId, cmd.EntryId);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            _logger.LogError(ex, "Meal remove {OperationId} concurrency failure. EntryId={EntryId}, MealPlanId={MealPlanId}, FailedEntries={FailedEntries}",
+                operationId, cmd.EntryId, plan.Id,
+                string.Join("; ", ex.Entries.Select(e => $"{e.Metadata.ClrType.Name}:{e.State}")));
+            throw;
+        }
     }
 
     public async Task<int> Handle(PushMealIngredientsToQueueCommand cmd, CancellationToken ct)
