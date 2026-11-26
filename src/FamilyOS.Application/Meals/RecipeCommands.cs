@@ -117,7 +117,7 @@ public class RecipeCommandHandlers :
         }
 
         var entry = plan.UpsertEntry(
-            cmd.DayUtc, slot, recipe.Name, notes: $"{recipe.Servings} servings", recipe.IngredientsCsv, recipe.Id);
+            cmd.DayUtc, slot, recipe.Name, notes: $"{recipe.Servings} servings", ingredientsCsv: recipe.IngredientsCsv, recipeId: recipe.Id);
         await _db.SaveChangesAsync(ct);
         return new MealEntryDto(
             entry.Id, entry.DayUtc, entry.Slot.ToString(), entry.DishName, entry.Notes, entry.IngredientsCsv, entry.RecipeId);
