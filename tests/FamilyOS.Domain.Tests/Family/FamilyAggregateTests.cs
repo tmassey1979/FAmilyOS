@@ -32,7 +32,7 @@ public class FamilyAggregateTests
         m.QuietHoursEnabled.Should().BeTrue();
         m.QuietHoursStartMinutes.Should().Be(21 * 60);
         m.QuietHoursEndMinutes.Should().Be(7 * 60);
-        m.IsInQuietHours(new DateTime(2026, 1, 1, 22, 0, 0, DateTimeKind.Utc)).Should().BeTrue();
+        m.IsInQuietHours(TimeSpan.FromHours(22)).Should().BeTrue();
 
         m.ChangeRole(FamilyRole.Adult);
         m.Role.Should().Be(FamilyRole.Adult);
