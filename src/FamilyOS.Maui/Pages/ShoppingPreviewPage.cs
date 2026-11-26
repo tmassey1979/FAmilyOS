@@ -38,46 +38,43 @@ public sealed class ShoppingPreviewPage : ContentPage
         {
             for (var i = 0; i < preview.Items.Count; i++)
             {
+                var icon = new Label { Text = "🛒", FontSize = 16, VerticalTextAlignment = TextAlignment.Center };
+                var itemText = new Label { Text = preview.Items[i], FontSize = 14, VerticalTextAlignment = TextAlignment.Center };
                 var row = new Grid
                 {
                     ColumnDefinitions = { new ColumnDefinition(GridLength.Auto), new ColumnDefinition(GridLength.Star) },
-                    ColumnSpacing = 10,
-                    Children =
-                    {
-                        new Label { Text = "🛒", FontSize = 16, VerticalTextAlignment = TextAlignment.Center },
-                        new Label { Text = preview.Items[i], FontSize = 14, VerticalTextAlignment = TextAlignment.Center }
-                    }
+                    ColumnSpacing = 10
                 };
-                Grid.SetColumn(row.Children[1], 1);
+                row.Add(icon, 0, 0);
+                row.Add(itemText, 1, 0);
                 var card = new Border { Padding = new Thickness(12, 9), Content = row };
                 card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
                 items.Children.Add(card);
             }
         }
 
-        Content = new Grid
+        var scroll = new ScrollView
         {
-            RowDefinitions = { new RowDefinition(GridLength.Star), new RowDefinition(GridLength.Auto) },
-            Children =
+            Content = new VerticalStackLayout
             {
-                new ScrollView
-                {
-                    Content = new VerticalStackLayout
-                    {
-                        Padding = new Thickness(18, 14),
-                        Spacing = 12,
-                        Children = { heading, summary, items, _status }
-                    }
-                },
-                new VerticalStackLayout
-                {
-                    Padding = new Thickness(18, 10),
-                    Spacing = 8,
-                    Children = { _add }
-                }
+                Padding = new Thickness(18, 14),
+                Spacing = 12,
+                Children = { heading, summary, items, _status }
             }
         };
-        Grid.SetRow(Content is Grid g ? g.Children[1] : null, 1);
+        var footer = new VerticalStackLayout
+        {
+            Padding = new Thickness(18, 10),
+            Spacing = 8,
+            Children = { _add }
+        };
+        var layout = new Grid
+        {
+            RowDefinitions = { new RowDefinition(GridLength.Star), new RowDefinition(GridLength.Auto) }
+        };
+        layout.Add(scroll, 0, 0);
+        layout.Add(footer, 0, 1);
+        Content = layout;
     }
 
     private async Task AddToShoppingAsync()
