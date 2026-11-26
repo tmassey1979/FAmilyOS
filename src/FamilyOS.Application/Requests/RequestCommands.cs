@@ -16,7 +16,7 @@ namespace FamilyOS.Application.Requests;
 public record PendingQuestionDto(Guid Id, string QuestionText, bool IsAnswered, string? Answer);
 
 public record RequestHistoryDto(
-    Guid Id, RequestStatus Status, Guid ActorMemberId, string Detail, DateTime TimestampUtc);
+    Guid Id, RequestStatus Status, Guid ActorMemberId, string ActorName, string Detail, DateTime TimestampUtc);
 
 public record RequestDto(
     Guid Id, RequestTypeCode Type, RequestStatus Status, string Title, string? Summary,
@@ -300,9 +300,15 @@ public class RequestCommandHandlers :
     {
         await _current.EnsureLoadedAsync(ct);
         var request = await GetRequest(query.RequestId, ct);
+        var actorIds = request.History.Select(h => h.ActorMemberId).Where(id => id != Guid.Empty).Distinct().ToArray();
+        var actorNames = await _db.FamilyMembers.AsNoTracking()
+            .Where(m => m.FamilyId == _current.FamilyId && actorIds.Contains(m.Id))
+            .ToDictionaryAsync(m => m.Id, m => m.DisplayName, ct);
         return request.History
             .OrderBy(h => h.TimestampUtc)
-            .Select(h => new RequestHistoryDto(h.Id, h.Status, h.ActorMemberId, h.Detail, h.TimestampUtc))
+            .Select(h => new RequestHistoryDto(h.Id, h.Status, h.ActorMemberId,
+                h.ActorMemberId == Guid.Empty ? "FamilyOS" : actorNames.GetValueOrDefault(h.ActorMemberId, "Family member"),
+                h.Detail, h.TimestampUtc))
             .ToList();
     }
 
