@@ -60,6 +60,20 @@ public sealed class RequestsApiClient
             new StringContent(body, Encoding.UTF8, "application/json"), ct);
     }
 
+    public Task<List<RequestConditionDto>> GetConditionsAsync(Guid id, CancellationToken ct = default)
+        => SendAsync<List<RequestConditionDto>>(HttpMethod.Get, $"api/conditions/by-request/{id:D}", null, ct);
+
+    public Task<RequestConditionDto> CreateConditionAsync(Guid requestId, string name, string description, CancellationToken ct = default)
+    {
+        var body = JsonSerializer.Serialize(new { name, type = "Manual", requestId, taskId = (Guid?)null,
+            description, deadlineUtc = (DateTime?)null, logicGroup = "All", groupOrder = 0 }, JsonOptions);
+        return SendAsync<RequestConditionDto>(HttpMethod.Post, "api/conditions",
+            new StringContent(body, Encoding.UTF8, "application/json"), ct);
+    }
+
+    public Task<RequestConditionDto> SatisfyConditionAsync(Guid id, CancellationToken ct = default)
+        => SendAsync<RequestConditionDto>(HttpMethod.Post, $"api/conditions/{id:D}/satisfy", null, ct);
+
     public Task<List<RequestHistoryEntryDto>> GetHistoryAsync(Guid id, CancellationToken ct = default)
         => SendAsync<List<RequestHistoryEntryDto>>(HttpMethod.Get, $"api/requests/{id:D}/history", null, ct);
 
@@ -82,6 +96,7 @@ public sealed class RequestsApiClient
         var body = action switch
         {
             "approve" => JsonSerializer.Serialize(new { conditional = false }, JsonOptions),
+            "conditional-approve" => JsonSerializer.Serialize(new { conditional = true }, JsonOptions),
             "deny" => JsonSerializer.Serialize(new { reason = string.IsNullOrWhiteSpace(reason) ? "Not approved" : reason }, JsonOptions),
             "cancel" => JsonSerializer.Serialize(new { reason }, JsonOptions),
             _ => "{}"
@@ -140,3 +155,6 @@ public sealed record ExecutionPlanDto(Guid Id, Guid RequestId, string Status, Li
 public sealed record ExecutionItemDto(Guid Id, string Type, string Title, Guid? AssigneeMemberId, bool IsSelected, Guid? ResultingEntityId);
 
 public sealed record RequestHistoryEntryDto(Guid Id, string Status, Guid ActorMemberId, string Detail, DateTime TimestampUtc);
+public sealed record RequestConditionDto(Guid Id, Guid? RequestId, Guid? TaskId, string Name, string? Description,
+    string Type, string Status, string LogicGroup, int GroupOrder, DateTime? DeadlineUtc,
+    Guid? SatisfiedByMemberId, DateTime? SatisfiedAtUtc);
