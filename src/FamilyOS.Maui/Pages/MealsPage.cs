@@ -145,16 +145,42 @@ public sealed class MealsPage : ContentPage
                 stack.Children.Add(dayShopping);
                 foreach (var slot in Slots)
                 {
-                    var entry = plan.Entries.FirstOrDefault(x => x.DayUtc.Date == day.Date && string.Equals(x.Slot, slot, StringComparison.OrdinalIgnoreCase));
-                    var button = new Button
+                    var slotDishes = plan.Entries
+                        .Where(x => x.DayUtc.Date == day.Date && string.Equals(x.Slot, slot, StringComparison.OrdinalIgnoreCase))
+                        .OrderBy(x => x.DishName)
+                        .ToList();
+                    var slotHeader = new Label
                     {
-                        Text = $"{slot}: {(entry is null ? "＋ Add meal" : entry.DishName)}",
-                        HorizontalOptions = LayoutOptions.Fill,
-                        FontSize = 13
+                        Text = slot,
+                        FontSize = 13,
+                        FontAttributes = FontAttributes.Bold,
+                        Margin = new Thickness(0, 5, 0, 0)
                     };
-                    button.SetDynamicResource(VisualElement.StyleProperty, entry is null ? "FoGhostButtonStyle" : "FoSecondaryButtonStyle");
-                    button.Clicked += async (_, _) => await EditMealAsync(day, slot, entry);
-                    stack.Children.Add(button);
+                    slotHeader.SetDynamicResource(VisualElement.StyleProperty, "TextBodyStrong");
+                    stack.Children.Add(slotHeader);
+
+                    foreach (var dish in slotDishes)
+                    {
+                        var dishButton = new Button
+                        {
+                            Text = $"  •  {dish.DishName}   ·   Edit",
+                            HorizontalOptions = LayoutOptions.Fill,
+                            FontSize = 12
+                        };
+                        dishButton.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+                        dishButton.Clicked += async (_, _) => await EditMealAsync(day, slot, dish);
+                        stack.Children.Add(dishButton);
+                    }
+
+                    var addDish = new Button
+                    {
+                        Text = slotDishes.Count == 0 ? "＋ Add dish" : "＋ Add another dish",
+                        HorizontalOptions = LayoutOptions.Start,
+                        FontSize = 11
+                    };
+                    addDish.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+                    addDish.Clicked += async (_, _) => await EditMealAsync(day, slot, null);
+                    stack.Children.Add(addDish);
                 }
                 var card = new Border { Padding = 0, StrokeThickness = 1, Content = stack };
         stack.Padding = new Thickness(14);
@@ -166,7 +192,7 @@ public sealed class MealsPage : ContentPage
             _recipeTotalCount = recipePage.TotalCount;
             RenderRecipes();
 
-            _status.Text = $"{plan.Entries.Count} planned meal{(plan.Entries.Count == 1 ? "" : "s")} · {_recipeTotalCount} recipes in the market";
+            _status.Text = $"{plan.Entries.Count} planned dish{(plan.Entries.Count == 1 ? "" : "es")} · {_recipeTotalCount} recipes in the market";
         }
         catch (OperationCanceledException)
         {
@@ -323,7 +349,7 @@ public sealed class MealsPage : ContentPage
         {
             await _api.UpsertEntryAsync(new MealEntryWriteDto(
                 DateTime.SpecifyKind(day.Date, DateTimeKind.Utc), slot, dish.Trim(),
-                existing?.Notes, string.IsNullOrWhiteSpace(ingredients) ? null : ingredients.Trim(), _weekStart, existing?.RecipeId));
+                existing?.Notes, string.IsNullOrWhiteSpace(ingredients) ? null : ingredients.Trim(), _weekStart, existing?.RecipeId, existing?.Id));
             await LoadAsync();
         }
         catch (Exception ex)
