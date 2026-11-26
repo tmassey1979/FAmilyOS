@@ -60,7 +60,11 @@ public class RecipeCommandHandlers :
         var r = await _db.Recipes.AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == query.Id && (x.FamilyId == _current.FamilyId || x.FamilyId == Guid.Empty), ct)
             ?? throw new NotFoundException("Recipe", query.Id);
-        var tagged = await AddTagsAsync(new List<Recipe> { r }, ct);\n        return tagged[0];\n    }\n\n    public async Task<RecipeDto> Handle(CreateRecipeCommand cmd, CancellationToken ct)
+        var tagged = await AddTagsAsync(new List<Recipe> { r }, ct);
+        return tagged[0];
+    }
+
+    public async Task<RecipeDto> Handle(CreateRecipeCommand cmd, CancellationToken ct)
     {
         await EnsureFamilyAsync(ct);
         var recipe = Recipe.Create(
