@@ -42,6 +42,19 @@ public sealed class FamilyApiClient
     public Task RemoveMemberAsync(Guid memberId, CancellationToken ct = default)
         => SendNoContentAsync(HttpMethod.Delete, $"api/family/members/{memberId:D}", null, ct);
 
+    // Aliases used by pages / background services
+    public Task SetLocationSharingAsync(bool enabled, CancellationToken ct = default)
+        => SetLocationConsentAsync(enabled, ct);
+
+    public Task SetBatterySharingAsync(bool enabled, CancellationToken ct = default)
+        => SetBatteryConsentAsync(enabled, ct);
+
+    public Task ShareBatteryStatusAsync(int batteryPercent, bool isCharging, CancellationToken ct = default)
+        => ReportBatteryAsync(batteryPercent, isCharging, ct);
+
+    public Task<CheckInDto> CreateCheckInAsync(Guid targetMemberId, int dueInMinutes = 30, CancellationToken ct = default)
+        => RequestCheckInAsync(targetMemberId, dueInMinutes, ct);
+
     public Task<List<CheckInDto>> GetCheckInsAsync(bool includeCompleted = false, CancellationToken ct = default)
         => SendAsync<List<CheckInDto>>(HttpMethod.Get, $"api/checkins?includeCompleted={includeCompleted.ToString().ToLowerInvariant()}", null, ct);
 
@@ -176,7 +189,7 @@ public sealed class FamilyApiClient
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
     }
 
-    private async Task<FamilyDto> GetFamilyAsync(CancellationToken ct)
+    public async Task<FamilyDto> GetFamilyAsync(CancellationToken ct = default)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
