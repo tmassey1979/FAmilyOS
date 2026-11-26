@@ -81,6 +81,10 @@ public class RequestsController : ControllerBase
     public async Task<ActionResult<ExecutionPlanDto>> GeneratePlan(Guid id, CancellationToken ct)
         => Ok(await _mediator.Send(new GenerateExecutionPlanCommand(id), ct));
 
+    [HttpGet("/api/execution-plans/{planId:guid}")]
+    public async Task<ActionResult<ExecutionPlanDto>> GetPlan(Guid planId, CancellationToken ct)
+        => Ok(await _mediator.Send(new GetExecutionPlanQuery(planId), ct));
+
     [HttpPost("execution-plans/{planId:guid}/commit")]
     public async Task<ActionResult<ExecutionPlanDto>> CommitPlan(Guid planId, [FromBody] CommitBody? body, CancellationToken ct)
         => Ok(await _mediator.Send(new CommitExecutionPlanCommand(planId, body?.DeselectedItemIds), ct));
