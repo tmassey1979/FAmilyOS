@@ -1,5 +1,6 @@
 using FamilyOS.Maui.Pages;
 using FamilyOS.Maui.Services;
+using FamilyOS.Maui.Services.Offline;
 using Microsoft.Extensions.Logging;
 
 namespace FamilyOS.Maui;
@@ -8,21 +9,23 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
-        var diagnostics = new StartupDiagnosticsService();
-        diagnostics.BeginLaunch();
-
         var builder = MauiApp.CreateBuilder();
+        var diagnostics = new StartupDiagnosticsService();
+        diagnostics.RecordCheckpoint("MauiProgram.CreateMauiApp entered");
+
         builder.Services.AddSingleton(diagnostics);
+
         builder
             .UseMauiApp<App>()
             .ConfigureFonts(fonts =>
             {
-                // System fonts; add brand fonts under Resources/Fonts when available.
+                fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
+                fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
         builder.Services.AddSingleton<IThemeService, ThemeService>();
-        builder.Services.AddTransient<StartupDiagnosticsPage>();
-        builder.Services.AddTransient<AccessTokenPage>();
+
+        // Shared HTTP + auth session used by all API clients.
         builder.Services.AddSingleton<HttpClient>();
         builder.Services.AddSingleton<IAuthSessionService, KeycloakAuthService>();
         builder.Services.AddSingleton<ClientLogService>();
@@ -40,6 +43,9 @@ public static class MauiProgram
         builder.Services.AddTransient<CalendarPage>();
         builder.Services.AddSingleton<OnboardingApiClient>();
         builder.Services.AddTransient<OnboardingPage>();
+        builder.Services.AddSingleton<OfflineStore>();
+        builder.Services.AddSingleton<OfflineFlushService>();
+        builder.Services.AddSingleton<ConnectivityMonitor>();
         builder.Services.AddSingleton<FamilyApiClient>();
         builder.Services.AddSingleton<DeviceLocationService>();
         builder.Services.AddTransient<LocationPage>();
@@ -70,6 +76,7 @@ public static class MauiProgram
             // Resolve once so the flush timer starts; log launch for remote observability.
             var clientLogs = app.Services.GetService<ClientLogService>();
             clientLogs?.Info("app_launch", "MauiProgram");
+            app.Services.GetService<ConnectivityMonitor>()?.Start();
 
             return app;
         }
