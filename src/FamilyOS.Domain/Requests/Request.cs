@@ -120,7 +120,7 @@ public class Request : Entity
 
     public void Deny(Guid approverMemberId, string reason)
     {
-        if (Status is not (RequestStatus.Submitted or RequestStatus.PendingApproval or RequestStatus.UnderReview or RequestStatus.WaitingForInformation))
+        if (Status is not (RequestStatus.Submitted or RequestStatus.PendingApproval or RequestStatus.UnderReview or RequestStatus.WaitingForInformation or RequestStatus.ConditionallyApproved))
             throw new InvalidOperationException($"Cannot deny request in status {Status}.");
         if (RequesterMemberId == approverMemberId)
             throw new UnauthorizedAccessException("Requester cannot deny their own request.");
