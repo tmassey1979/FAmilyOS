@@ -32,7 +32,7 @@ public partial class FamilyOsDbContext
         modelBuilder.Entity<MealNominationVote>(e =>
         {
             e.HasKey(x => x.Id);
-            e.HasIndex(x => new { x.NominationId, x.MemberId }).IsUnique();
+            e.HasIndex(x => new { x.NominationId, x.MemberId }).IsUnique().HasFilter("\"IsDeleted\" = false");
             e.HasIndex(x => x.FamilyId);
             e.HasQueryFilter(x => !x.IsDeleted);
         });
