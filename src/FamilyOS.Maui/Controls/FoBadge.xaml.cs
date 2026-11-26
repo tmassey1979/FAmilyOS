@@ -31,6 +31,8 @@ public partial class FoBadge : ContentView
             _ => "BgSurfaceAlt"
         };
         var resources = Application.Current!.Resources;
+        BadgeBorder.StrokeThickness = 0;
+        BadgeBorder.Stroke = Colors.Transparent;
         if (Tone == FoBadgeTone.Neutral)
         {
             BadgeBorder.BackgroundColor = (Color)resources["BgSurfaceAlt"];
