@@ -11,30 +11,30 @@ public class ThemeTokenTests
     public static readonly IReadOnlyDictionary<string, string> FamilyOsDarkColors =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["bg"] = "#080D1B",
-            ["surface"] = "#111B2E",
-            ["surfaceAlt"] = "#1B2940",
-            ["border"] = "#30445F",
-            ["primary"] = "#55E6FF",
-            ["text"] = "#F3F7FF",
-            ["textMuted"] = "#9BAFC9",
-            ["danger"] = "#FF718B",
-            ["success"] = "#53E6B1",
+            ["bg"] = "#030712",
+            ["surface"] = "#0A1020",
+            ["surfaceAlt"] = "#0E1A2E",
+            ["border"] = "#1B3552",
+            ["primary"] = "#45F3FF",
+            ["text"] = "#EAF6FF",
+            ["textMuted"] = "#8CA7C5",
+            ["danger"] = "#FF5D7D",
+            ["success"] = "#47F0B2",
             ["warning"] = "#FFC66D",
         };
 
     public static readonly IReadOnlyDictionary<string, string> MauiDarkSemantic =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["BgPage"] = "#080D1B",
-            ["BgSurface"] = "#111B2E",
-            ["BgSurfaceAlt"] = "#1B2940",
-            ["BorderSubtle"] = "#30445F",
-            ["AccentPrimary"] = "#55E6FF",
-            ["TextPrimary"] = "#F3F7FF",
-            ["TextMuted"] = "#9BAFC9",
-            ["AccentDanger"] = "#FF718B",
-            ["AccentSuccess"] = "#53E6B1",
+            ["BgPage"] = "#030712",
+            ["BgSurface"] = "#0A1020",
+            ["BgSurfaceAlt"] = "#0E1A2E",
+            ["BorderSubtle"] = "#1B3552",
+            ["AccentPrimary"] = "#45F3FF",
+            ["TextPrimary"] = "#EAF6FF",
+            ["TextMuted"] = "#8CA7C5",
+            ["AccentDanger"] = "#FF5D7D",
+            ["AccentSuccess"] = "#47F0B2",
             ["AccentWarning"] = "#FFC66D",
         };
 
