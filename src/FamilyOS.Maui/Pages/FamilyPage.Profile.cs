@@ -28,7 +28,13 @@ public sealed partial class FamilyPage
                     Source = ImageSource.FromUri(new Uri(abs)),
                     Aspect = Aspect.AspectFill,
                     WidthRequest = 44,
-                    HeightRequest = 44
+                    HeightRequest = 44,
+                    Clip = new Microsoft.Maui.Controls.Shapes.EllipseGeometry
+                    {
+                        Center = new Point(22, 22),
+                        RadiusX = 22,
+                        RadiusY = 22
+                    }
                 }
             };
         }
