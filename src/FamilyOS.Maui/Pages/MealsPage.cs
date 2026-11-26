@@ -115,6 +115,10 @@ public sealed class MealsPage : ContentPage
                 var dayTitle = new Label { Text = day.ToString("dddd, MMMM d"), FontSize = 16, FontAttributes = FontAttributes.Bold };
                 dayTitle.SetDynamicResource(VisualElement.StyleProperty, "TextBodyStrong");
                 stack.Children.Add(dayTitle);
+                var dayShopping = new Button { Text = "🛒 Shopping list for this day", FontSize = 11, HorizontalOptions = LayoutOptions.Start };
+                dayShopping.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+                dayShopping.Clicked += async (_, _) => await AddDayToShoppingAsync(day);
+                stack.Children.Add(dayShopping);
                 foreach (var slot in Slots)
                 {
                     var entry = plan.Entries.FirstOrDefault(x => x.DayUtc.Date == day.Date && string.Equals(x.Slot, slot, StringComparison.OrdinalIgnoreCase));
@@ -213,6 +217,15 @@ public sealed class MealsPage : ContentPage
         var title = new Label { Text = recipe.Name, FontSize = 16, FontAttributes = FontAttributes.Bold };
         title.SetDynamicResource(VisualElement.StyleProperty, "TextBodyStrong");
         stack.Children.Add(title);
+        var source = new Label { Text = recipe.IsBuiltIn ? "FAMILYOS RECIPE COLLECTION" : "YOUR FAMILY RECIPE", FontSize = 9, CharacterSpacing = 1.1 };
+        source.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+        stack.Children.Add(source);
+        if (recipe.Tags is { Count: > 0 })
+        {
+            var tags = new Label { Text = string.Join("  ·  ", recipe.Tags), FontSize = 11, LineBreakMode = LineBreakMode.WordWrap };
+            tags.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+            stack.Children.Add(tags);
+        }
         var detail = new Label
         {
             Text = $"{recipe.Servings} servings" + (string.IsNullOrWhiteSpace(recipe.IngredientsCsv) ? "" : $" · {recipe.IngredientsCsv}"),
@@ -322,6 +335,19 @@ public sealed class MealsPage : ContentPage
         catch (Exception ex)
         {
             await DisplayAlertAsync("Recipe not deleted", ex is FamilyApiException ? ex.Message : "Could not delete this recipe.", "OK");
+        }
+    }
+
+    private async Task AddDayToShoppingAsync(DateTime day)
+    {
+        try
+        {
+            var result = await _api.AddDayToShoppingAsync(day);
+            await DisplayAlertAsync("Daily shopping list", $"Added {result.Added} new ingredient item(s) for {day:dddd}.", "OK");
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlertAsync("Shopping list not updated", ex is FamilyApiException ? ex.Message : "Could not add this day's ingredients.", "OK");
         }
     }
 
