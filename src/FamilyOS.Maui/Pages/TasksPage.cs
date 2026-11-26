@@ -333,7 +333,9 @@ public sealed class TasksPage : ContentPage
         save.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
         save.Clicked += async (_, _) =>
         {
-            completion.TrySetResult((true, date.Date.Date + time.Time));
+            var pickedDate = date.Date is DateTime selectedDate ? selectedDate.Date : initialValue.Date;
+            var pickedTime = time.Time is TimeSpan selectedTime ? selectedTime : initialValue.TimeOfDay;
+            completion.TrySetResult((true, pickedDate + pickedTime));
             await Navigation.PopModalAsync();
         };
         var buttons = new HorizontalStackLayout { Spacing = 10, Children = { cancel, save } };
@@ -513,10 +515,21 @@ public sealed class TasksPage : ContentPage
             return;
         }
 
-        await _tasks.SetPlannedTimesAsync(taskId, new PlannedTimesBody(
-            start.Value.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
-            end.Value.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
-            null));
+        try
+        {
+            await _tasks.SetPlannedTimesAsync(taskId, new PlannedTimesBody(
+                start.Value.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+                end.Value.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+                null));
+        }
+        catch (FamilyApiException ex)
+        {
+            _status.Text = $"Task accepted, but its schedule could not be saved: {ex.Message}";
+        }
+        catch (Exception)
+        {
+            _status.Text = "Task accepted, but its schedule could not be saved.";
+        }
     }
 
     private async Task ShowHistoryAsync(Guid taskId, string title)
