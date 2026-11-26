@@ -56,6 +56,9 @@ public sealed class RecipePreferencesController : ControllerBase
         Guid recipeId, [FromBody] SetRecipeMemberPreferenceBody body, CancellationToken ct)
     {
         var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
+        var displayName = await _db.FamilyMembers.AsNoTracking()
+            .Where(member => member.Id == memberId && member.FamilyId == familyId)
+            .Select(member => member.DisplayName).FirstAsync(ct);
         if (body.Preference is not null
             && (!Enum.TryParse<RecipePreferenceKind>(body.Preference, true, out var parsedPreference)
                 || !Enum.IsDefined(typeof(RecipePreferenceKind), parsedPreference)))
@@ -75,7 +78,7 @@ public sealed class RecipePreferencesController : ControllerBase
         if (row is null)
         {
             if (preferenceKind is null && !body.IsFavorite)
-                return Ok(new RecipeMemberPreferenceDto(recipeId, memberId, string.Empty, null, false, true));
+                return Ok(new RecipeMemberPreferenceDto(recipeId, memberId, displayName, null, false, true));
             row = RecipeMemberPreference.Create(familyId, recipeId, memberId, preferenceKind, body.IsFavorite);
             _db.RecipeMemberPreferences.Add(row);
         }
@@ -89,9 +92,6 @@ public sealed class RecipePreferencesController : ControllerBase
         }
 
         await _db.SaveChangesAsync(ct);
-        var displayName = await _db.FamilyMembers.AsNoTracking()
-            .Where(member => member.Id == memberId && member.FamilyId == familyId)
-            .Select(member => member.DisplayName).FirstAsync(ct);
         return Ok(new RecipeMemberPreferenceDto(recipeId, memberId, displayName,
             preferenceKind?.ToString(), body.IsFavorite, true));
     }
