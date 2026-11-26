@@ -7,6 +7,7 @@ public sealed class CalendarPage : ContentPage
 {
     private readonly CalendarApiClient _calendar;
     private readonly TasksApiClient _tasks;
+    private readonly Dictionary<Guid, string> _taskTitles = new();
     private readonly VerticalStackLayout _events;
     private readonly Label _rangeLabel;
     private readonly Label _status;
@@ -87,6 +88,17 @@ public sealed class CalendarPage : ContentPage
         try
         {
             var events = await _calendar.GetRangeAsync(_rangeStart, end);
+            _taskTitles.Clear();
+            try
+            {
+                var tasks = await _tasks.GetFamilyTasksAsync();
+                foreach (var task in tasks)
+                    _taskTitles[task.Id] = task.Title;
+            }
+            catch
+            {
+                // Calendar events remain useful if task details are temporarily unavailable.
+            }
             _events.Children.Clear();
             if (events.Count == 0)
             {
@@ -154,7 +166,9 @@ public sealed class CalendarPage : ContentPage
 
         if (item.LinkedTaskId is not null || item.LinkedRequestId is not null)
         {
-            var linked = item.LinkedTaskId is not null ? "Linked to a family task" : "Linked to a family request";
+            var linked = item.LinkedTaskId is Guid taskId
+                ? $"Task: {_taskTitles.GetValueOrDefault(taskId, "Linked family task")}"
+                : "Linked to a family request";
             var linkLabel = new Label { Text = linked, FontSize = 12 };
             linkLabel.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
             stack.Children.Add(linkLabel);
