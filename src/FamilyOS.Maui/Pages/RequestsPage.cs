@@ -581,7 +581,7 @@ public sealed class RequestsPage : ContentPage
         if (queue && status is "Submitted" or "PendingApproval" or "UnderReview" or "WaitingForInformation")
             return new[] { ("approve", "Approve", true), ("conditional-approve", "Approve with condition", false), ("deny", "Deny", false) };
         if (queue && status == "ConditionallyApproved")
-            return new[] { ("add-condition", "Add condition", false) };
+            return new[] { ("add-condition", "Add condition", false), ("deny", "Reject request", false) };
         if (!queue && status == "Draft")
             return new[] { ("submit", "Submit", true), ("cancel", "Withdraw", false) };
         if (!queue && status is "Submitted" or "PendingApproval" or "UnderReview" or "WaitingForInformation")
@@ -614,6 +614,13 @@ public sealed class RequestsPage : ContentPage
                 if (action == "conditional-approve")
                     await _api.RunActionAsync(id, action);
                 await _api.CreateConditionAsync(id, name.Trim(), description.Trim(), logicGroup);
+            }
+            else if (action == "deny")
+            {
+                var reason = await DisplayPromptAsync("Reject request", "Why is this request not approved?",
+                    "Reject", "Cancel", maxLength: 500);
+                if (reason is null) return;
+                await _api.RunActionAsync(id, action, string.IsNullOrWhiteSpace(reason) ? "Not approved" : reason.Trim());
             }
             else
                 await _api.RunActionAsync(id, action);
