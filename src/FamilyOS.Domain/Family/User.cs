@@ -42,6 +42,13 @@ public class User : Entity
         MarkUpdated();
     }
 
+    public void ClearFamilyAssociation()
+    {
+        FamilyId = null;
+        FamilyMemberId = null;
+        MarkUpdated();
+    }
+
     public string DisplayName => string.IsNullOrWhiteSpace($"{FirstName} {LastName}".Trim())
         ? Email
         : $"{FirstName} {LastName}".Trim();
