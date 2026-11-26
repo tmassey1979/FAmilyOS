@@ -11,6 +11,7 @@ public sealed class MealsPage : ContentPage
     private readonly VerticalStackLayout _recipeItems = new() { Spacing = 10 };
     private readonly SearchBar _recipeSearch = new() { Placeholder = "Search meals, ingredients, or cuisine…", FontSize = 14 };
     private readonly HorizontalStackLayout _recipeFilters = new() { Spacing = 8 };
+    private readonly Picker _recipeSort = new() { Title = "Sort recipes", WidthRequest = 170 };
     private List<RecipeDto> _allRecipes = new();
     private string _activeRecipeFilter = "All";
     private readonly Label _status = new() { FontSize = 13 };
@@ -56,7 +57,12 @@ public sealed class MealsPage : ContentPage
         newRecipe.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         newRecipe.Clicked += async (_, _) => await CreateRecipeAsync();
         _recipeSearch.TextChanged += (_, _) => RenderRecipes();
-        foreach (var filter in new[] { "All", "Dinner", "Breakfast", "Quick", "Vegetarian", "Kid-Friendly" })
+        _recipeSort.Items.Add("Recommended");
+        _recipeSort.Items.Add("Quickest");
+        _recipeSort.Items.Add("A to Z");
+        _recipeSort.SelectedIndex = 0;
+        _recipeSort.SelectedIndexChanged += (_, _) => RenderRecipes();
+        foreach (var filter in new[] { "All", "Dinner", "Breakfast", "Lunch", "Quick", "Vegetarian", "Kid-Friendly", "Budget-Friendly", "Family-Favorite", "High-Protein", "Slow-Cooker" })
         {
             var chip = new Button { Text = filter, FontSize = 12, Padding = new Thickness(14, 7), CornerRadius = 18 };
             chip.SetDynamicResource(VisualElement.StyleProperty, filter == "All" ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle");
@@ -79,7 +85,7 @@ public sealed class MealsPage : ContentPage
             {
                 heading, range, _today, _shopping, _status, _planItems,
                 new BoxView { HeightRequest = 1, Opacity = 0.25 },
-                recipeHeading, _recipeSearch, new ScrollView { Orientation = ScrollOrientation.Horizontal, Content = _recipeFilters, HeightRequest = 48 }, newRecipe, _recipeItems
+                recipeHeading, _recipeSearch, new ScrollView { Orientation = ScrollOrientation.Horizontal, Content = _recipeFilters, HeightRequest = 48 }, _recipeSort, newRecipe, _recipeItems
             }
         };
         Content = new RefreshView
@@ -293,6 +299,14 @@ public sealed class MealsPage : ContentPage
             var tagMatch = _activeRecipeFilter == "All"
                 || (recipe.Tags?.Any(tag => string.Equals(tag, _activeRecipeFilter, StringComparison.OrdinalIgnoreCase)) ?? false);
             return textMatch && tagMatch;
+        }).ToList();
+
+        results = (_recipeSort.SelectedIndex switch
+        {
+            1 => results.OrderBy(x => (x.PrepMinutes ?? 999) + (x.CookMinutes ?? 999)).ThenBy(x => x.Name),
+            2 => results.OrderBy(x => x.Name),
+            _ => results.OrderByDescending(x => x.Tags?.Contains("Family-Favorite") == true)
+                .ThenBy(x => x.Name)
         }).ToList();
 
         if (results.Count == 0)
