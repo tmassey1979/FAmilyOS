@@ -48,7 +48,7 @@ try
 
     builder.Services.AddInfrastructure(builder.Configuration);
     builder.Services.AddMediatR(cfg =>
-        cfg.RegisterServicesFromAssembly(typeof(FamilyOS.Application.AssemblyMarker).Assembly));
+        cfg.RegisterServicesFromAssembly(typeof(TaskCommandHandlers).Assembly));
     builder.Services.AddControllers()
         .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
     builder.Services.AddEndpointsApiExplorer();
@@ -124,19 +124,19 @@ try
 
     if (useDevBypass)
     {
-        authBuilder.AddScheme<AuthenticationSchemeOptions, DevBypassAuthenticationHandler>("DevBypass", _ => { });
+        authBuilder.AddScheme<AuthenticationSchemeOptions, DevAuthenticationHandler>(DevAuthenticationHandler.SchemeName, _ => { });
         authBuilder.AddPolicyScheme("Smart", "JWT or DevBypass", options =>
         {
             options.ForwardDefaultSelector = context =>
             {
-                if (context.Request.Headers.ContainsKey("X-Dev-User"))
-                    return "DevBypass";
+                if (context.Request.Headers.ContainsKey(DevAuthenticationHandler.HeaderName))
+                    return DevAuthenticationHandler.SchemeName;
                 return JwtBearerDefaults.AuthenticationScheme;
             };
         });
     }
 
-    builder.Services.AddAuthorization(options => FamilyAuthPolicies.AddPolicies(options));
+    builder.Services.AddFamilyAuthorization();
 
     builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
         p.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin()));
