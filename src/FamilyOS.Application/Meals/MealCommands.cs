@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace FamilyOS.Application.Meals;
 
 public record MealEntryDto(
-    Guid Id, DateTime DayUtc, string Slot, string DishName, string? Notes, string? IngredientsCsv);
+    Guid Id, DateTime DayUtc, string Slot, string DishName, string? Notes, string? IngredientsCsv, Guid? RecipeId = null);
 
 public record MealPlanDto(
     Guid Id, DateTime WeekStartUtc, string? Notes, List<MealEntryDto> Entries);
@@ -62,7 +62,7 @@ public class MealCommandHandlers :
 
         var week = MealPlan.ToMonday(cmd.WeekStartUtc ?? cmd.DayUtc);
         var plan = await LoadOrCreateAsync(week, ct);
-        var entry = plan.UpsertEntry(cmd.DayUtc, slot, cmd.DishName, cmd.Notes, cmd.IngredientsCsv);
+        var entry = plan.UpsertEntry(cmd.DayUtc, slot, cmd.DishName, cmd.Notes, cmd.IngredientsCsv, cmd.RecipeId);
         await _db.SaveChangesAsync(ct);
         return ToEntryDto(entry);
     }
@@ -157,5 +157,5 @@ public class MealCommandHandlers :
             .ToList());
 
     private static MealEntryDto ToEntryDto(MealEntry e) => new(
-        e.Id, e.DayUtc, e.Slot.ToString(), e.DishName, e.Notes, e.IngredientsCsv);
+        e.Id, e.DayUtc, e.Slot.ToString(), e.DishName, e.Notes, e.IngredientsCsv, e.RecipeId);
 }
