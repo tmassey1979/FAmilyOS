@@ -64,11 +64,13 @@ public sealed class ShoppingPage : ContentPage
         _status.Text = "Loading household shopping…";
         try
         {
-            var results = await Task.WhenAll(_api.GetQueueAsync(), _api.GetCartsAsync());
+            var queueTask = _api.GetQueueAsync();
+            var cartsTask = _api.GetCartsAsync();
+            await Task.WhenAll(queueTask, cartsTask);
             _queue.Children.Clear();
             _carts.Children.Clear();
-            var items = results[0];
-            var carts = results[1];
+            var items = await queueTask;
+            var carts = await cartsTask;
 
             if (items.Count == 0)
                 _queue.Children.Add(EmptyCard("Your shopping list is clear", "Add groceries, household supplies, or anything the family needs."));
