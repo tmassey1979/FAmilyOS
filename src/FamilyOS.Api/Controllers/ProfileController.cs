@@ -40,15 +40,15 @@ public class ProfileController : ControllerBase
         return Ok(dto);
     }
 
-    /// <summary>Upload a profile photo (multipart field name: file). Max ~2 MB. JPEG/PNG/WebP/GIF.</summary>
+    /// <summary>Upload a profile photo (multipart field name: file). Max ~20 MB. JPEG/PNG/WebP/GIF.</summary>
     [HttpPost("avatar")]
-    [RequestSizeLimit(2_500_000)]
+    [RequestSizeLimit(22_000_000)]
     public async Task<ActionResult<ProfileDto>> UploadAvatar(IFormFile? file, CancellationToken ct)
     {
         if (file is null || file.Length == 0)
             return BadRequest(new { detail = "No image file provided." });
-        if (file.Length > 2_000_000)
-            return BadRequest(new { detail = "Image must be 2 MB or smaller." });
+        if (file.Length > 20_000_000)
+            return BadRequest(new { detail = "Original image must be 20 MB or smaller." });
 
         var contentType = (file.ContentType ?? "").Split(';', 2)[0].Trim().ToLowerInvariant();
         if (!AllowedContentTypes.Contains(contentType))
