@@ -16,9 +16,11 @@ public static class EnsureTaskSchema
             """
             ALTER TABLE familyos."Tasks"
                 ADD COLUMN IF NOT EXISTS "EstimatedMinutes" integer NULL,
-                ADD COLUMN IF NOT EXISTS "CompletedAtUtc" timestamp with time zone NULL;
+                ADD COLUMN IF NOT EXISTS "CompletedAtUtc" timestamp with time zone NULL,
+                ADD COLUMN IF NOT EXISTS "PlannedStartUtc" timestamp with time zone NULL,
+                ADD COLUMN IF NOT EXISTS "PlannedEndUtc" timestamp with time zone NULL;
             """);
 
-        logger.LogInformation("Task schema ensured (EstimatedMinutes, CompletedAtUtc)");
+        logger.LogInformation("Task schema ensured (EstimatedMinutes, CompletedAtUtc, PlannedStartUtc, PlannedEndUtc)");
     }
 }
