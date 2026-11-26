@@ -3,12 +3,13 @@ using FamilyOS.Maui.Services;
 
 namespace FamilyOS.Maui.Pages;
 
-/// <summary>Sign in, create a household, or accept an existing family invitation.</summary>
+/// <summary>Sign in, choose a test subscription, then create or join a household.</summary>
 public sealed class OnboardingPage : ContentPage
 {
     private readonly IAuthSessionService _auth;
     private readonly OnboardingApiClient _api;
     private readonly StartupDiagnosticsService _diagnostics;
+    private readonly ISubscriptionPurchaseService _subscriptions;
     private readonly Entry _familyName = new() { Placeholder = "Household name" };
     private readonly Entry _displayName = new() { Placeholder = "Your display name (optional)" };
     private readonly Entry _email = new() { Placeholder = "Email (optional)", Keyboard = Keyboard.Email };
@@ -16,40 +17,72 @@ public sealed class OnboardingPage : ContentPage
     private readonly Entry _joinName = new() { Placeholder = "Your display name (optional)" };
     private readonly Label _status = new() { FontSize = 13 };
     private readonly Label _invitePreview = new() { FontSize = 14, IsVisible = false };
+    private readonly Label _planSummary = new() { FontSize = 14 };
+    private readonly Switch _annualBilling = new();
+    private readonly Switch _locationModule = new();
+    private readonly Switch _financeModule = new();
     private readonly FoButton _signIn = new() { Title = "Sign in with FamilyOS", LoadingText = "Opening sign-in…" };
+    private readonly FoButton _activateTestPlan = new() { Title = "Activate test plan — no charge", LoadingText = "Activating test plan…" };
     private readonly FoButton _create = new() { Title = "Create household", LoadingText = "Creating household…" };
     private readonly FoButton _preview = new() { Title = "Check invite", LoadingText = "Checking invitation…", Variant = FoButtonVariant.Secondary };
     private readonly FoButton _join = new() { Title = "Join household", LoadingText = "Joining household…" };
+    private Border? _subscriptionCard;
+    private Border? _createCard;
     private bool _signedIn;
     private bool _busy;
     private FoButton? _busyButton;
     private InvitePreviewDto? _currentInvite;
+    private SubscriptionPlan? _activePlan;
 
-    public OnboardingPage(IAuthSessionService auth, OnboardingApiClient api, StartupDiagnosticsService diagnostics)
+    public OnboardingPage(
+        IAuthSessionService auth,
+        OnboardingApiClient api,
+        StartupDiagnosticsService diagnostics,
+        ISubscriptionPurchaseService subscriptions)
     {
         _auth = auth;
         _api = api;
         _diagnostics = diagnostics;
+        _subscriptions = subscriptions;
         Title = "Get started";
         _status.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
-
         _signIn.Clicked += async (_, _) => await SignInAsync();
+        _activateTestPlan.Clicked += async (_, _) => await ActivateTestPlanAsync();
         _create.Clicked += async (_, _) => await CreateHouseholdAsync();
         _preview.Clicked += async (_, _) => await PreviewInviteAsync();
         _join.Clicked += async (_, _) => await JoinHouseholdAsync();
+        _annualBilling.Toggled += (_, _) => UpdatePlanSummary();
+        _locationModule.Toggled += (_, _) => UpdatePlanSummary();
+        _financeModule.Toggled += (_, _) => UpdatePlanSummary();
 
         var heading = new Label { Text = "Welcome to FamilyOS", FontSize = 26, FontAttributes = FontAttributes.Bold };
         heading.SetDynamicResource(VisualElement.StyleProperty, "TextDisplay");
         var intro = new Label
         {
-            Text = "Sign in, then create a household or join one with an invitation code.",
+            Text = "One place to organize your household. Sign in, choose a plan for a new household, or join an existing one by invitation.",
             FontSize = 14,
             LineBreakMode = LineBreakMode.WordWrap
         };
         intro.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
 
         var signInCard = Card("Your account", new View[] { _signIn });
-        var createCard = Card("Create a household", new View[] { _familyName, _displayName, _email, _create });
+        var annualRow = ToggleRow("Pay yearly (save on annual plans)", _annualBilling);
+        var locationRow = ToggleRow("Location & Safety  ·  optional", _locationModule);
+        var financeRow = ToggleRow("Family Finance  ·  optional", _financeModule);
+        _subscriptionCard = Card("Choose your FamilyOS plan", new View[]
+        {
+            new Label { Text = "Core is required for every household. Add either module, or choose both with the discounted bundle.", FontSize = 13 },
+            annualRow,
+            new BoxView { HeightRequest = 1, Opacity = 0.15 },
+            locationRow,
+            financeRow,
+            _planSummary,
+            new Label { Text = "30-day free trial applies to Core only. Optional modules are billed when selected. Trial eligibility and final terms will be confirmed by the store in the production billing flow.", FontSize = 12 },
+            new Label { Text = "TEST MODE · No payment is collected. This local simulator does not create a real subscription or server entitlement.", FontSize = 12, TextColor = Color.FromArgb("#B54708") },
+            _activateTestPlan
+        });
+        _createCard = Card("Create a household", new View[] { _familyName, _displayName, _email, _create });
+        _createCard.IsVisible = false;
         var joinCard = Card("Join an existing household",
             new View[] { _inviteCode, _preview, _invitePreview, _joinName, _join });
 
@@ -59,9 +92,10 @@ public sealed class OnboardingPage : ContentPage
             {
                 Padding = new Thickness(20, 24),
                 Spacing = 16,
-                Children = { heading, intro, _status, signInCard, createCard, joinCard }
+                Children = { heading, intro, _status, signInCard, _subscriptionCard, _createCard, joinCard }
             }
         };
+        UpdatePlanSummary();
         UpdateEnabledState();
     }
 
@@ -72,8 +106,18 @@ public sealed class OnboardingPage : ContentPage
         try
         {
             _signedIn = !string.IsNullOrWhiteSpace(await _auth.GetAccessTokenAsync());
-            _diagnostics.RecordCheckpoint($"AUTH onboarding session check completed; signed_in={_signedIn}");
-            _status.Text = _signedIn ? "You're signed in. Choose how to continue." : "Sign in to get started.";
+            _activePlan = await _subscriptions.GetCurrentPlanAsync();
+            if (_activePlan is not null)
+            {
+                _annualBilling.IsToggled = _activePlan.IsAnnual;
+                _locationModule.IsToggled = _activePlan.LocationEnabled;
+                _financeModule.IsToggled = _activePlan.FinanceEnabled;
+            }
+            _diagnostics.RecordCheckpoint($"AUTH onboarding session check completed; signed_in={_signedIn}; demo_plan_active={_activePlan is not null}");
+            _status.Text = _signedIn
+                ? _activePlan is null ? "You're signed in. Choose a test plan to create a household, or join one with an invitation."
+                    : "You're signed in. Your local test plan is active; you can create a household or join one."
+                : "Sign in to get started.";
         }
         catch (Exception ex)
         {
@@ -81,6 +125,7 @@ public sealed class OnboardingPage : ContentPage
             _signedIn = false;
             _status.Text = "Sign in to get started.";
         }
+        UpdatePlanSummary();
         UpdateEnabledState();
     }
 
@@ -93,8 +138,11 @@ public sealed class OnboardingPage : ContentPage
         {
             await _auth.SignInAsync();
             _signedIn = true;
+            _activePlan = await _subscriptions.GetCurrentPlanAsync();
             _diagnostics.RecordCheckpoint("AUTH onboarding sign-in succeeded; UI state updated to signed_in=true");
-            _status.Text = "You're signed in. Create or join a household below.";
+            _status.Text = _activePlan is null
+                ? "You're signed in. Choose a test plan to create a household, or join one with an invitation."
+                : "You're signed in. Your local test plan is active.";
         }
         catch (OperationCanceledException)
         {
@@ -112,9 +160,38 @@ public sealed class OnboardingPage : ContentPage
         }
     }
 
+    private async Task ActivateTestPlanAsync()
+    {
+        if (_busy || !_signedIn) return;
+        SetBusy(true, "Activating local test plan…", _activateTestPlan);
+        try
+        {
+            var plan = CurrentSelection();
+            _activePlan = await _subscriptions.ActivateTestPlanAsync(plan);
+            _diagnostics.RecordCheckpoint($"BILLING demo plan activated; annual={plan.IsAnnual}; location={plan.LocationEnabled}; finance={plan.FinanceEnabled}; no_store_purchase=true");
+            _status.Text = "Test plan saved on this device. No payment was made and no server entitlement was granted.";
+            _createCard!.IsVisible = true;
+            _activateTestPlan.Title = "Update test plan — no charge";
+        }
+        catch (Exception ex)
+        {
+            _diagnostics.RecordCheckpoint($"BILLING demo plan activation failed; exception={ex.GetType().Name}");
+            _status.Text = "Could not save the test plan. Try again.";
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
     private async Task CreateHouseholdAsync()
     {
         if (_busy || !_signedIn) return;
+        if (_activePlan is null || await _subscriptions.GetCurrentPlanAsync() is null)
+        {
+            _status.Text = "Activate a test plan before creating a household. Joining an existing household does not require a plan here.";
+            return;
+        }
         if (string.IsNullOrWhiteSpace(_familyName.Text))
         {
             _status.Text = "Enter a name for your household.";
@@ -239,6 +316,28 @@ public sealed class OnboardingPage : ContentPage
         }
     }
 
+    private SubscriptionPlan CurrentSelection()
+        => new(_annualBilling.IsToggled, _locationModule.IsToggled, _financeModule.IsToggled);
+
+    private void UpdatePlanSummary()
+    {
+        var plan = CurrentSelection();
+        var amount = plan.TotalPrice.ToString("C2", System.Globalization.CultureInfo.GetCultureInfo("en-US"));
+        _planSummary.Text = $"{plan.ModulesLabel}\n{amount} / {plan.BillingLabel} · Core required";
+    }
+
+    private static View ToggleRow(string title, Switch toggle)
+    {
+        var grid = new Grid
+        {
+            ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+            ColumnSpacing = 12,
+            Children = { new Label { Text = title, VerticalOptions = LayoutOptions.Center, FontSize = 14 }, toggle }
+        };
+        Grid.SetColumn(toggle, 1);
+        return grid;
+    }
+
     private async Task FinishAsync(string message)
     {
         _status.Text = message;
@@ -268,9 +367,15 @@ public sealed class OnboardingPage : ContentPage
     private void UpdateEnabledState()
     {
         _signIn.IsEnabled = !_busy && !_signedIn;
-        _create.IsEnabled = !_busy && _signedIn;
+        _annualBilling.IsEnabled = !_busy && _signedIn;
+        _locationModule.IsEnabled = !_busy && _signedIn;
+        _financeModule.IsEnabled = !_busy && _signedIn;
+        _activateTestPlan.IsEnabled = !_busy && _signedIn;
+        _create.IsEnabled = !_busy && _signedIn && _activePlan is not null;
         _preview.IsEnabled = !_busy;
         _join.IsEnabled = !_busy && _signedIn && _currentInvite?.IsOpen == true;
+        if (_subscriptionCard is not null) _subscriptionCard.IsVisible = _signedIn;
+        if (_createCard is not null) _createCard.IsVisible = _signedIn && _activePlan is not null;
     }
 
     private static Border Card(string title, IEnumerable<View> children)
