@@ -48,7 +48,7 @@ def generate_menu_icons() -> int:
     ensure_pillow()
     from PIL import Image, ImageDraw
 
-    menu_dir = MAUI_RES / "Images" / "Menu"
+    menu_dir = MAUI_RES / "Images"
     menu_dir.mkdir(parents=True, exist_ok=True)
     written = 0
 
