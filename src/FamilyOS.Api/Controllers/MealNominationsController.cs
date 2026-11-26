@@ -118,7 +118,7 @@ public sealed class MealNominationsController : ControllerBase
                 _db.MealPlans.Add(week);
             }
             var slot = Enum.Parse<MealSlot>(body.Slot!, true);
-            week.UpsertEntry(body.DayUtc!.Value, slot, nomination.Title,
+            week.AddEntry(body.DayUtc!.Value, slot, nomination.Title,
                 nomination.Note, recipeId: nomination.RecipeId);
         }
         await _db.SaveChangesAsync(ct);
