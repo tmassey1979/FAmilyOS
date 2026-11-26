@@ -153,7 +153,9 @@ public sealed record CreateTaskBody(
     string? Category = null,
     DateTime? DueDate = null,
     int? EstimatedDurationMinutes = null,
-    Guid? AssignToMemberId = null);
+    Guid? AssignToMemberId = null,
+    string? PlannedStartTime = null,
+    string? PlannedEndTime = null);
 
 public sealed record UpdateTaskDetailsBody(
     string? Title = null,
