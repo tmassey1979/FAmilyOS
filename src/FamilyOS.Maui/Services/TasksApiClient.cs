@@ -171,11 +171,12 @@ public sealed record PlannedTimesBody(
     int? EstimatedDurationMinutes = null);
 
 public sealed record TaskHistoryDto(
-    string Action,
-    string? Detail,
-    DateTime OccurredAtUtc,
-    Guid? ActorMemberId = null,
-    string? ActorName = null);
+    Guid Id,
+    string Status,
+    Guid ActorMemberId,
+    string ActorName,
+    string Detail,
+    DateTime TimestampUtc);
 
 internal sealed record NoteBody(string? Note, string? Reason);
 internal sealed record DeclineTaskBody(Guid? ReasonId, string? Note);
