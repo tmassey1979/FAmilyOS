@@ -1,1318 +1,340 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
+using FamilyOS.Domain.Meals;
 using FamilyOS.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace FamilyOS.Infrastructure.Seed;
 
-/// <summary>Creates normalized recipe catalog tables and idempotently seeds common ingredients and discovery tags.</summary>
+/// <summary>Creates normalized recipe catalog tables and idempotently seeds shared starter content.</summary>
 public static class EnsureRecipeCatalogSchema
 {
+    private static readonly (string Name, string Category, string? Aliases)[] Ingredients =
+    [
+        ("All-purpose flour", "Pantry", "plain flour"), ("Bread flour", "Pantry", "strong flour"),
+        ("Granulated sugar", "Pantry", "white sugar"), ("Brown sugar", "Pantry", "light brown sugar;dark brown sugar"),
+        ("Powdered sugar", "Pantry", "icing sugar;confectioners sugar"), ("Baking powder", "Pantry", null),
+        ("Baking soda", "Pantry", "bicarbonate of soda"), ("Salt", "Spices", "table salt"),
+        ("Black pepper", "Spices", "ground black pepper"), ("Olive oil", "Pantry", "extra virgin olive oil"),
+        ("Vegetable oil", "Pantry", "canola oil"), ("Butter", "Dairy", "unsalted butter;salted butter"),
+        ("Eggs", "Dairy", "large eggs"), ("Milk", "Dairy", "whole milk"), ("Heavy cream", "Dairy", "whipping cream"),
+        ("Sour cream", "Dairy", null), ("Cream cheese", "Dairy", null),
+        ("Shredded cheddar cheese", "Dairy", "cheddar"), ("Mozzarella cheese", "Dairy", "mozzarella"),
+        ("Parmesan cheese", "Dairy", "parmigiano"), ("Plain Greek yogurt", "Dairy", "greek yogurt"),
+        ("Chicken breast", "Meat", "boneless skinless chicken breast"), ("Chicken thighs", "Meat", "boneless chicken thighs"),
+        ("Ground beef", "Meat", "minced beef"), ("Steak", "Meat", "beef steak"), ("Bacon", "Meat", null),
+        ("Italian sausage", "Meat", "sausage"), ("Ground turkey", "Meat", "minced turkey"),
+        ("Salmon fillet", "Seafood", "salmon"), ("Shrimp", "Seafood", "prawns"),
+        ("Yellow onion", "Produce", "onion"), ("Red onion", "Produce", null), ("Garlic", "Produce", "garlic cloves"),
+        ("Russet potatoes", "Produce", "potatoes"), ("Sweet potatoes", "Produce", null),
+        ("Carrots", "Produce", null), ("Celery", "Produce", null), ("Broccoli", "Produce", null),
+        ("Bell pepper", "Produce", "capsicum;bell peppers"), ("Tomatoes", "Produce", "fresh tomato;tomato"),
+        ("Cherry tomatoes", "Produce", null), ("Cucumber", "Produce", null), ("Spinach", "Produce", "baby spinach"),
+        ("Lettuce", "Produce", "romaine lettuce"), ("Avocado", "Produce", null), ("Lemon", "Produce", null),
+        ("Lime", "Produce", null), ("Fresh parsley", "Produce", "parsley"), ("Fresh cilantro", "Produce", "coriander leaves"),
+        ("Fresh basil", "Produce", "basil"), ("Apples", "Produce", null), ("Bananas", "Produce", null),
+        ("Blueberries", "Produce", null), ("Strawberries", "Produce", null),
+        ("Linguine", "Pantry", null), ("Spaghetti", "Pantry", null), ("Penne pasta", "Pantry", "penne"),
+        ("Macaroni", "Pantry", "elbow macaroni"), ("White rice", "Pantry", "long grain rice;rice"),
+        ("Brown rice", "Pantry", null), ("Quinoa", "Pantry", null), ("Rolled oats", "Pantry", "old fashioned oats"),
+        ("Breadcrumbs", "Pantry", "bread crumbs"), ("Panko breadcrumbs", "Pantry", "panko"),
+        ("Tortillas", "Bakery", "flour tortillas"), ("Sandwich bread", "Bakery", "bread"),
+        ("Hamburger buns", "Bakery", "burger buns"), ("Pita bread", "Bakery", "pita"),
+        ("Canned diced tomatoes", "Canned", "tinned chopped tomatoes"), ("Tomato paste", "Canned", null),
+        ("Marinara sauce", "Canned", "pasta sauce"), ("Chicken broth", "Canned", "chicken stock"),
+        ("Beef broth", "Canned", "beef stock"), ("Black beans", "Canned", null), ("Kidney beans", "Canned", null),
+        ("Chickpeas", "Canned", "garbanzo beans"), ("Corn", "Canned", "sweetcorn"),
+        ("Peanut butter", "Pantry", null), ("Honey", "Pantry", null), ("Maple syrup", "Pantry", null),
+        ("Soy sauce", "Condiments", null), ("Worcestershire sauce", "Condiments", null),
+        ("Dijon mustard", "Condiments", "mustard"), ("Mayonnaise", "Condiments", "mayo"),
+        ("Ketchup", "Condiments", null), ("BBQ sauce", "Condiments", "barbecue sauce"),
+        ("Hot sauce", "Condiments", null), ("Italian seasoning", "Spices", null), ("Paprika", "Spices", "smoked paprika"),
+        ("Chili powder", "Spices", null), ("Ground cumin", "Spices", "cumin"),
+        ("Dried oregano", "Spices", "oregano"), ("Dried thyme", "Spices", "thyme"),
+        ("Cinnamon", "Spices", "ground cinnamon"), ("Red pepper flakes", "Spices", "crushed red pepper"),
+        ("Vanilla extract", "Baking", "vanilla"), ("Cocoa powder", "Baking", null),
+        ("Chocolate chips", "Baking", null), ("Cornstarch", "Baking", "corn flour"),
+        ("Active dry yeast", "Baking", "yeast"), ("Frozen peas", "Frozen", null),
+        ("Frozen mixed vegetables", "Frozen", "mixed veg"), ("Frozen berries", "Frozen", null),
+        ("Orange juice", "Beverages", null), ("Chicken stock", "Canned", "stock")
+    ];
+
+    private static readonly string[] Tags =
+    [
+        "Breakfast", "Lunch", "Dinner", "Snack", "Dessert", "Vegetarian", "Vegan", "Gluten-Free",
+        "Dairy-Free", "High-Protein", "Low-Carb", "Budget-Friendly", "Kid-Friendly", "Quick",
+        "Under-30-Minutes", "One-Pot", "Slow-Cooker", "Air-Fryer", "Meal-Prep", "Freezer-Friendly",
+        "Comfort-Food", "Italian", "Mexican", "American", "Asian-Inspired", "Mediterranean",
+        "Healthy", "Family-Favorite"
+    ];
+
+    private static readonly BuiltInRecipe[] Recipes =
+    [
+        new("Chicken fajita bowls", 4, "1 lb chicken breast, 2 bell peppers, 1 onion, 2 cups rice, 1 tbsp olive oil, 2 tsp chili powder, 1 tsp cumin, lime",
+            "Cook rice. Season and sauté sliced chicken in oil. Add peppers and onion; cook until tender. Serve over rice with lime.",
+            ["Dinner", "Mexican", "High-Protein", "Family-Favorite"]),
+        new("Creamy garlic chicken pasta", 4, "1 lb chicken breast, 12 oz penne pasta, 3 cloves garlic, 1 cup heavy cream, 1/2 cup parmesan cheese, 1 tbsp olive oil",
+            "Cook pasta. Sauté chicken until cooked through; add garlic and cream. Simmer, stir in parmesan, and toss with pasta.",
+            ["Dinner", "Italian", "Comfort-Food", "Family-Favorite"]),
+        new("Beef tacos", 4, "1 lb ground beef, 8 tortillas, 1 packet taco seasoning, 1 cup shredded cheddar cheese, 1 tomato, 1 cup lettuce",
+            "Brown beef, drain, add seasoning and water per packet. Spoon into warm tortillas and add toppings.",
+            ["Dinner", "Mexican", "Budget-Friendly", "Kid-Friendly"]),
+        new("Sheet-pan lemon chicken", 4, "1.5 lb chicken thighs, 1 lb potatoes, 3 carrots, 2 tbsp olive oil, 1 lemon, 1 tsp dried thyme",
+            "Heat oven to 425 F. Toss chopped vegetables with oil and thyme. Add chicken and lemon; roast 30-40 minutes until chicken reaches 165 F.",
+            ["Dinner", "One-Pot", "Meal-Prep", "Gluten-Free"]),
+        new("Slow cooker pulled pork", 8, "3 lb pork shoulder, 1 cup BBQ sauce, 1 onion, 1/2 cup chicken broth, 8 hamburger buns",
+            "Add pork, sliced onion, broth, and half the BBQ sauce to slow cooker. Cook low 8 hours, shred, and stir in remaining sauce.",
+            ["Dinner", "Slow-Cooker", "Budget-Friendly", "Freezer-Friendly"]),
+        new("Classic spaghetti and meat sauce", 4, "1 lb ground beef, 12 oz spaghetti, 24 oz marinara sauce, 1 onion, 2 cloves garlic, 1/4 cup parmesan cheese",
+            "Cook spaghetti. Brown beef with onion and garlic, drain, add marinara and simmer 15 minutes. Serve over pasta with parmesan.",
+            ["Dinner", "Italian", "Budget-Friendly", "Family-Favorite"]),
+        new("One-pot cheesy beef macaroni", 6, "1 lb ground beef, 2 cups macaroni, 2 cups beef broth, 1 cup milk, 1.5 cups shredded cheddar cheese, 1 tsp paprika",
+            "Brown beef in a pot. Add macaroni and broth; simmer until pasta is tender. Stir in milk and cheese until creamy.",
+            ["Dinner", "One-Pot", "Kid-Friendly", "Comfort-Food"]),
+        new("Baked salmon with rice", 4, "4 salmon fillets, 1 cup white rice, 1 lemon, 1 tbsp olive oil, 1 tsp garlic, 1 tsp black pepper",
+            "Cook rice. Brush salmon with oil, garlic, pepper, and lemon. Bake at 400 F for 12-15 minutes or until flaky.",
+            ["Dinner", "High-Protein", "Gluten-Free", "Quick"]),
+        new("Chicken quesadillas", 4, "2 cups cooked chicken, 4 tortillas, 1.5 cups shredded cheddar cheese, 1 bell pepper, 1 tbsp olive oil",
+            "Fill tortillas with chicken, cheese, and sliced pepper. Fold and cook in oiled skillet until crisp and cheese melts.",
+            ["Lunch", "Dinner", "Mexican", "Quick", "Kid-Friendly"]),
+        new("Turkey meatballs", 4, "1 lb ground turkey, 1 egg, 1/2 cup breadcrumbs, 1/4 cup parmesan cheese, 2 cups marinara sauce",
+            "Mix turkey, egg, breadcrumbs, and parmesan. Form meatballs and bake at 400 F for 18-22 minutes. Warm in marinara.",
+            ["Dinner", "High-Protein", "Meal-Prep", "Italian"]),
+        new("Vegetable fried rice", 4, "3 cups cooked rice, 2 eggs, 1 cup frozen mixed vegetables, 2 tbsp soy sauce, 1 tbsp vegetable oil, 2 green onions",
+            "Scramble eggs and set aside. Stir-fry vegetables, add rice and soy sauce, then fold in eggs and green onions.",
+            ["Lunch", "Dinner", "Vegetarian", "Budget-Friendly", "Quick"]),
+        new("Creamy tomato soup", 4, "28 oz canned diced tomatoes, 1 onion, 2 cloves garlic, 1 cup vegetable broth, 1/2 cup heavy cream, 1 tbsp olive oil",
+            "Sauté onion and garlic. Add tomatoes and broth; simmer 20 minutes. Blend smooth and stir in cream.",
+            ["Lunch", "Vegetarian", "Comfort-Food", "Budget-Friendly"]),
+        new("BBQ chicken sandwiches", 6, "2 lb chicken breast, 1 cup BBQ sauce, 6 hamburger buns, 1/2 onion, 1/2 cup chicken broth",
+            "Slow cook chicken with broth and half the BBQ sauce until shreddable. Shred, stir in remaining sauce, and serve on buns.",
+            ["Dinner", "Slow-Cooker", "Kid-Friendly", "Meal-Prep"]),
+        new("Breakfast egg muffins", 6, "8 eggs, 1/2 cup milk, 1 cup shredded cheddar cheese, 1 bell pepper, 1/2 cup spinach",
+            "Whisk eggs and milk. Stir in diced pepper, spinach, and cheese. Pour into greased muffin tin and bake at 350 F for 18-22 minutes.",
+            ["Breakfast", "High-Protein", "Meal-Prep", "Gluten-Free"]),
+        new("Blueberry oatmeal", 4, "2 cups rolled oats, 3 cups milk, 1 cup blueberries, 1 tbsp honey, 1 tsp cinnamon",
+            "Simmer oats and milk until creamy. Stir in cinnamon and honey; top with blueberries.",
+            ["Breakfast", "Vegetarian", "Budget-Friendly", "Kid-Friendly"]),
+        new("Banana pancakes", 4, "1.5 cups all-purpose flour, 2 bananas, 1 egg, 1 cup milk, 2 tsp baking powder, 2 tbsp butter",
+            "Mash bananas. Whisk with egg and milk, then fold in flour and baking powder. Cook pancakes in buttered skillet until golden.",
+            ["Breakfast", "Kid-Friendly", "Budget-Friendly"]),
+        new("Greek chicken wraps", 4, "1 lb chicken breast, 4 pita bread, 1 cucumber, 1 tomato, 1 cup plain Greek yogurt, 1 lemon, 1 tsp garlic",
+            "Season and grill chicken. Mix yogurt, lemon, and garlic for sauce. Fill pita with chicken, cucumber, tomato, and sauce.",
+            ["Lunch", "Dinner", "Mediterranean", "High-Protein"]),
+        new("Black bean quesadillas", 4, "1 can black beans, 4 tortillas, 1 cup shredded cheddar cheese, 1/2 bell pepper, 1 tsp cumin",
+            "Mash half the beans. Spread on tortillas, add cheese and pepper, fold, and toast in skillet until crisp.",
+            ["Lunch", "Vegetarian", "Budget-Friendly", "Quick"]),
+        new("Honey garlic shrimp bowls", 4, "1 lb shrimp, 2 cups white rice, 3 cloves garlic, 2 tbsp honey, 2 tbsp soy sauce, 1 tbsp olive oil",
+            "Cook rice. Sauté shrimp in oil; add garlic, honey, and soy sauce. Simmer until shrimp are opaque and sauce thickens.",
+            ["Dinner", "Asian-Inspired", "Quick", "High-Protein"]),
+        new("Loaded baked potatoes", 4, "4 russet potatoes, 1 cup sour cream, 1 cup shredded cheddar cheese, 4 slices bacon, 2 green onions",
+            "Bake potatoes at 425 F for 45-60 minutes until tender. Split and top with sour cream, cheese, bacon, and onions.",
+            ["Dinner", "Budget-Friendly", "Gluten-Free", "Comfort-Food"]),
+        new("Chicken noodle soup", 6, "1 lb chicken breast, 8 oz linguine, 3 carrots, 3 celery stalks, 1 onion, 8 cups chicken broth, 1 tsp dried thyme",
+            "Simmer chicken and vegetables in broth until chicken is cooked. Remove and shred chicken. Add pasta and cook tender; return chicken.",
+            ["Lunch", "Dinner", "Comfort-Food", "Freezer-Friendly"]),
+        new("Beef and broccoli stir-fry", 4, "1 lb steak, 4 cups broccoli, 2 tbsp soy sauce, 2 cloves garlic, 1 tbsp honey, 2 cups white rice",
+            "Cook rice. Sear thinly sliced steak, add broccoli with a splash of water, cover until tender. Stir in soy, garlic, and honey.",
+            ["Dinner", "Asian-Inspired", "High-Protein", "Quick"]),
+        new("Spinach and cheese omelet", 1, "2 eggs, 1/4 cup shredded cheddar cheese, 1/2 cup spinach, 1 tsp butter",
+            "Whisk eggs. Melt butter in skillet, add eggs, then spinach and cheese. Fold when set.",
+            ["Breakfast", "Vegetarian", "Quick", "Gluten-Free"]),
+        new("Baked ziti", 8, "1 lb penne pasta, 24 oz marinara sauce, 2 cups mozzarella cheese, 1/2 cup parmesan cheese, 1 cup ricotta cheese",
+            "Cook pasta until just shy of tender. Mix with marinara and ricotta, top with mozzarella and parmesan. Bake at 375 F for 25 minutes.",
+            ["Dinner", "Italian", "Comfort-Food", "Freezer-Friendly"]),
+        new("Crispy chicken tenders", 4, "1.5 lb chicken breast, 1 cup breadcrumbs, 1 egg, 1/2 cup all-purpose flour, 1 tsp paprika",
+            "Cut chicken into strips. Coat in flour, beaten egg, then breadcrumbs with paprika. Bake at 425 F for 18-22 minutes, turning once.",
+            ["Dinner", "Kid-Friendly", "Air-Fryer", "High-Protein"]),
+        new("Tuna pasta salad", 4, "12 oz penne pasta, 2 cans tuna, 1/2 cup mayonnaise, 2 celery stalks, 1/2 red onion, 1 tbsp lemon juice",
+            "Cook pasta and cool. Fold in drained tuna, mayonnaise, diced celery and onion, and lemon juice. Chill before serving.",
+            ["Lunch", "Budget-Friendly", "Meal-Prep"]),
+        new("Lentil vegetable curry", 6, "1.5 cups lentils, 1 onion, 2 carrots, 1 can diced tomatoes, 2 tbsp curry powder, 4 cups vegetable broth",
+            "Sauté onion and carrots. Add lentils, tomatoes, curry powder, and broth. Simmer 30-35 minutes until lentils are tender.",
+            ["Dinner", "Vegetarian", "Vegan", "Budget-Friendly", "One-Pot"]),
+        new("Caprese grilled cheese", 2, "4 slices sandwich bread, 4 slices mozzarella cheese, 1 tomato, 4 basil leaves, 2 tbsp butter",
+            "Layer mozzarella, tomato, and basil between bread. Butter outside and cook in skillet until golden and cheese melts.",
+            ["Lunch", "Vegetarian", "Quick", "Kid-Friendly"]),
+        new("Turkey chili", 6, "1 lb ground turkey, 1 can kidney beans, 1 can black beans, 1 can diced tomatoes, 1 onion, 2 tbsp chili powder",
+            "Brown turkey and onion. Add beans, tomatoes, chili powder, and 1 cup water. Simmer 25-30 minutes.",
+            ["Dinner", "One-Pot", "High-Protein", "Freezer-Friendly"]),
+        new("Apple cinnamon overnight oats", 2, "1 cup rolled oats, 1 cup milk, 1 apple, 1/2 cup plain Greek yogurt, 1 tsp cinnamon, 1 tbsp honey",
+            "Combine oats, milk, yogurt, diced apple, cinnamon, and honey. Refrigerate overnight and stir before serving.",
+            ["Breakfast", "Vegetarian", "Meal-Prep", "Quick"])
+    ];
+
     public static async Task RunAsync(FamilyOsDbContext db, ILogger logger)
     {
         await db.Database.ExecuteSqlRawAsync("""
             CREATE TABLE IF NOT EXISTS familyos."IngredientCatalog" (
-                "Id" uuid NOT NULL PRIMARY KEY,
-                "FamilyId" uuid NULL,
-                "Name" character varying(160) NOT NULL,
-                "SearchKey" character varying(180) NOT NULL,
-                "Category" character varying(60) NOT NULL,
-                "AliasesCsv" character varying(800) NULL,
+                "Id" uuid NOT NULL PRIMARY KEY, "FamilyId" uuid NULL,
+                "Name" character varying(160) NOT NULL, "SearchKey" character varying(180) NOT NULL,
+                "Category" character varying(60) NOT NULL, "AliasesCsv" character varying(800) NULL,
                 "IsBuiltIn" boolean NOT NULL DEFAULT false,
-                "CreatedAtUtc" timestamp with time zone NOT NULL,
-                "UpdatedAtUtc" timestamp with time zone NULL,
+                "CreatedAtUtc" timestamp with time zone NOT NULL, "UpdatedAtUtc" timestamp with time zone NULL,
                 "IsDeleted" boolean NOT NULL DEFAULT false
             );
-            CREATE INDEX IF NOT EXISTS "IX_IngredientCatalog_SearchKey"
-                ON familyos."IngredientCatalog" ("SearchKey");
-            CREATE INDEX IF NOT EXISTS "IX_IngredientCatalog_FamilyId_Name"
-                ON familyos."IngredientCatalog" ("FamilyId", "Name");
+            CREATE INDEX IF NOT EXISTS "IX_IngredientCatalog_SearchKey" ON familyos."IngredientCatalog" ("SearchKey");
+            CREATE INDEX IF NOT EXISTS "IX_IngredientCatalog_FamilyId_Name" ON familyos."IngredientCatalog" ("FamilyId", "Name");
 
             CREATE TABLE IF NOT EXISTS familyos."RecipeIngredients" (
-                "Id" uuid NOT NULL PRIMARY KEY,
-                "RecipeId" uuid NOT NULL,
-                "IngredientId" uuid NOT NULL,
-                "Quantity" numeric(12,3) NULL,
-                "Unit" character varying(40) NULL,
-                "PreparationNote" character varying(240) NULL,
-                "Section" character varying(100) NULL,
-                "SortOrder" integer NOT NULL,
-                "CreatedAtUtc" timestamp with time zone NOT NULL,
-                "UpdatedAtUtc" timestamp with time zone NULL,
-                "IsDeleted" boolean NOT NULL DEFAULT false
+                "Id" uuid NOT NULL PRIMARY KEY, "RecipeId" uuid NOT NULL, "IngredientId" uuid NOT NULL,
+                "Quantity" numeric(12,3) NULL, "Unit" character varying(40) NULL,
+                "PreparationNote" character varying(240) NULL, "Section" character varying(100) NULL,
+                "SortOrder" integer NOT NULL, "CreatedAtUtc" timestamp with time zone NOT NULL,
+                "UpdatedAtUtc" timestamp with time zone NULL, "IsDeleted" boolean NOT NULL DEFAULT false
             );
-            CREATE INDEX IF NOT EXISTS "IX_RecipeIngredients_RecipeId_SortOrder"
-                ON familyos."RecipeIngredients" ("RecipeId", "SortOrder");
-            CREATE INDEX IF NOT EXISTS "IX_RecipeIngredients_RecipeId_IngredientId"
-                ON familyos."RecipeIngredients" ("RecipeId", "IngredientId");
+            CREATE INDEX IF NOT EXISTS "IX_RecipeIngredients_RecipeId_SortOrder" ON familyos."RecipeIngredients" ("RecipeId", "SortOrder");
+            CREATE INDEX IF NOT EXISTS "IX_RecipeIngredients_RecipeId_IngredientId" ON familyos."RecipeIngredients" ("RecipeId", "IngredientId");
 
             CREATE TABLE IF NOT EXISTS familyos."RecipeTags" (
-                "Id" uuid NOT NULL PRIMARY KEY,
-                "FamilyId" uuid NULL,
-                "Name" character varying(60) NOT NULL,
-                "Slug" character varying(80) NOT NULL,
-                "CreatedAtUtc" timestamp with time zone NOT NULL,
-                "UpdatedAtUtc" timestamp with time zone NULL,
-                "IsDeleted" boolean NOT NULL DEFAULT false
+                "Id" uuid NOT NULL PRIMARY KEY, "FamilyId" uuid NULL, "Name" character varying(60) NOT NULL,
+                "Slug" character varying(80) NOT NULL, "CreatedAtUtc" timestamp with time zone NOT NULL,
+                "UpdatedAtUtc" timestamp with time zone NULL, "IsDeleted" boolean NOT NULL DEFAULT false
             );
             CREATE INDEX IF NOT EXISTS "IX_RecipeTags_Slug" ON familyos."RecipeTags" ("Slug");
-            CREATE UNIQUE INDEX IF NOT EXISTS "IX_RecipeTags_FamilyId_Slug"
-                ON familyos."RecipeTags" ("FamilyId", "Slug");
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_RecipeTags_FamilyId_Slug" ON familyos."RecipeTags" ("FamilyId", "Slug");
 
             CREATE TABLE IF NOT EXISTS familyos."RecipeTagLinks" (
-                "Id" uuid NOT NULL PRIMARY KEY,
-                "RecipeId" uuid NOT NULL,
-                "TagId" uuid NOT NULL,
-                "CreatedAtUtc" timestamp with time zone NOT NULL,
-                "UpdatedAtUtc" timestamp with time zone NULL,
+                "Id" uuid NOT NULL PRIMARY KEY, "RecipeId" uuid NOT NULL, "TagId" uuid NOT NULL,
+                "CreatedAtUtc" timestamp with time zone NOT NULL, "UpdatedAtUtc" timestamp with time zone NULL,
                 "IsDeleted" boolean NOT NULL DEFAULT false
             );
-            CREATE UNIQUE INDEX IF NOT EXISTS "IX_RecipeTagLinks_RecipeId_TagId"
-                ON familyos."RecipeTagLinks" ("RecipeId", "TagId");
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_RecipeTagLinks_RecipeId_TagId" ON familyos."RecipeTagLinks" ("RecipeId", "TagId");
 
             CREATE TABLE IF NOT EXISTS familyos."RecipeInstructionSteps" (
-                "Id" uuid NOT NULL PRIMARY KEY,
-                "RecipeId" uuid NOT NULL,
-                "StepNumber" integer NOT NULL,
-                "Text" character varying(2000) NOT NULL,
-                "DurationMinutes" integer NULL,
-                "CreatedAtUtc" timestamp with time zone NOT NULL,
-                "UpdatedAtUtc" timestamp with time zone NULL,
+                "Id" uuid NOT NULL PRIMARY KEY, "RecipeId" uuid NOT NULL, "StepNumber" integer NOT NULL,
+                "Text" character varying(2000) NOT NULL, "DurationMinutes" integer NULL,
+                "CreatedAtUtc" timestamp with time zone NOT NULL, "UpdatedAtUtc" timestamp with time zone NULL,
                 "IsDeleted" boolean NOT NULL DEFAULT false
             );
             CREATE UNIQUE INDEX IF NOT EXISTS "IX_RecipeInstructionSteps_RecipeId_StepNumber"
                 ON familyos."RecipeInstructionSteps" ("RecipeId", "StepNumber");
             """);
 
-        await db.Database.ExecuteSqlRawAsync("""
-            INSERT INTO familyos."IngredientCatalog"
-                ("Id", "FamilyId", "Name", "SearchKey", "Category", "AliasesCsv", "IsBuiltIn", "CreatedAtUtc", "IsDeleted")
-            SELECT v."Id", NULL, v."Name", v."SearchKey", v."Category", v."AliasesCsv", true, now(), false
-            FROM (VALUES
-            (gen_random_uuid(), NULL, 'All-purpose flour', 'all-purpose flour', 'Pantry', 'plain flour', true, now(), false),
-(gen_random_uuid(), NULL, 'Bread flour', 'bread flour', 'Pantry', 'strong flour', true, now(), false),
-(gen_random_uuid(), NULL, 'Granulated sugar', 'granulated sugar', 'Pantry', 'white sugar', true, now(), false),
-(gen_random_uuid(), NULL, 'Brown sugar', 'brown sugar', 'Pantry', 'light brown sugar;dark brown sugar', true, now(), false),
-(gen_random_uuid(), NULL, 'Powdered sugar', 'powdered sugar', 'Pantry', 'icing sugar;confectioners sugar', true, now(), false),
-(gen_random_uuid(), NULL, 'Baking powder', 'baking powder', 'Pantry', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Baking soda', 'baking soda', 'Pantry', 'bicarbonate of soda', true, now(), false),
-(gen_random_uuid(), NULL, 'Salt', 'salt', 'Spices', 'table salt', true, now(), false),
-(gen_random_uuid(), NULL, 'Black pepper', 'black pepper', 'Spices', 'ground black pepper', true, now(), false),
-(gen_random_uuid(), NULL, 'Olive oil', 'olive oil', 'Pantry', 'extra virgin olive oil', true, now(), false),
-(gen_random_uuid(), NULL, 'Vegetable oil', 'vegetable oil', 'Pantry', 'canola oil', true, now(), false),
-(gen_random_uuid(), NULL, 'Butter', 'butter', 'Dairy', 'unsalted butter;salted butter', true, now(), false),
-(gen_random_uuid(), NULL, 'Eggs', 'eggs', 'Dairy', 'large eggs', true, now(), false),
-(gen_random_uuid(), NULL, 'Milk', 'milk', 'Dairy', 'whole milk', true, now(), false),
-(gen_random_uuid(), NULL, 'Heavy cream', 'heavy cream', 'Dairy', 'whipping cream', true, now(), false),
-(gen_random_uuid(), NULL, 'Sour cream', 'sour cream', 'Dairy', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Cream cheese', 'cream cheese', 'Dairy', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Shredded cheddar cheese', 'shredded cheddar cheese', 'Dairy', 'cheddar', true, now(), false),
-(gen_random_uuid(), NULL, 'Mozzarella cheese', 'mozzarella cheese', 'Dairy', 'mozzarella', true, now(), false),
-(gen_random_uuid(), NULL, 'Parmesan cheese', 'parmesan cheese', 'Dairy', 'parmigiano', true, now(), false),
-(gen_random_uuid(), NULL, 'Plain Greek yogurt', 'plain greek yogurt', 'Dairy', 'greek yogurt', true, now(), false),
-(gen_random_uuid(), NULL, 'Chicken breast', 'chicken breast', 'Meat', 'boneless skinless chicken breast', true, now(), false),
-(gen_random_uuid(), NULL, 'Chicken thighs', 'chicken thighs', 'Meat', 'boneless chicken thighs', true, now(), false),
-(gen_random_uuid(), NULL, 'Ground beef', 'ground beef', 'Meat', 'minced beef', true, now(), false),
-(gen_random_uuid(), NULL, 'Steak', 'steak', 'Meat', 'beef steak', true, now(), false),
-(gen_random_uuid(), NULL, 'Bacon', 'bacon', 'Meat', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Italian sausage', 'italian sausage', 'Meat', 'sausage', true, now(), false),
-(gen_random_uuid(), NULL, 'Ground turkey', 'ground turkey', 'Meat', 'minced turkey', true, now(), false),
-(gen_random_uuid(), NULL, 'Salmon fillet', 'salmon fillet', 'Seafood', 'salmon', true, now(), false),
-(gen_random_uuid(), NULL, 'Shrimp', 'shrimp', 'Seafood', 'prawns', true, now(), false),
-(gen_random_uuid(), NULL, 'Yellow onion', 'yellow onion', 'Produce', 'onion', true, now(), false),
-(gen_random_uuid(), NULL, 'Red onion', 'red onion', 'Produce', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Garlic', 'garlic', 'Produce', 'garlic cloves', true, now(), false),
-(gen_random_uuid(), NULL, 'Russet potatoes', 'russet potatoes', 'Produce', 'potatoes', true, now(), false),
-(gen_random_uuid(), NULL, 'Sweet potatoes', 'sweet potatoes', 'Produce', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Carrots', 'carrots', 'Produce', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Celery', 'celery', 'Produce', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Broccoli', 'broccoli', 'Produce', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Bell pepper', 'bell pepper', 'Produce', 'capsicum', true, now(), false),
-(gen_random_uuid(), NULL, 'Tomatoes', 'tomatoes', 'Produce', 'fresh tomato', true, now(), false),
-(gen_random_uuid(), NULL, 'Cherry tomatoes', 'cherry tomatoes', 'Produce', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Cucumber', 'cucumber', 'Produce', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Spinach', 'spinach', 'Produce', 'baby spinach', true, now(), false),
-(gen_random_uuid(), NULL, 'Lettuce', 'lettuce', 'Produce', 'romaine lettuce', true, now(), false),
-(gen_random_uuid(), NULL, 'Avocado', 'avocado', 'Produce', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Lemon', 'lemon', 'Produce', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Lime', 'lime', 'Produce', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Fresh parsley', 'fresh parsley', 'Produce', 'parsley', true, now(), false),
-(gen_random_uuid(), NULL, 'Fresh cilantro', 'fresh cilantro', 'Produce', 'coriander leaves', true, now(), false),
-(gen_random_uuid(), NULL, 'Fresh basil', 'fresh basil', 'Produce', 'basil', true, now(), false),
-(gen_random_uuid(), NULL, 'Apples', 'apples', 'Produce', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Bananas', 'bananas', 'Produce', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Blueberries', 'blueberries', 'Produce', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Strawberries', 'strawberries', 'Produce', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Linguine', 'linguine', 'Pantry', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Spaghetti', 'spaghetti', 'Pantry', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Penne pasta', 'penne pasta', 'Pantry', 'penne', true, now(), false),
-(gen_random_uuid(), NULL, 'Macaroni', 'macaroni', 'Pantry', 'elbow macaroni', true, now(), false),
-(gen_random_uuid(), NULL, 'White rice', 'white rice', 'Pantry', 'long grain rice', true, now(), false),
-(gen_random_uuid(), NULL, 'Brown rice', 'brown rice', 'Pantry', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Quinoa', 'quinoa', 'Pantry', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Rolled oats', 'rolled oats', 'Pantry', 'old fashioned oats', true, now(), false),
-(gen_random_uuid(), NULL, 'Breadcrumbs', 'breadcrumbs', 'Pantry', 'bread crumbs', true, now(), false),
-(gen_random_uuid(), NULL, 'Panko breadcrumbs', 'panko breadcrumbs', 'Pantry', 'panko', true, now(), false),
-(gen_random_uuid(), NULL, 'Tortillas', 'tortillas', 'Bakery', 'flour tortillas', true, now(), false),
-(gen_random_uuid(), NULL, 'Sandwich bread', 'sandwich bread', 'Bakery', 'bread', true, now(), false),
-(gen_random_uuid(), NULL, 'Hamburger buns', 'hamburger buns', 'Bakery', 'burger buns', true, now(), false),
-(gen_random_uuid(), NULL, 'Pita bread', 'pita bread', 'Bakery', 'pita', true, now(), false),
-(gen_random_uuid(), NULL, 'Canned diced tomatoes', 'canned diced tomatoes', 'Canned', 'tinned chopped tomatoes', true, now(), false),
-(gen_random_uuid(), NULL, 'Tomato paste', 'tomato paste', 'Canned', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Marinara sauce', 'marinara sauce', 'Canned', 'pasta sauce', true, now(), false),
-(gen_random_uuid(), NULL, 'Chicken broth', 'chicken broth', 'Canned', 'chicken stock', true, now(), false),
-(gen_random_uuid(), NULL, 'Beef broth', 'beef broth', 'Canned', 'beef stock', true, now(), false),
-(gen_random_uuid(), NULL, 'Black beans', 'black beans', 'Canned', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Kidney beans', 'kidney beans', 'Canned', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Chickpeas', 'chickpeas', 'Canned', 'garbanzo beans', true, now(), false),
-(gen_random_uuid(), NULL, 'Corn', 'corn', 'Canned', 'sweetcorn', true, now(), false),
-(gen_random_uuid(), NULL, 'Peanut butter', 'peanut butter', 'Pantry', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Honey', 'honey', 'Pantry', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Maple syrup', 'maple syrup', 'Pantry', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Soy sauce', 'soy sauce', 'Condiments', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Worcestershire sauce', 'worcestershire sauce', 'Condiments', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Dijon mustard', 'dijon mustard', 'Condiments', 'mustard', true, now(), false),
-(gen_random_uuid(), NULL, 'Mayonnaise', 'mayonnaise', 'Condiments', 'mayo', true, now(), false),
-(gen_random_uuid(), NULL, 'Ketchup', 'ketchup', 'Condiments', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'BBQ sauce', 'bbq sauce', 'Condiments', 'barbecue sauce', true, now(), false),
-(gen_random_uuid(), NULL, 'Hot sauce', 'hot sauce', 'Condiments', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Italian seasoning', 'italian seasoning', 'Spices', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Paprika', 'paprika', 'Spices', 'smoked paprika', true, now(), false),
-(gen_random_uuid(), NULL, 'Chili powder', 'chili powder', 'Spices', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Ground cumin', 'ground cumin', 'Spices', 'cumin', true, now(), false),
-(gen_random_uuid(), NULL, 'Dried oregano', 'dried oregano', 'Spices', 'oregano', true, now(), false),
-(gen_random_uuid(), NULL, 'Dried thyme', 'dried thyme', 'Spices', 'thyme', true, now(), false),
-(gen_random_uuid(), NULL, 'Cinnamon', 'cinnamon', 'Spices', 'ground cinnamon', true, now(), false),
-(gen_random_uuid(), NULL, 'Red pepper flakes', 'red pepper flakes', 'Spices', 'crushed red pepper', true, now(), false),
-(gen_random_uuid(), NULL, 'Vanilla extract', 'vanilla extract', 'Baking', 'vanilla', true, now(), false),
-(gen_random_uuid(), NULL, 'Cocoa powder', 'cocoa powder', 'Baking', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Chocolate chips', 'chocolate chips', 'Baking', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Cornstarch', 'cornstarch', 'Baking', 'corn flour', true, now(), false),
-(gen_random_uuid(), NULL, 'Active dry yeast', 'active dry yeast', 'Baking', 'yeast', true, now(), false),
-(gen_random_uuid(), NULL, 'Frozen peas', 'frozen peas', 'Frozen', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Frozen mixed vegetables', 'frozen mixed vegetables', 'Frozen', 'mixed veg', true, now(), false),
-(gen_random_uuid(), NULL, 'Frozen berries', 'frozen berries', 'Frozen', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Orange juice', 'orange juice', 'Beverages', NULL, true, now(), false),
-(gen_random_uuid(), NULL, 'Chicken stock', 'chicken stock', 'Canned', 'stock', true, now(), false)
-            ) AS v("Id", "FamilyId", "Name", "SearchKey", "Category", "AliasesCsv", "IsBuiltIn", "CreatedAtUtc", "IsDeleted")
-            WHERE NOT EXISTS (
-                SELECT 1 FROM familyos."IngredientCatalog" i
-                WHERE i."FamilyId" IS NULL AND i."SearchKey" = v."SearchKey" AND i."IsDeleted" = false
-            );
-            """);
-        await db.Database.ExecuteSqlRawAsync("""
-            INSERT INTO familyos."RecipeTags" ("Id", "FamilyId", "Name", "Slug", "CreatedAtUtc", "IsDeleted")
-            SELECT v."Id", NULL, v."Name", v."Slug", now(), false
-            FROM (VALUES
-            (gen_random_uuid(), NULL, 'Breakfast', 'breakfast', now(), false),
-(gen_random_uuid(), NULL, 'Lunch', 'lunch', now(), false),
-(gen_random_uuid(), NULL, 'Dinner', 'dinner', now(), false),
-(gen_random_uuid(), NULL, 'Snack', 'snack', now(), false),
-(gen_random_uuid(), NULL, 'Dessert', 'dessert', now(), false),
-(gen_random_uuid(), NULL, 'Vegetarian', 'vegetarian', now(), false),
-(gen_random_uuid(), NULL, 'Vegan', 'vegan', now(), false),
-(gen_random_uuid(), NULL, 'Gluten-Free', 'gluten-free', now(), false),
-(gen_random_uuid(), NULL, 'Dairy-Free', 'dairy-free', now(), false),
-(gen_random_uuid(), NULL, 'High-Protein', 'high-protein', now(), false),
-(gen_random_uuid(), NULL, 'Low-Carb', 'low-carb', now(), false),
-(gen_random_uuid(), NULL, 'Budget-Friendly', 'budget-friendly', now(), false),
-(gen_random_uuid(), NULL, 'Kid-Friendly', 'kid-friendly', now(), false),
-(gen_random_uuid(), NULL, 'Quick', 'quick', now(), false),
-(gen_random_uuid(), NULL, 'Under-30-Minutes', 'under-30-minutes', now(), false),
-(gen_random_uuid(), NULL, 'One-Pot', 'one-pot', now(), false),
-(gen_random_uuid(), NULL, 'Slow-Cooker', 'slow-cooker', now(), false),
-(gen_random_uuid(), NULL, 'Air-Fryer', 'air-fryer', now(), false),
-(gen_random_uuid(), NULL, 'Meal-Prep', 'meal-prep', now(), false),
-(gen_random_uuid(), NULL, 'Freezer-Friendly', 'freezer-friendly', now(), false),
-(gen_random_uuid(), NULL, 'Comfort-Food', 'comfort-food', now(), false),
-(gen_random_uuid(), NULL, 'Italian', 'italian', now(), false),
-(gen_random_uuid(), NULL, 'Mexican', 'mexican', now(), false),
-(gen_random_uuid(), NULL, 'American', 'american', now(), false),
-(gen_random_uuid(), NULL, 'Asian-Inspired', 'asian-inspired', now(), false),
-(gen_random_uuid(), NULL, 'Mediterranean', 'mediterranean', now(), false),
-(gen_random_uuid(), NULL, 'Healthy', 'healthy', now(), false),
-(gen_random_uuid(), NULL, 'Family-Favorite', 'family-favorite', now(), false)
-            ) AS v("Id", "FamilyId", "Name", "Slug", "CreatedAtUtc", "IsDeleted")
-            WHERE NOT EXISTS (
-                SELECT 1 FROM familyos."RecipeTags" t
-                WHERE t."FamilyId" IS NULL AND t."Slug" = v."Slug" AND t."IsDeleted" = false
-            );
-            """);
-
-        await db.Database.ExecuteSqlRawAsync("""
-            INSERT INTO familyos."Recipes"
-                ("Id", "FamilyId", "Name", "Servings", "IngredientsCsv", "Instructions", "CreatedAtUtc", "UpdatedAtUtc", "IsDeleted")
-            SELECT v."Id", v."FamilyId", v."Name", v."Servings", v."IngredientsCsv", v."Instructions", now(), NULL, false
-            FROM (VALUES
-            (gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Chicken fajita bowls', 4, '1 lb chicken breast, 2 bell peppers, 1 onion, 2 cups rice, 1 tbsp olive oil, 2 tsp chili powder, 1 tsp cumin, lime', 'Cook rice. Season and sauté sliced chicken in oil. Add peppers and onion; cook until tender. Serve over rice with lime.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Creamy garlic chicken pasta', 4, '1 lb chicken breast, 12 oz penne pasta, 3 cloves garlic, 1 cup heavy cream, 1/2 cup parmesan cheese, 1 tbsp olive oil', 'Cook pasta. Sauté chicken until cooked through; add garlic and cream. Simmer, stir in parmesan, and toss with pasta.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Beef tacos', 4, '1 lb ground beef, 8 tortillas, 1 packet taco seasoning, 1 cup shredded cheddar cheese, 1 tomato, 1 cup lettuce', 'Brown beef, drain, add seasoning and water per packet. Spoon into warm tortillas and add toppings.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Sheet-pan lemon chicken', 4, '1.5 lb chicken thighs, 1 lb potatoes, 3 carrots, 2 tbsp olive oil, 1 lemon, 1 tsp dried thyme', 'Heat oven to 425 F. Toss chopped vegetables with oil and thyme. Add chicken and lemon; roast 30-40 minutes until chicken reaches 165 F.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Slow cooker pulled pork', 4, '3 lb pork shoulder, 1 cup BBQ sauce, 1 onion, 1/2 cup chicken broth, 8 hamburger buns', 'Add pork, sliced onion, broth, and half the BBQ sauce to slow cooker. Cook low 8 hours, shred, and stir in remaining sauce.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Classic spaghetti and meat sauce', 4, '1 lb ground beef, 12 oz spaghetti, 24 oz marinara sauce, 1 onion, 2 cloves garlic, 1/4 cup parmesan cheese', 'Cook spaghetti. Brown beef with onion and garlic, drain, add marinara and simmer 15 minutes. Serve over pasta with parmesan.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'One-pot cheesy beef macaroni', 4, '1 lb ground beef, 2 cups macaroni, 2 cups beef broth, 1 cup milk, 1.5 cups shredded cheddar cheese, 1 tsp paprika', 'Brown beef in a pot. Add macaroni and broth; simmer until pasta is tender. Stir in milk and cheese until creamy.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Baked salmon with rice', 4, '4 salmon fillets, 1 cup white rice, 1 lemon, 1 tbsp olive oil, 1 tsp garlic, 1 tsp black pepper', 'Cook rice. Brush salmon with oil, garlic, pepper, and lemon. Bake at 400 F for 12-15 minutes or until flaky.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Chicken quesadillas', 4, '2 cups cooked chicken, 4 tortillas, 1.5 cups shredded cheddar cheese, 1 bell pepper, 1 tbsp olive oil', 'Fill tortillas with chicken, cheese, and sliced pepper. Fold and cook in oiled skillet until crisp and cheese melts.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Turkey meatballs', 4, '1 lb ground turkey, 1 egg, 1/2 cup breadcrumbs, 1/4 cup parmesan cheese, 2 cups marinara sauce', 'Mix turkey, egg, breadcrumbs, and parmesan. Form meatballs and bake at 400 F for 18-22 minutes. Warm in marinara.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Vegetable fried rice', 4, '3 cups cooked rice, 2 eggs, 1 cup frozen mixed vegetables, 2 tbsp soy sauce, 1 tbsp vegetable oil, 2 green onions', 'Scramble eggs and set aside. Stir-fry vegetables, add rice and soy sauce, then fold in eggs and green onions.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Creamy tomato soup', 4, '28 oz canned diced tomatoes, 1 onion, 2 cloves garlic, 1 cup vegetable broth, 1/2 cup heavy cream, 1 tbsp olive oil', 'Sauté onion and garlic. Add tomatoes and broth; simmer 20 minutes. Blend smooth and stir in cream.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'BBQ chicken sandwiches', 4, '2 lb chicken breast, 1 cup BBQ sauce, 6 hamburger buns, 1/2 onion, 1/2 cup chicken broth', 'Slow cook chicken with broth and half the BBQ sauce until shreddable. Shred, stir in remaining sauce, and serve on buns.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Breakfast egg muffins', 4, '8 eggs, 1/2 cup milk, 1 cup shredded cheddar cheese, 1 bell pepper, 1/2 cup spinach', 'Whisk eggs and milk. Stir in diced pepper, spinach, and cheese. Pour into greased muffin tin and bake at 350 F for 18-22 minutes.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Blueberry oatmeal', 4, '2 cups rolled oats, 3 cups milk, 1 cup blueberries, 1 tbsp honey, 1 tsp cinnamon', 'Simmer oats and milk until creamy. Stir in cinnamon and honey; top with blueberries.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Banana pancakes', 4, '1.5 cups all-purpose flour, 2 bananas, 1 egg, 1 cup milk, 2 tsp baking powder, 2 tbsp butter', 'Mash bananas. Whisk with egg and milk, then fold in flour and baking powder. Cook pancakes in buttered skillet until golden.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Greek chicken wraps', 4, '1 lb chicken breast, 4 pita bread, 1 cucumber, 1 tomato, 1 cup plain Greek yogurt, 1 lemon, 1 tsp garlic', 'Season and grill chicken. Mix yogurt, lemon, and garlic for sauce. Fill pita with chicken, cucumber, tomato, and sauce.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Black bean quesadillas', 4, '1 can black beans, 4 tortillas, 1 cup shredded cheddar cheese, 1/2 bell pepper, 1 tsp cumin', 'Mash half the beans. Spread on tortillas, add cheese and pepper, fold, and toast in skillet until crisp.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Honey garlic shrimp bowls', 4, '1 lb shrimp, 2 cups white rice, 3 cloves garlic, 2 tbsp honey, 2 tbsp soy sauce, 1 tbsp olive oil', 'Cook rice. Sauté shrimp in oil; add garlic, honey, and soy sauce. Simmer until shrimp are opaque and sauce thickens.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Loaded baked potatoes', 4, '4 russet potatoes, 1 cup sour cream, 1 cup shredded cheddar cheese, 4 slices bacon, 2 green onions', 'Bake potatoes at 425 F for 45-60 minutes until tender. Split and top with sour cream, cheese, bacon, and onions.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Chicken noodle soup', 4, '1 lb chicken breast, 8 oz linguine, 3 carrots, 3 celery stalks, 1 onion, 8 cups chicken broth, 1 tsp dried thyme', 'Simmer chicken and vegetables in broth until chicken is cooked. Remove and shred chicken. Add pasta and cook tender; return chicken.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Beef and broccoli stir-fry', 4, '1 lb steak, 4 cups broccoli, 2 tbsp soy sauce, 2 cloves garlic, 1 tbsp honey, 2 cups white rice', 'Cook rice. Sear thinly sliced steak, add broccoli with a splash of water, cover until tender. Stir in soy, garlic, and honey.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Spinach and cheese omelet', 4, '2 eggs, 1/4 cup shredded cheddar cheese, 1/2 cup spinach, 1 tsp butter', 'Whisk eggs. Melt butter in skillet, add eggs, then spinach and cheese. Fold when set.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Baked ziti', 4, '1 lb penne pasta, 24 oz marinara sauce, 2 cups mozzarella cheese, 1/2 cup parmesan cheese, 1 cup ricotta cheese', 'Cook pasta until just shy of tender. Mix with marinara and ricotta, top with mozzarella and parmesan. Bake at 375 F for 25 minutes.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Crispy chicken tenders', 4, '1.5 lb chicken breast, 1 cup breadcrumbs, 1 egg, 1/2 cup all-purpose flour, 1 tsp paprika', 'Cut chicken into strips. Coat in flour, beaten egg, then breadcrumbs with paprika. Bake at 425 F for 18-22 minutes, turning once.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Tuna pasta salad', 4, '12 oz penne pasta, 2 cans tuna, 1/2 cup mayonnaise, 2 celery stalks, 1/2 red onion, 1 tbsp lemon juice', 'Cook pasta and cool. Fold in drained tuna, mayonnaise, diced celery and onion, and lemon juice. Chill before serving.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Lentil vegetable curry', 4, '1.5 cups lentils, 1 onion, 2 carrots, 1 can diced tomatoes, 2 tbsp curry powder, 4 cups vegetable broth', 'Sauté onion and carrots. Add lentils, tomatoes, curry powder, and broth. Simmer 30-35 minutes until lentils are tender.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Caprese grilled cheese', 4, '4 slices sandwich bread, 4 slices mozzarella cheese, 1 tomato, 4 basil leaves, 2 tbsp butter', 'Layer mozzarella, tomato, and basil between bread. Butter outside and cook in skillet until golden and cheese melts.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Turkey chili', 4, '1 lb ground turkey, 1 can kidney beans, 1 can black beans, 1 can diced tomatoes, 1 onion, 2 tbsp chili powder', 'Brown turkey and onion. Add beans, tomatoes, chili powder, and 1 cup water. Simmer 25-30 minutes.', now(), NULL, false),
-(gen_random_uuid(), '00000000-0000-0000-0000-000000000000'::uuid, 'Apple cinnamon overnight oats', 4, '1 cup rolled oats, 1 cup milk, 1 apple, 1/2 cup plain Greek yogurt, 1 tsp cinnamon, 1 tbsp honey', 'Combine oats, milk, yogurt, diced apple, cinnamon, and honey. Refrigerate overnight and stir before serving.', now(), NULL, false)
-            ) AS v("Id", "FamilyId", "Name", "Servings", "IngredientsCsv", "Instructions", "CreatedAtUtc", "UpdatedAtUtc", "IsDeleted")
-            WHERE NOT EXISTS (
-                SELECT 1 FROM familyos."Recipes" r
-                WHERE r."FamilyId" = '00000000-0000-0000-0000-000000000000'::uuid
-                  AND lower(r."Name") = lower(v."Name") AND r."IsDeleted" = false
-            );
-            """);
-        await db.Database.ExecuteSqlRawAsync("""
-            WITH raw_lines AS (
-                SELECT r."Id" AS "RecipeId", trim(line) AS "RawLine",
-                       row_number() OVER (PARTITION BY r."Id" ORDER BY ordinality)::integer - 1 AS "SortOrder"
-                FROM familyos."Recipes" r
-                CROSS JOIN LATERAL regexp_split_to_table(coalesce(r."IngredientsCsv", ''), ',')
-                    WITH ORDINALITY AS split(line, ordinality)
-                WHERE r."FamilyId" = '00000000-0000-0000-0000-000000000000'::uuid
-                  AND r."IsDeleted" = false
-            ),
-            parsed AS (
-                SELECT "RecipeId", "RawLine", "SortOrder",
-                    (regexp_match("RawLine", '^\s*([0-9]+(?:\.[0-9]+)?|[0-9]+/[0-9]+)\s+([[:alpha:]]+)\s+(.+?)\s* ("Id", "RecipeId", "TagId", "CreatedAtUtc", "IsDeleted")
-            SELECT gen_random_uuid(), r."Id", t."Id", now(), false
-            FROM familyos."Recipes" r
-            JOIN (VALUES
-('Chicken fajita bowls', 'dinner'),
-('Chicken fajita bowls', 'mexican'),
-('Chicken fajita bowls', 'high-protein'),
-('Chicken fajita bowls', 'family-favorite'),
-('Creamy garlic chicken pasta', 'dinner'),
-('Creamy garlic chicken pasta', 'italian'),
-('Creamy garlic chicken pasta', 'comfort-food'),
-('Creamy garlic chicken pasta', 'family-favorite'),
-('Beef tacos', 'dinner'),
-('Beef tacos', 'mexican'),
-('Beef tacos', 'budget-friendly'),
-('Beef tacos', 'kid-friendly'),
-('Sheet-pan lemon chicken', 'dinner'),
-('Sheet-pan lemon chicken', 'one-pot'),
-('Sheet-pan lemon chicken', 'meal-prep'),
-('Sheet-pan lemon chicken', 'gluten-free'),
-('Slow cooker pulled pork', 'dinner'),
-('Slow cooker pulled pork', 'slow-cooker'),
-('Slow cooker pulled pork', 'budget-friendly'),
-('Slow cooker pulled pork', 'freezer-friendly'),
-('Classic spaghetti and meat sauce', 'dinner'),
-('Classic spaghetti and meat sauce', 'italian'),
-('Classic spaghetti and meat sauce', 'budget-friendly'),
-('Classic spaghetti and meat sauce', 'family-favorite'),
-('One-pot cheesy beef macaroni', 'dinner'),
-('One-pot cheesy beef macaroni', 'one-pot'),
-('One-pot cheesy beef macaroni', 'kid-friendly'),
-('One-pot cheesy beef macaroni', 'comfort-food'),
-('Baked salmon with rice', 'dinner'),
-('Baked salmon with rice', 'high-protein'),
-('Baked salmon with rice', 'gluten-free'),
-('Baked salmon with rice', 'quick'),
-('Chicken quesadillas', 'lunch'),
-('Chicken quesadillas', 'dinner'),
-('Chicken quesadillas', 'mexican'),
-('Chicken quesadillas', 'quick'),
-('Chicken quesadillas', 'kid-friendly'),
-('Turkey meatballs', 'dinner'),
-('Turkey meatballs', 'high-protein'),
-('Turkey meatballs', 'meal-prep'),
-('Turkey meatballs', 'italian'),
-('Vegetable fried rice', 'lunch'),
-('Vegetable fried rice', 'dinner'),
-('Vegetable fried rice', 'vegetarian'),
-('Vegetable fried rice', 'budget-friendly'),
-('Vegetable fried rice', 'quick'),
-('Creamy tomato soup', 'lunch'),
-('Creamy tomato soup', 'vegetarian'),
-('Creamy tomato soup', 'comfort-food'),
-('Creamy tomato soup', 'budget-friendly'),
-('BBQ chicken sandwiches', 'dinner'),
-('BBQ chicken sandwiches', 'slow-cooker'),
-('BBQ chicken sandwiches', 'kid-friendly'),
-('BBQ chicken sandwiches', 'meal-prep'),
-('Breakfast egg muffins', 'breakfast'),
-('Breakfast egg muffins', 'high-protein'),
-('Breakfast egg muffins', 'meal-prep'),
-('Breakfast egg muffins', 'gluten-free'),
-('Blueberry oatmeal', 'breakfast'),
-('Blueberry oatmeal', 'vegetarian'),
-('Blueberry oatmeal', 'budget-friendly'),
-('Blueberry oatmeal', 'kid-friendly'),
-('Banana pancakes', 'breakfast'),
-('Banana pancakes', 'kid-friendly'),
-('Banana pancakes', 'budget-friendly'),
-('Greek chicken wraps', 'lunch'),
-('Greek chicken wraps', 'dinner'),
-('Greek chicken wraps', 'mediterranean'),
-('Greek chicken wraps', 'high-protein'),
-('Black bean quesadillas', 'lunch'),
-('Black bean quesadillas', 'vegetarian'),
-('Black bean quesadillas', 'budget-friendly'),
-('Black bean quesadillas', 'quick'),
-('Honey garlic shrimp bowls', 'dinner'),
-('Honey garlic shrimp bowls', 'asian-inspired'),
-('Honey garlic shrimp bowls', 'quick'),
-('Honey garlic shrimp bowls', 'high-protein'),
-('Loaded baked potatoes', 'dinner'),
-('Loaded baked potatoes', 'budget-friendly'),
-('Loaded baked potatoes', 'gluten-free'),
-('Loaded baked potatoes', 'comfort-food'),
-('Chicken noodle soup', 'lunch'),
-('Chicken noodle soup', 'dinner'),
-('Chicken noodle soup', 'comfort-food'),
-('Chicken noodle soup', 'freezer-friendly'),
-('Beef and broccoli stir-fry', 'dinner'),
-('Beef and broccoli stir-fry', 'asian-inspired'),
-('Beef and broccoli stir-fry', 'high-protein'),
-('Beef and broccoli stir-fry', 'quick'),
-('Spinach and cheese omelet', 'breakfast'),
-('Spinach and cheese omelet', 'vegetarian'),
-('Spinach and cheese omelet', 'quick'),
-('Spinach and cheese omelet', 'gluten-free'),
-('Baked ziti', 'dinner'),
-('Baked ziti', 'italian'),
-('Baked ziti', 'comfort-food'),
-('Baked ziti', 'freezer-friendly'),
-('Crispy chicken tenders', 'dinner'),
-('Crispy chicken tenders', 'kid-friendly'),
-('Crispy chicken tenders', 'air-fryer'),
-('Crispy chicken tenders', 'high-protein'),
-('Tuna pasta salad', 'lunch'),
-('Tuna pasta salad', 'budget-friendly'),
-('Tuna pasta salad', 'meal-prep'),
-('Lentil vegetable curry', 'dinner'),
-('Lentil vegetable curry', 'vegetarian'),
-('Lentil vegetable curry', 'vegan'),
-('Lentil vegetable curry', 'budget-friendly'),
-('Lentil vegetable curry', 'one-pot'),
-('Caprese grilled cheese', 'lunch'),
-('Caprese grilled cheese', 'vegetarian'),
-('Caprese grilled cheese', 'quick'),
-('Caprese grilled cheese', 'kid-friendly'),
-('Turkey chili', 'dinner'),
-('Turkey chili', 'one-pot'),
-('Turkey chili', 'high-protein'),
-('Turkey chili', 'freezer-friendly'),
-('Apple cinnamon overnight oats', 'breakfast'),
-('Apple cinnamon overnight oats', 'vegetarian'),
-('Apple cinnamon overnight oats', 'meal-prep'),
-('Apple cinnamon overnight oats', 'quick')
-            ) AS recipe_tags("RecipeName", "TagSlug")
-              ON lower(r."Name") = lower(recipe_tags."RecipeName")
-            CROSS JOIN LATERAL unnest(ARRAY[recipe_tags."TagSlug"]) AS tag_slug("Slug")
-            JOIN familyos."RecipeTags" t ON t."Slug" = tag_slug."Slug" AND t."FamilyId" IS NULL
-            WHERE r."FamilyId" = '00000000-0000-0000-0000-000000000000'::uuid
-              AND NOT EXISTS (SELECT 1 FROM familyos."RecipeTagLinks" l WHERE l."RecipeId" = r."Id" AND l."TagId" = t."Id" AND l."IsDeleted" = false);
-            """);
-
-        logger.LogInformation("Recipe catalog schema ensured; seeded {IngredientCount} common ingredients and {TagCount} tags.",
-            105, 28);
+        await SeedIngredientsAsync(db);
+        await SeedTagsAsync(db);
+        await SeedRecipesAsync(db, logger);
     }
-}
-))[1] AS "QtyText",
-                    (regexp_match("RawLine", '^\s*([0-9]+(?:\.[0-9]+)?|[0-9]+/[0-9]+)\s+([[:alpha:]]+)\s+(.+?)\s* ("Id", "RecipeId", "TagId", "CreatedAtUtc", "IsDeleted")
-            SELECT gen_random_uuid(), r."Id", t."Id", now(), false
-            FROM familyos."Recipes" r
-            JOIN (VALUES
-('Chicken fajita bowls', 'dinner'),
-('Chicken fajita bowls', 'mexican'),
-('Chicken fajita bowls', 'high-protein'),
-('Chicken fajita bowls', 'family-favorite'),
-('Creamy garlic chicken pasta', 'dinner'),
-('Creamy garlic chicken pasta', 'italian'),
-('Creamy garlic chicken pasta', 'comfort-food'),
-('Creamy garlic chicken pasta', 'family-favorite'),
-('Beef tacos', 'dinner'),
-('Beef tacos', 'mexican'),
-('Beef tacos', 'budget-friendly'),
-('Beef tacos', 'kid-friendly'),
-('Sheet-pan lemon chicken', 'dinner'),
-('Sheet-pan lemon chicken', 'one-pot'),
-('Sheet-pan lemon chicken', 'meal-prep'),
-('Sheet-pan lemon chicken', 'gluten-free'),
-('Slow cooker pulled pork', 'dinner'),
-('Slow cooker pulled pork', 'slow-cooker'),
-('Slow cooker pulled pork', 'budget-friendly'),
-('Slow cooker pulled pork', 'freezer-friendly'),
-('Classic spaghetti and meat sauce', 'dinner'),
-('Classic spaghetti and meat sauce', 'italian'),
-('Classic spaghetti and meat sauce', 'budget-friendly'),
-('Classic spaghetti and meat sauce', 'family-favorite'),
-('One-pot cheesy beef macaroni', 'dinner'),
-('One-pot cheesy beef macaroni', 'one-pot'),
-('One-pot cheesy beef macaroni', 'kid-friendly'),
-('One-pot cheesy beef macaroni', 'comfort-food'),
-('Baked salmon with rice', 'dinner'),
-('Baked salmon with rice', 'high-protein'),
-('Baked salmon with rice', 'gluten-free'),
-('Baked salmon with rice', 'quick'),
-('Chicken quesadillas', 'lunch'),
-('Chicken quesadillas', 'dinner'),
-('Chicken quesadillas', 'mexican'),
-('Chicken quesadillas', 'quick'),
-('Chicken quesadillas', 'kid-friendly'),
-('Turkey meatballs', 'dinner'),
-('Turkey meatballs', 'high-protein'),
-('Turkey meatballs', 'meal-prep'),
-('Turkey meatballs', 'italian'),
-('Vegetable fried rice', 'lunch'),
-('Vegetable fried rice', 'dinner'),
-('Vegetable fried rice', 'vegetarian'),
-('Vegetable fried rice', 'budget-friendly'),
-('Vegetable fried rice', 'quick'),
-('Creamy tomato soup', 'lunch'),
-('Creamy tomato soup', 'vegetarian'),
-('Creamy tomato soup', 'comfort-food'),
-('Creamy tomato soup', 'budget-friendly'),
-('BBQ chicken sandwiches', 'dinner'),
-('BBQ chicken sandwiches', 'slow-cooker'),
-('BBQ chicken sandwiches', 'kid-friendly'),
-('BBQ chicken sandwiches', 'meal-prep'),
-('Breakfast egg muffins', 'breakfast'),
-('Breakfast egg muffins', 'high-protein'),
-('Breakfast egg muffins', 'meal-prep'),
-('Breakfast egg muffins', 'gluten-free'),
-('Blueberry oatmeal', 'breakfast'),
-('Blueberry oatmeal', 'vegetarian'),
-('Blueberry oatmeal', 'budget-friendly'),
-('Blueberry oatmeal', 'kid-friendly'),
-('Banana pancakes', 'breakfast'),
-('Banana pancakes', 'kid-friendly'),
-('Banana pancakes', 'budget-friendly'),
-('Greek chicken wraps', 'lunch'),
-('Greek chicken wraps', 'dinner'),
-('Greek chicken wraps', 'mediterranean'),
-('Greek chicken wraps', 'high-protein'),
-('Black bean quesadillas', 'lunch'),
-('Black bean quesadillas', 'vegetarian'),
-('Black bean quesadillas', 'budget-friendly'),
-('Black bean quesadillas', 'quick'),
-('Honey garlic shrimp bowls', 'dinner'),
-('Honey garlic shrimp bowls', 'asian-inspired'),
-('Honey garlic shrimp bowls', 'quick'),
-('Honey garlic shrimp bowls', 'high-protein'),
-('Loaded baked potatoes', 'dinner'),
-('Loaded baked potatoes', 'budget-friendly'),
-('Loaded baked potatoes', 'gluten-free'),
-('Loaded baked potatoes', 'comfort-food'),
-('Chicken noodle soup', 'lunch'),
-('Chicken noodle soup', 'dinner'),
-('Chicken noodle soup', 'comfort-food'),
-('Chicken noodle soup', 'freezer-friendly'),
-('Beef and broccoli stir-fry', 'dinner'),
-('Beef and broccoli stir-fry', 'asian-inspired'),
-('Beef and broccoli stir-fry', 'high-protein'),
-('Beef and broccoli stir-fry', 'quick'),
-('Spinach and cheese omelet', 'breakfast'),
-('Spinach and cheese omelet', 'vegetarian'),
-('Spinach and cheese omelet', 'quick'),
-('Spinach and cheese omelet', 'gluten-free'),
-('Baked ziti', 'dinner'),
-('Baked ziti', 'italian'),
-('Baked ziti', 'comfort-food'),
-('Baked ziti', 'freezer-friendly'),
-('Crispy chicken tenders', 'dinner'),
-('Crispy chicken tenders', 'kid-friendly'),
-('Crispy chicken tenders', 'air-fryer'),
-('Crispy chicken tenders', 'high-protein'),
-('Tuna pasta salad', 'lunch'),
-('Tuna pasta salad', 'budget-friendly'),
-('Tuna pasta salad', 'meal-prep'),
-('Lentil vegetable curry', 'dinner'),
-('Lentil vegetable curry', 'vegetarian'),
-('Lentil vegetable curry', 'vegan'),
-('Lentil vegetable curry', 'budget-friendly'),
-('Lentil vegetable curry', 'one-pot'),
-('Caprese grilled cheese', 'lunch'),
-('Caprese grilled cheese', 'vegetarian'),
-('Caprese grilled cheese', 'quick'),
-('Caprese grilled cheese', 'kid-friendly'),
-('Turkey chili', 'dinner'),
-('Turkey chili', 'one-pot'),
-('Turkey chili', 'high-protein'),
-('Turkey chili', 'freezer-friendly'),
-('Apple cinnamon overnight oats', 'breakfast'),
-('Apple cinnamon overnight oats', 'vegetarian'),
-('Apple cinnamon overnight oats', 'meal-prep'),
-('Apple cinnamon overnight oats', 'quick')
-            ) AS recipe_tags("RecipeName", "TagSlug")
-              ON lower(r."Name") = lower(recipe_tags."RecipeName")
-            CROSS JOIN LATERAL unnest(ARRAY[recipe_tags."TagSlug"]) AS tag_slug("Slug")
-            JOIN familyos."RecipeTags" t ON t."Slug" = tag_slug."Slug" AND t."FamilyId" IS NULL
-            WHERE r."FamilyId" = '00000000-0000-0000-0000-000000000000'::uuid
-              AND NOT EXISTS (SELECT 1 FROM familyos."RecipeTagLinks" l WHERE l."RecipeId" = r."Id" AND l."TagId" = t."Id" AND l."IsDeleted" = false);
-            """);
 
-        logger.LogInformation("Recipe catalog schema ensured; seeded {IngredientCount} common ingredients and {TagCount} tags.",
-            105, 28);
+    private static async Task SeedIngredientsAsync(FamilyOsDbContext db)
+    {
+        var existing = await db.IngredientCatalog.Where(x => x.FamilyId == null).ToListAsync();
+        var keys = existing.Select(x => x.SearchKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in Ingredients)
+        {
+            var key = Normalize(item.Name);
+            if (keys.Add(key))
+                db.IngredientCatalog.Add(IngredientCatalogItem.CreateBuiltIn(item.Name, item.Category, item.Aliases));
+        }
+        await db.SaveChangesAsync();
     }
-}
-))[2] AS "Unit",
-                    coalesce((regexp_match("RawLine", '^\s*([0-9]+(?:\.[0-9]+)?|[0-9]+/[0-9]+)\s+([[:alpha:]]+)\s+(.+?)\s* ("Id", "RecipeId", "TagId", "CreatedAtUtc", "IsDeleted")
-            SELECT gen_random_uuid(), r."Id", t."Id", now(), false
-            FROM familyos."Recipes" r
-            JOIN (VALUES
-('Chicken fajita bowls', 'dinner'),
-('Chicken fajita bowls', 'mexican'),
-('Chicken fajita bowls', 'high-protein'),
-('Chicken fajita bowls', 'family-favorite'),
-('Creamy garlic chicken pasta', 'dinner'),
-('Creamy garlic chicken pasta', 'italian'),
-('Creamy garlic chicken pasta', 'comfort-food'),
-('Creamy garlic chicken pasta', 'family-favorite'),
-('Beef tacos', 'dinner'),
-('Beef tacos', 'mexican'),
-('Beef tacos', 'budget-friendly'),
-('Beef tacos', 'kid-friendly'),
-('Sheet-pan lemon chicken', 'dinner'),
-('Sheet-pan lemon chicken', 'one-pot'),
-('Sheet-pan lemon chicken', 'meal-prep'),
-('Sheet-pan lemon chicken', 'gluten-free'),
-('Slow cooker pulled pork', 'dinner'),
-('Slow cooker pulled pork', 'slow-cooker'),
-('Slow cooker pulled pork', 'budget-friendly'),
-('Slow cooker pulled pork', 'freezer-friendly'),
-('Classic spaghetti and meat sauce', 'dinner'),
-('Classic spaghetti and meat sauce', 'italian'),
-('Classic spaghetti and meat sauce', 'budget-friendly'),
-('Classic spaghetti and meat sauce', 'family-favorite'),
-('One-pot cheesy beef macaroni', 'dinner'),
-('One-pot cheesy beef macaroni', 'one-pot'),
-('One-pot cheesy beef macaroni', 'kid-friendly'),
-('One-pot cheesy beef macaroni', 'comfort-food'),
-('Baked salmon with rice', 'dinner'),
-('Baked salmon with rice', 'high-protein'),
-('Baked salmon with rice', 'gluten-free'),
-('Baked salmon with rice', 'quick'),
-('Chicken quesadillas', 'lunch'),
-('Chicken quesadillas', 'dinner'),
-('Chicken quesadillas', 'mexican'),
-('Chicken quesadillas', 'quick'),
-('Chicken quesadillas', 'kid-friendly'),
-('Turkey meatballs', 'dinner'),
-('Turkey meatballs', 'high-protein'),
-('Turkey meatballs', 'meal-prep'),
-('Turkey meatballs', 'italian'),
-('Vegetable fried rice', 'lunch'),
-('Vegetable fried rice', 'dinner'),
-('Vegetable fried rice', 'vegetarian'),
-('Vegetable fried rice', 'budget-friendly'),
-('Vegetable fried rice', 'quick'),
-('Creamy tomato soup', 'lunch'),
-('Creamy tomato soup', 'vegetarian'),
-('Creamy tomato soup', 'comfort-food'),
-('Creamy tomato soup', 'budget-friendly'),
-('BBQ chicken sandwiches', 'dinner'),
-('BBQ chicken sandwiches', 'slow-cooker'),
-('BBQ chicken sandwiches', 'kid-friendly'),
-('BBQ chicken sandwiches', 'meal-prep'),
-('Breakfast egg muffins', 'breakfast'),
-('Breakfast egg muffins', 'high-protein'),
-('Breakfast egg muffins', 'meal-prep'),
-('Breakfast egg muffins', 'gluten-free'),
-('Blueberry oatmeal', 'breakfast'),
-('Blueberry oatmeal', 'vegetarian'),
-('Blueberry oatmeal', 'budget-friendly'),
-('Blueberry oatmeal', 'kid-friendly'),
-('Banana pancakes', 'breakfast'),
-('Banana pancakes', 'kid-friendly'),
-('Banana pancakes', 'budget-friendly'),
-('Greek chicken wraps', 'lunch'),
-('Greek chicken wraps', 'dinner'),
-('Greek chicken wraps', 'mediterranean'),
-('Greek chicken wraps', 'high-protein'),
-('Black bean quesadillas', 'lunch'),
-('Black bean quesadillas', 'vegetarian'),
-('Black bean quesadillas', 'budget-friendly'),
-('Black bean quesadillas', 'quick'),
-('Honey garlic shrimp bowls', 'dinner'),
-('Honey garlic shrimp bowls', 'asian-inspired'),
-('Honey garlic shrimp bowls', 'quick'),
-('Honey garlic shrimp bowls', 'high-protein'),
-('Loaded baked potatoes', 'dinner'),
-('Loaded baked potatoes', 'budget-friendly'),
-('Loaded baked potatoes', 'gluten-free'),
-('Loaded baked potatoes', 'comfort-food'),
-('Chicken noodle soup', 'lunch'),
-('Chicken noodle soup', 'dinner'),
-('Chicken noodle soup', 'comfort-food'),
-('Chicken noodle soup', 'freezer-friendly'),
-('Beef and broccoli stir-fry', 'dinner'),
-('Beef and broccoli stir-fry', 'asian-inspired'),
-('Beef and broccoli stir-fry', 'high-protein'),
-('Beef and broccoli stir-fry', 'quick'),
-('Spinach and cheese omelet', 'breakfast'),
-('Spinach and cheese omelet', 'vegetarian'),
-('Spinach and cheese omelet', 'quick'),
-('Spinach and cheese omelet', 'gluten-free'),
-('Baked ziti', 'dinner'),
-('Baked ziti', 'italian'),
-('Baked ziti', 'comfort-food'),
-('Baked ziti', 'freezer-friendly'),
-('Crispy chicken tenders', 'dinner'),
-('Crispy chicken tenders', 'kid-friendly'),
-('Crispy chicken tenders', 'air-fryer'),
-('Crispy chicken tenders', 'high-protein'),
-('Tuna pasta salad', 'lunch'),
-('Tuna pasta salad', 'budget-friendly'),
-('Tuna pasta salad', 'meal-prep'),
-('Lentil vegetable curry', 'dinner'),
-('Lentil vegetable curry', 'vegetarian'),
-('Lentil vegetable curry', 'vegan'),
-('Lentil vegetable curry', 'budget-friendly'),
-('Lentil vegetable curry', 'one-pot'),
-('Caprese grilled cheese', 'lunch'),
-('Caprese grilled cheese', 'vegetarian'),
-('Caprese grilled cheese', 'quick'),
-('Caprese grilled cheese', 'kid-friendly'),
-('Turkey chili', 'dinner'),
-('Turkey chili', 'one-pot'),
-('Turkey chili', 'high-protein'),
-('Turkey chili', 'freezer-friendly'),
-('Apple cinnamon overnight oats', 'breakfast'),
-('Apple cinnamon overnight oats', 'vegetarian'),
-('Apple cinnamon overnight oats', 'meal-prep'),
-('Apple cinnamon overnight oats', 'quick')
-            ) AS recipe_tags("RecipeName", "TagSlug")
-              ON lower(r."Name") = lower(recipe_tags."RecipeName")
-            CROSS JOIN LATERAL unnest(ARRAY[recipe_tags."TagSlug"]) AS tag_slug("Slug")
-            JOIN familyos."RecipeTags" t ON t."Slug" = tag_slug."Slug" AND t."FamilyId" IS NULL
-            WHERE r."FamilyId" = '00000000-0000-0000-0000-000000000000'::uuid
-              AND NOT EXISTS (SELECT 1 FROM familyos."RecipeTagLinks" l WHERE l."RecipeId" = r."Id" AND l."TagId" = t."Id" AND l."IsDeleted" = false);
-            """);
 
-        logger.LogInformation("Recipe catalog schema ensured; seeded {IngredientCount} common ingredients and {TagCount} tags.",
-            105, 28);
+    private static async Task SeedTagsAsync(FamilyOsDbContext db)
+    {
+        var existing = await db.RecipeTags.Where(x => x.FamilyId == null).ToListAsync();
+        var slugs = existing.Select(x => x.Slug).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var name in Tags)
+        {
+            var slug = Slug(name);
+            if (slugs.Add(slug))
+                db.RecipeTags.Add(RecipeTag.CreateBuiltIn(name));
+        }
+        await db.SaveChangesAsync();
     }
-}
-))[3], "RawLine") AS "IngredientName"
-                FROM raw_lines
-                WHERE "RawLine" <> ''
-            )
-            INSERT INTO familyos."IngredientCatalog"
-                ("Id", "FamilyId", "Name", "SearchKey", "Category", "AliasesCsv", "IsBuiltIn", "CreatedAtUtc", "IsDeleted")
-            SELECT gen_random_uuid(), NULL, p."IngredientName",
-                   lower(regexp_replace(trim(p."IngredientName"), '\s+', ' ', 'g')),
-                   'Other', NULL, true, now(), false
-            FROM parsed p
-            WHERE NOT EXISTS (
-                SELECT 1 FROM familyos."IngredientCatalog" i
-                WHERE i."FamilyId" IS NULL AND i."IsDeleted" = false
-                  AND (i."SearchKey" = lower(regexp_replace(trim(p."IngredientName"), '\s+', ' ', 'g'))
-                       OR EXISTS (SELECT 1 FROM unnest(string_to_array(coalesce(i."AliasesCsv", ''), ',')) a
-                                  WHERE lower(trim(a)) = lower(trim(p."IngredientName"))))
-            )
-            GROUP BY p."IngredientName";
-            """);
 
-        await db.Database.ExecuteSqlRawAsync("""
-            WITH raw_lines AS (
-                SELECT r."Id" AS "RecipeId", trim(line) AS "RawLine",
-                       row_number() OVER (PARTITION BY r."Id" ORDER BY ordinality)::integer - 1 AS "SortOrder"
-                FROM familyos."Recipes" r
-                CROSS JOIN LATERAL regexp_split_to_table(coalesce(r."IngredientsCsv", ''), ',')
-                    WITH ORDINALITY AS split(line, ordinality)
-                WHERE r."FamilyId" = '00000000-0000-0000-0000-000000000000'::uuid
-                  AND r."IsDeleted" = false
-            ),
-            parsed AS (
-                SELECT "RecipeId", "RawLine", "SortOrder",
-                    (regexp_match("RawLine", '^\s*([0-9]+(?:\.[0-9]+)?|[0-9]+/[0-9]+)\s+([[:alpha:]]+)\s+(.+?)\s* ("Id", "RecipeId", "TagId", "CreatedAtUtc", "IsDeleted")
-            SELECT gen_random_uuid(), r."Id", t."Id", now(), false
-            FROM familyos."Recipes" r
-            JOIN (VALUES
-('Chicken fajita bowls', 'dinner'),
-('Chicken fajita bowls', 'mexican'),
-('Chicken fajita bowls', 'high-protein'),
-('Chicken fajita bowls', 'family-favorite'),
-('Creamy garlic chicken pasta', 'dinner'),
-('Creamy garlic chicken pasta', 'italian'),
-('Creamy garlic chicken pasta', 'comfort-food'),
-('Creamy garlic chicken pasta', 'family-favorite'),
-('Beef tacos', 'dinner'),
-('Beef tacos', 'mexican'),
-('Beef tacos', 'budget-friendly'),
-('Beef tacos', 'kid-friendly'),
-('Sheet-pan lemon chicken', 'dinner'),
-('Sheet-pan lemon chicken', 'one-pot'),
-('Sheet-pan lemon chicken', 'meal-prep'),
-('Sheet-pan lemon chicken', 'gluten-free'),
-('Slow cooker pulled pork', 'dinner'),
-('Slow cooker pulled pork', 'slow-cooker'),
-('Slow cooker pulled pork', 'budget-friendly'),
-('Slow cooker pulled pork', 'freezer-friendly'),
-('Classic spaghetti and meat sauce', 'dinner'),
-('Classic spaghetti and meat sauce', 'italian'),
-('Classic spaghetti and meat sauce', 'budget-friendly'),
-('Classic spaghetti and meat sauce', 'family-favorite'),
-('One-pot cheesy beef macaroni', 'dinner'),
-('One-pot cheesy beef macaroni', 'one-pot'),
-('One-pot cheesy beef macaroni', 'kid-friendly'),
-('One-pot cheesy beef macaroni', 'comfort-food'),
-('Baked salmon with rice', 'dinner'),
-('Baked salmon with rice', 'high-protein'),
-('Baked salmon with rice', 'gluten-free'),
-('Baked salmon with rice', 'quick'),
-('Chicken quesadillas', 'lunch'),
-('Chicken quesadillas', 'dinner'),
-('Chicken quesadillas', 'mexican'),
-('Chicken quesadillas', 'quick'),
-('Chicken quesadillas', 'kid-friendly'),
-('Turkey meatballs', 'dinner'),
-('Turkey meatballs', 'high-protein'),
-('Turkey meatballs', 'meal-prep'),
-('Turkey meatballs', 'italian'),
-('Vegetable fried rice', 'lunch'),
-('Vegetable fried rice', 'dinner'),
-('Vegetable fried rice', 'vegetarian'),
-('Vegetable fried rice', 'budget-friendly'),
-('Vegetable fried rice', 'quick'),
-('Creamy tomato soup', 'lunch'),
-('Creamy tomato soup', 'vegetarian'),
-('Creamy tomato soup', 'comfort-food'),
-('Creamy tomato soup', 'budget-friendly'),
-('BBQ chicken sandwiches', 'dinner'),
-('BBQ chicken sandwiches', 'slow-cooker'),
-('BBQ chicken sandwiches', 'kid-friendly'),
-('BBQ chicken sandwiches', 'meal-prep'),
-('Breakfast egg muffins', 'breakfast'),
-('Breakfast egg muffins', 'high-protein'),
-('Breakfast egg muffins', 'meal-prep'),
-('Breakfast egg muffins', 'gluten-free'),
-('Blueberry oatmeal', 'breakfast'),
-('Blueberry oatmeal', 'vegetarian'),
-('Blueberry oatmeal', 'budget-friendly'),
-('Blueberry oatmeal', 'kid-friendly'),
-('Banana pancakes', 'breakfast'),
-('Banana pancakes', 'kid-friendly'),
-('Banana pancakes', 'budget-friendly'),
-('Greek chicken wraps', 'lunch'),
-('Greek chicken wraps', 'dinner'),
-('Greek chicken wraps', 'mediterranean'),
-('Greek chicken wraps', 'high-protein'),
-('Black bean quesadillas', 'lunch'),
-('Black bean quesadillas', 'vegetarian'),
-('Black bean quesadillas', 'budget-friendly'),
-('Black bean quesadillas', 'quick'),
-('Honey garlic shrimp bowls', 'dinner'),
-('Honey garlic shrimp bowls', 'asian-inspired'),
-('Honey garlic shrimp bowls', 'quick'),
-('Honey garlic shrimp bowls', 'high-protein'),
-('Loaded baked potatoes', 'dinner'),
-('Loaded baked potatoes', 'budget-friendly'),
-('Loaded baked potatoes', 'gluten-free'),
-('Loaded baked potatoes', 'comfort-food'),
-('Chicken noodle soup', 'lunch'),
-('Chicken noodle soup', 'dinner'),
-('Chicken noodle soup', 'comfort-food'),
-('Chicken noodle soup', 'freezer-friendly'),
-('Beef and broccoli stir-fry', 'dinner'),
-('Beef and broccoli stir-fry', 'asian-inspired'),
-('Beef and broccoli stir-fry', 'high-protein'),
-('Beef and broccoli stir-fry', 'quick'),
-('Spinach and cheese omelet', 'breakfast'),
-('Spinach and cheese omelet', 'vegetarian'),
-('Spinach and cheese omelet', 'quick'),
-('Spinach and cheese omelet', 'gluten-free'),
-('Baked ziti', 'dinner'),
-('Baked ziti', 'italian'),
-('Baked ziti', 'comfort-food'),
-('Baked ziti', 'freezer-friendly'),
-('Crispy chicken tenders', 'dinner'),
-('Crispy chicken tenders', 'kid-friendly'),
-('Crispy chicken tenders', 'air-fryer'),
-('Crispy chicken tenders', 'high-protein'),
-('Tuna pasta salad', 'lunch'),
-('Tuna pasta salad', 'budget-friendly'),
-('Tuna pasta salad', 'meal-prep'),
-('Lentil vegetable curry', 'dinner'),
-('Lentil vegetable curry', 'vegetarian'),
-('Lentil vegetable curry', 'vegan'),
-('Lentil vegetable curry', 'budget-friendly'),
-('Lentil vegetable curry', 'one-pot'),
-('Caprese grilled cheese', 'lunch'),
-('Caprese grilled cheese', 'vegetarian'),
-('Caprese grilled cheese', 'quick'),
-('Caprese grilled cheese', 'kid-friendly'),
-('Turkey chili', 'dinner'),
-('Turkey chili', 'one-pot'),
-('Turkey chili', 'high-protein'),
-('Turkey chili', 'freezer-friendly'),
-('Apple cinnamon overnight oats', 'breakfast'),
-('Apple cinnamon overnight oats', 'vegetarian'),
-('Apple cinnamon overnight oats', 'meal-prep'),
-('Apple cinnamon overnight oats', 'quick')
-            ) AS recipe_tags("RecipeName", "TagSlug")
-              ON lower(r."Name") = lower(recipe_tags."RecipeName")
-            CROSS JOIN LATERAL unnest(ARRAY[recipe_tags."TagSlug"]) AS tag_slug("Slug")
-            JOIN familyos."RecipeTags" t ON t."Slug" = tag_slug."Slug" AND t."FamilyId" IS NULL
-            WHERE r."FamilyId" = '00000000-0000-0000-0000-000000000000'::uuid
-              AND NOT EXISTS (SELECT 1 FROM familyos."RecipeTagLinks" l WHERE l."RecipeId" = r."Id" AND l."TagId" = t."Id" AND l."IsDeleted" = false);
-            """);
+    private static async Task SeedRecipesAsync(FamilyOsDbContext db, ILogger logger)
+    {
+        var existing = await db.Recipes.Where(x => x.FamilyId == Guid.Empty).ToListAsync();
+        var byName = existing.ToDictionary(x => x.Name, StringComparer.OrdinalIgnoreCase);
+        foreach (var seed in Recipes)
+        {
+            if (byName.ContainsKey(seed.Name)) continue;
+            var recipe = Recipe.Create(Guid.Empty, seed.Name, seed.Servings, seed.Ingredients, seed.Instructions);
+            db.Recipes.Add(recipe);
+            byName.Add(seed.Name, recipe);
+        }
+        await db.SaveChangesAsync();
 
-        logger.LogInformation("Recipe catalog schema ensured; seeded {IngredientCount} common ingredients and {TagCount} tags.",
-            105, 28);
+        var recipeIds = byName.Values.Select(x => x.Id).ToArray();
+        var tags = await db.RecipeTags.Where(x => x.FamilyId == null).ToListAsync();
+        var tagBySlug = tags.ToDictionary(x => x.Slug, StringComparer.OrdinalIgnoreCase);
+        var links = await db.RecipeTagLinks.Where(x => recipeIds.Contains(x.RecipeId)).ToListAsync();
+        var linkKeys = links.Select(x => (x.RecipeId, x.TagId)).ToHashSet();
+        foreach (var seed in Recipes)
+        {
+            var recipe = byName[seed.Name];
+            foreach (var tagName in seed.Tags)
+            {
+                if (!tagBySlug.TryGetValue(Slug(tagName), out var tag)) continue;
+                if (linkKeys.Add((recipe.Id, tag.Id)))
+                    db.RecipeTagLinks.Add(RecipeTagLink.Create(recipe.Id, tag.Id));
+            }
+        }
+
+        var structured = await db.RecipeIngredients.Where(x => recipeIds.Contains(x.RecipeId))
+            .Select(x => x.RecipeId).Distinct().ToListAsync();
+        var structuredIds = structured.ToHashSet();
+        var catalog = await db.IngredientCatalog.Where(x => x.FamilyId == null).ToListAsync();
+        var catalogByKey = new Dictionary<string, IngredientCatalogItem>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in catalog)
+        {
+            catalogByKey[item.SearchKey] = item;
+            foreach (var alias in (item.AliasesCsv ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                catalogByKey.TryAdd(Normalize(alias), item);
+        }
+
+        foreach (var seed in Recipes)
+        {
+            var recipe = byName[seed.Name];
+            if (!structuredIds.Add(recipe.Id)) continue;
+            var lines = seed.Ingredients.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            for (var index = 0; index < lines.Length; index++)
+            {
+                var (quantity, unit, ingredientName) = ParseIngredient(lines[index]);
+                var key = Normalize(ingredientName);
+                if (!catalogByKey.TryGetValue(key, out var ingredient))
+                {
+                    ingredient = IngredientCatalogItem.CreateBuiltIn(ingredientName, "Other");
+                    db.IngredientCatalog.Add(ingredient);
+                    catalogByKey[key] = ingredient;
+                }
+                db.RecipeIngredients.Add(RecipeIngredient.Create(recipe.Id, ingredient.Id,
+                    quantity, unit, null, index));
+            }
+
+            var steps = seed.Instructions.Split(". ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            for (var index = 0; index < steps.Length; index++)
+                db.RecipeInstructionSteps.Add(RecipeInstructionStep.Create(recipe.Id, index + 1,
+                    steps[index].TrimEnd('.')));
+        }
+
+        await db.SaveChangesAsync();
+        logger.LogInformation("Built-in recipe catalog ready: {RecipeCount} recipes, {IngredientCount} ingredient entries, {TagCount} discovery tags.",
+            Recipes.Length, Ingredients.Length, Tags.Length);
     }
-}
-))[1] AS "QtyText",
-                    (regexp_match("RawLine", '^\s*([0-9]+(?:\.[0-9]+)?|[0-9]+/[0-9]+)\s+([[:alpha:]]+)\s+(.+?)\s* ("Id", "RecipeId", "TagId", "CreatedAtUtc", "IsDeleted")
-            SELECT gen_random_uuid(), r."Id", t."Id", now(), false
-            FROM familyos."Recipes" r
-            JOIN (VALUES
-('Chicken fajita bowls', 'dinner'),
-('Chicken fajita bowls', 'mexican'),
-('Chicken fajita bowls', 'high-protein'),
-('Chicken fajita bowls', 'family-favorite'),
-('Creamy garlic chicken pasta', 'dinner'),
-('Creamy garlic chicken pasta', 'italian'),
-('Creamy garlic chicken pasta', 'comfort-food'),
-('Creamy garlic chicken pasta', 'family-favorite'),
-('Beef tacos', 'dinner'),
-('Beef tacos', 'mexican'),
-('Beef tacos', 'budget-friendly'),
-('Beef tacos', 'kid-friendly'),
-('Sheet-pan lemon chicken', 'dinner'),
-('Sheet-pan lemon chicken', 'one-pot'),
-('Sheet-pan lemon chicken', 'meal-prep'),
-('Sheet-pan lemon chicken', 'gluten-free'),
-('Slow cooker pulled pork', 'dinner'),
-('Slow cooker pulled pork', 'slow-cooker'),
-('Slow cooker pulled pork', 'budget-friendly'),
-('Slow cooker pulled pork', 'freezer-friendly'),
-('Classic spaghetti and meat sauce', 'dinner'),
-('Classic spaghetti and meat sauce', 'italian'),
-('Classic spaghetti and meat sauce', 'budget-friendly'),
-('Classic spaghetti and meat sauce', 'family-favorite'),
-('One-pot cheesy beef macaroni', 'dinner'),
-('One-pot cheesy beef macaroni', 'one-pot'),
-('One-pot cheesy beef macaroni', 'kid-friendly'),
-('One-pot cheesy beef macaroni', 'comfort-food'),
-('Baked salmon with rice', 'dinner'),
-('Baked salmon with rice', 'high-protein'),
-('Baked salmon with rice', 'gluten-free'),
-('Baked salmon with rice', 'quick'),
-('Chicken quesadillas', 'lunch'),
-('Chicken quesadillas', 'dinner'),
-('Chicken quesadillas', 'mexican'),
-('Chicken quesadillas', 'quick'),
-('Chicken quesadillas', 'kid-friendly'),
-('Turkey meatballs', 'dinner'),
-('Turkey meatballs', 'high-protein'),
-('Turkey meatballs', 'meal-prep'),
-('Turkey meatballs', 'italian'),
-('Vegetable fried rice', 'lunch'),
-('Vegetable fried rice', 'dinner'),
-('Vegetable fried rice', 'vegetarian'),
-('Vegetable fried rice', 'budget-friendly'),
-('Vegetable fried rice', 'quick'),
-('Creamy tomato soup', 'lunch'),
-('Creamy tomato soup', 'vegetarian'),
-('Creamy tomato soup', 'comfort-food'),
-('Creamy tomato soup', 'budget-friendly'),
-('BBQ chicken sandwiches', 'dinner'),
-('BBQ chicken sandwiches', 'slow-cooker'),
-('BBQ chicken sandwiches', 'kid-friendly'),
-('BBQ chicken sandwiches', 'meal-prep'),
-('Breakfast egg muffins', 'breakfast'),
-('Breakfast egg muffins', 'high-protein'),
-('Breakfast egg muffins', 'meal-prep'),
-('Breakfast egg muffins', 'gluten-free'),
-('Blueberry oatmeal', 'breakfast'),
-('Blueberry oatmeal', 'vegetarian'),
-('Blueberry oatmeal', 'budget-friendly'),
-('Blueberry oatmeal', 'kid-friendly'),
-('Banana pancakes', 'breakfast'),
-('Banana pancakes', 'kid-friendly'),
-('Banana pancakes', 'budget-friendly'),
-('Greek chicken wraps', 'lunch'),
-('Greek chicken wraps', 'dinner'),
-('Greek chicken wraps', 'mediterranean'),
-('Greek chicken wraps', 'high-protein'),
-('Black bean quesadillas', 'lunch'),
-('Black bean quesadillas', 'vegetarian'),
-('Black bean quesadillas', 'budget-friendly'),
-('Black bean quesadillas', 'quick'),
-('Honey garlic shrimp bowls', 'dinner'),
-('Honey garlic shrimp bowls', 'asian-inspired'),
-('Honey garlic shrimp bowls', 'quick'),
-('Honey garlic shrimp bowls', 'high-protein'),
-('Loaded baked potatoes', 'dinner'),
-('Loaded baked potatoes', 'budget-friendly'),
-('Loaded baked potatoes', 'gluten-free'),
-('Loaded baked potatoes', 'comfort-food'),
-('Chicken noodle soup', 'lunch'),
-('Chicken noodle soup', 'dinner'),
-('Chicken noodle soup', 'comfort-food'),
-('Chicken noodle soup', 'freezer-friendly'),
-('Beef and broccoli stir-fry', 'dinner'),
-('Beef and broccoli stir-fry', 'asian-inspired'),
-('Beef and broccoli stir-fry', 'high-protein'),
-('Beef and broccoli stir-fry', 'quick'),
-('Spinach and cheese omelet', 'breakfast'),
-('Spinach and cheese omelet', 'vegetarian'),
-('Spinach and cheese omelet', 'quick'),
-('Spinach and cheese omelet', 'gluten-free'),
-('Baked ziti', 'dinner'),
-('Baked ziti', 'italian'),
-('Baked ziti', 'comfort-food'),
-('Baked ziti', 'freezer-friendly'),
-('Crispy chicken tenders', 'dinner'),
-('Crispy chicken tenders', 'kid-friendly'),
-('Crispy chicken tenders', 'air-fryer'),
-('Crispy chicken tenders', 'high-protein'),
-('Tuna pasta salad', 'lunch'),
-('Tuna pasta salad', 'budget-friendly'),
-('Tuna pasta salad', 'meal-prep'),
-('Lentil vegetable curry', 'dinner'),
-('Lentil vegetable curry', 'vegetarian'),
-('Lentil vegetable curry', 'vegan'),
-('Lentil vegetable curry', 'budget-friendly'),
-('Lentil vegetable curry', 'one-pot'),
-('Caprese grilled cheese', 'lunch'),
-('Caprese grilled cheese', 'vegetarian'),
-('Caprese grilled cheese', 'quick'),
-('Caprese grilled cheese', 'kid-friendly'),
-('Turkey chili', 'dinner'),
-('Turkey chili', 'one-pot'),
-('Turkey chili', 'high-protein'),
-('Turkey chili', 'freezer-friendly'),
-('Apple cinnamon overnight oats', 'breakfast'),
-('Apple cinnamon overnight oats', 'vegetarian'),
-('Apple cinnamon overnight oats', 'meal-prep'),
-('Apple cinnamon overnight oats', 'quick')
-            ) AS recipe_tags("RecipeName", "TagSlug")
-              ON lower(r."Name") = lower(recipe_tags."RecipeName")
-            CROSS JOIN LATERAL unnest(ARRAY[recipe_tags."TagSlug"]) AS tag_slug("Slug")
-            JOIN familyos."RecipeTags" t ON t."Slug" = tag_slug."Slug" AND t."FamilyId" IS NULL
-            WHERE r."FamilyId" = '00000000-0000-0000-0000-000000000000'::uuid
-              AND NOT EXISTS (SELECT 1 FROM familyos."RecipeTagLinks" l WHERE l."RecipeId" = r."Id" AND l."TagId" = t."Id" AND l."IsDeleted" = false);
-            """);
 
-        logger.LogInformation("Recipe catalog schema ensured; seeded {IngredientCount} common ingredients and {TagCount} tags.",
-            105, 28);
+    private static (decimal? Quantity, string? Unit, string Name) ParseIngredient(string line)
+    {
+        var match = Regex.Match(line, @"^(?<quantity>\d+(?:\.\d+)?|\d+/\d+)\s+(?<unit>[A-Za-z]+)\s+(?<name>.+)$");
+        if (!match.Success) return (null, null, line.Trim());
+        decimal quantity;
+        var quantityText = match.Groups["quantity"].Value;
+        if (quantityText.Contains('/'))
+        {
+            var parts = quantityText.Split('/');
+            quantity = decimal.Parse(parts[0], CultureInfo.InvariantCulture) /
+                decimal.Parse(parts[1], CultureInfo.InvariantCulture);
+        }
+        else quantity = decimal.Parse(quantityText, CultureInfo.InvariantCulture);
+        return (quantity, match.Groups["unit"].Value.ToLowerInvariant(), match.Groups["name"].Value.Trim());
     }
-}
-))[2] AS "Unit",
-                    coalesce((regexp_match("RawLine", '^\s*([0-9]+(?:\.[0-9]+)?|[0-9]+/[0-9]+)\s+([[:alpha:]]+)\s+(.+?)\s* ("Id", "RecipeId", "TagId", "CreatedAtUtc", "IsDeleted")
-            SELECT gen_random_uuid(), r."Id", t."Id", now(), false
-            FROM familyos."Recipes" r
-            JOIN (VALUES
-('Chicken fajita bowls', 'dinner'),
-('Chicken fajita bowls', 'mexican'),
-('Chicken fajita bowls', 'high-protein'),
-('Chicken fajita bowls', 'family-favorite'),
-('Creamy garlic chicken pasta', 'dinner'),
-('Creamy garlic chicken pasta', 'italian'),
-('Creamy garlic chicken pasta', 'comfort-food'),
-('Creamy garlic chicken pasta', 'family-favorite'),
-('Beef tacos', 'dinner'),
-('Beef tacos', 'mexican'),
-('Beef tacos', 'budget-friendly'),
-('Beef tacos', 'kid-friendly'),
-('Sheet-pan lemon chicken', 'dinner'),
-('Sheet-pan lemon chicken', 'one-pot'),
-('Sheet-pan lemon chicken', 'meal-prep'),
-('Sheet-pan lemon chicken', 'gluten-free'),
-('Slow cooker pulled pork', 'dinner'),
-('Slow cooker pulled pork', 'slow-cooker'),
-('Slow cooker pulled pork', 'budget-friendly'),
-('Slow cooker pulled pork', 'freezer-friendly'),
-('Classic spaghetti and meat sauce', 'dinner'),
-('Classic spaghetti and meat sauce', 'italian'),
-('Classic spaghetti and meat sauce', 'budget-friendly'),
-('Classic spaghetti and meat sauce', 'family-favorite'),
-('One-pot cheesy beef macaroni', 'dinner'),
-('One-pot cheesy beef macaroni', 'one-pot'),
-('One-pot cheesy beef macaroni', 'kid-friendly'),
-('One-pot cheesy beef macaroni', 'comfort-food'),
-('Baked salmon with rice', 'dinner'),
-('Baked salmon with rice', 'high-protein'),
-('Baked salmon with rice', 'gluten-free'),
-('Baked salmon with rice', 'quick'),
-('Chicken quesadillas', 'lunch'),
-('Chicken quesadillas', 'dinner'),
-('Chicken quesadillas', 'mexican'),
-('Chicken quesadillas', 'quick'),
-('Chicken quesadillas', 'kid-friendly'),
-('Turkey meatballs', 'dinner'),
-('Turkey meatballs', 'high-protein'),
-('Turkey meatballs', 'meal-prep'),
-('Turkey meatballs', 'italian'),
-('Vegetable fried rice', 'lunch'),
-('Vegetable fried rice', 'dinner'),
-('Vegetable fried rice', 'vegetarian'),
-('Vegetable fried rice', 'budget-friendly'),
-('Vegetable fried rice', 'quick'),
-('Creamy tomato soup', 'lunch'),
-('Creamy tomato soup', 'vegetarian'),
-('Creamy tomato soup', 'comfort-food'),
-('Creamy tomato soup', 'budget-friendly'),
-('BBQ chicken sandwiches', 'dinner'),
-('BBQ chicken sandwiches', 'slow-cooker'),
-('BBQ chicken sandwiches', 'kid-friendly'),
-('BBQ chicken sandwiches', 'meal-prep'),
-('Breakfast egg muffins', 'breakfast'),
-('Breakfast egg muffins', 'high-protein'),
-('Breakfast egg muffins', 'meal-prep'),
-('Breakfast egg muffins', 'gluten-free'),
-('Blueberry oatmeal', 'breakfast'),
-('Blueberry oatmeal', 'vegetarian'),
-('Blueberry oatmeal', 'budget-friendly'),
-('Blueberry oatmeal', 'kid-friendly'),
-('Banana pancakes', 'breakfast'),
-('Banana pancakes', 'kid-friendly'),
-('Banana pancakes', 'budget-friendly'),
-('Greek chicken wraps', 'lunch'),
-('Greek chicken wraps', 'dinner'),
-('Greek chicken wraps', 'mediterranean'),
-('Greek chicken wraps', 'high-protein'),
-('Black bean quesadillas', 'lunch'),
-('Black bean quesadillas', 'vegetarian'),
-('Black bean quesadillas', 'budget-friendly'),
-('Black bean quesadillas', 'quick'),
-('Honey garlic shrimp bowls', 'dinner'),
-('Honey garlic shrimp bowls', 'asian-inspired'),
-('Honey garlic shrimp bowls', 'quick'),
-('Honey garlic shrimp bowls', 'high-protein'),
-('Loaded baked potatoes', 'dinner'),
-('Loaded baked potatoes', 'budget-friendly'),
-('Loaded baked potatoes', 'gluten-free'),
-('Loaded baked potatoes', 'comfort-food'),
-('Chicken noodle soup', 'lunch'),
-('Chicken noodle soup', 'dinner'),
-('Chicken noodle soup', 'comfort-food'),
-('Chicken noodle soup', 'freezer-friendly'),
-('Beef and broccoli stir-fry', 'dinner'),
-('Beef and broccoli stir-fry', 'asian-inspired'),
-('Beef and broccoli stir-fry', 'high-protein'),
-('Beef and broccoli stir-fry', 'quick'),
-('Spinach and cheese omelet', 'breakfast'),
-('Spinach and cheese omelet', 'vegetarian'),
-('Spinach and cheese omelet', 'quick'),
-('Spinach and cheese omelet', 'gluten-free'),
-('Baked ziti', 'dinner'),
-('Baked ziti', 'italian'),
-('Baked ziti', 'comfort-food'),
-('Baked ziti', 'freezer-friendly'),
-('Crispy chicken tenders', 'dinner'),
-('Crispy chicken tenders', 'kid-friendly'),
-('Crispy chicken tenders', 'air-fryer'),
-('Crispy chicken tenders', 'high-protein'),
-('Tuna pasta salad', 'lunch'),
-('Tuna pasta salad', 'budget-friendly'),
-('Tuna pasta salad', 'meal-prep'),
-('Lentil vegetable curry', 'dinner'),
-('Lentil vegetable curry', 'vegetarian'),
-('Lentil vegetable curry', 'vegan'),
-('Lentil vegetable curry', 'budget-friendly'),
-('Lentil vegetable curry', 'one-pot'),
-('Caprese grilled cheese', 'lunch'),
-('Caprese grilled cheese', 'vegetarian'),
-('Caprese grilled cheese', 'quick'),
-('Caprese grilled cheese', 'kid-friendly'),
-('Turkey chili', 'dinner'),
-('Turkey chili', 'one-pot'),
-('Turkey chili', 'high-protein'),
-('Turkey chili', 'freezer-friendly'),
-('Apple cinnamon overnight oats', 'breakfast'),
-('Apple cinnamon overnight oats', 'vegetarian'),
-('Apple cinnamon overnight oats', 'meal-prep'),
-('Apple cinnamon overnight oats', 'quick')
-            ) AS recipe_tags("RecipeName", "TagSlug")
-              ON lower(r."Name") = lower(recipe_tags."RecipeName")
-            CROSS JOIN LATERAL unnest(ARRAY[recipe_tags."TagSlug"]) AS tag_slug("Slug")
-            JOIN familyos."RecipeTags" t ON t."Slug" = tag_slug."Slug" AND t."FamilyId" IS NULL
-            WHERE r."FamilyId" = '00000000-0000-0000-0000-000000000000'::uuid
-              AND NOT EXISTS (SELECT 1 FROM familyos."RecipeTagLinks" l WHERE l."RecipeId" = r."Id" AND l."TagId" = t."Id" AND l."IsDeleted" = false);
-            """);
 
-        logger.LogInformation("Recipe catalog schema ensured; seeded {IngredientCount} common ingredients and {TagCount} tags.",
-            105, 28);
-    }
-}
-))[3], "RawLine") AS "IngredientName"
-                FROM raw_lines
-                WHERE "RawLine" <> ''
-            )
-            INSERT INTO familyos."RecipeIngredients"
-                ("Id", "RecipeId", "IngredientId", "Quantity", "Unit", "PreparationNote", "Section", "SortOrder", "CreatedAtUtc", "UpdatedAtUtc", "IsDeleted")
-            SELECT gen_random_uuid(), p."RecipeId", ingredient."Id",
-                CASE WHEN p."QtyText" IS NULL THEN NULL
-                     WHEN position('/' in p."QtyText") > 0
-                     THEN split_part(p."QtyText", '/', 1)::numeric / nullif(split_part(p."QtyText", '/', 2)::numeric, 0)
-                     ELSE p."QtyText"::numeric END,
-                p."Unit", NULL, NULL, p."SortOrder", now(), NULL, false
-            FROM parsed p
-            JOIN LATERAL (
-                SELECT i."Id" FROM familyos."IngredientCatalog" i
-                WHERE i."FamilyId" IS NULL AND i."IsDeleted" = false
-                  AND (i."SearchKey" = lower(regexp_replace(trim(p."IngredientName"), '\s+', ' ', 'g'))
-                       OR EXISTS (SELECT 1 FROM unnest(string_to_array(coalesce(i."AliasesCsv", ''), ',')) a
-                                  WHERE lower(trim(a)) = lower(trim(p."IngredientName"))))
-                ORDER BY CASE WHEN i."SearchKey" = lower(regexp_replace(trim(p."IngredientName"), '\s+', ' ', 'g')) THEN 0 ELSE 1 END
-                LIMIT 1
-            ) ingredient ON true
-            WHERE NOT EXISTS (
-                SELECT 1 FROM familyos."RecipeIngredients" ri
-                WHERE ri."RecipeId" = p."RecipeId" AND ri."SortOrder" = p."SortOrder" AND ri."IsDeleted" = false
-            );
-            """);
+    private static string Normalize(string value)
+        => string.Join(' ', value.Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries));
 
-        await db.Database.ExecuteSqlRawAsync("""
-            INSERT INTO familyos."RecipeTagLinks" ("Id", "RecipeId", "TagId", "CreatedAtUtc", "IsDeleted")
-            SELECT gen_random_uuid(), r."Id", t."Id", now(), false
-            FROM familyos."Recipes" r
-            JOIN (VALUES
-('Chicken fajita bowls', 'dinner'),
-('Chicken fajita bowls', 'mexican'),
-('Chicken fajita bowls', 'high-protein'),
-('Chicken fajita bowls', 'family-favorite'),
-('Creamy garlic chicken pasta', 'dinner'),
-('Creamy garlic chicken pasta', 'italian'),
-('Creamy garlic chicken pasta', 'comfort-food'),
-('Creamy garlic chicken pasta', 'family-favorite'),
-('Beef tacos', 'dinner'),
-('Beef tacos', 'mexican'),
-('Beef tacos', 'budget-friendly'),
-('Beef tacos', 'kid-friendly'),
-('Sheet-pan lemon chicken', 'dinner'),
-('Sheet-pan lemon chicken', 'one-pot'),
-('Sheet-pan lemon chicken', 'meal-prep'),
-('Sheet-pan lemon chicken', 'gluten-free'),
-('Slow cooker pulled pork', 'dinner'),
-('Slow cooker pulled pork', 'slow-cooker'),
-('Slow cooker pulled pork', 'budget-friendly'),
-('Slow cooker pulled pork', 'freezer-friendly'),
-('Classic spaghetti and meat sauce', 'dinner'),
-('Classic spaghetti and meat sauce', 'italian'),
-('Classic spaghetti and meat sauce', 'budget-friendly'),
-('Classic spaghetti and meat sauce', 'family-favorite'),
-('One-pot cheesy beef macaroni', 'dinner'),
-('One-pot cheesy beef macaroni', 'one-pot'),
-('One-pot cheesy beef macaroni', 'kid-friendly'),
-('One-pot cheesy beef macaroni', 'comfort-food'),
-('Baked salmon with rice', 'dinner'),
-('Baked salmon with rice', 'high-protein'),
-('Baked salmon with rice', 'gluten-free'),
-('Baked salmon with rice', 'quick'),
-('Chicken quesadillas', 'lunch'),
-('Chicken quesadillas', 'dinner'),
-('Chicken quesadillas', 'mexican'),
-('Chicken quesadillas', 'quick'),
-('Chicken quesadillas', 'kid-friendly'),
-('Turkey meatballs', 'dinner'),
-('Turkey meatballs', 'high-protein'),
-('Turkey meatballs', 'meal-prep'),
-('Turkey meatballs', 'italian'),
-('Vegetable fried rice', 'lunch'),
-('Vegetable fried rice', 'dinner'),
-('Vegetable fried rice', 'vegetarian'),
-('Vegetable fried rice', 'budget-friendly'),
-('Vegetable fried rice', 'quick'),
-('Creamy tomato soup', 'lunch'),
-('Creamy tomato soup', 'vegetarian'),
-('Creamy tomato soup', 'comfort-food'),
-('Creamy tomato soup', 'budget-friendly'),
-('BBQ chicken sandwiches', 'dinner'),
-('BBQ chicken sandwiches', 'slow-cooker'),
-('BBQ chicken sandwiches', 'kid-friendly'),
-('BBQ chicken sandwiches', 'meal-prep'),
-('Breakfast egg muffins', 'breakfast'),
-('Breakfast egg muffins', 'high-protein'),
-('Breakfast egg muffins', 'meal-prep'),
-('Breakfast egg muffins', 'gluten-free'),
-('Blueberry oatmeal', 'breakfast'),
-('Blueberry oatmeal', 'vegetarian'),
-('Blueberry oatmeal', 'budget-friendly'),
-('Blueberry oatmeal', 'kid-friendly'),
-('Banana pancakes', 'breakfast'),
-('Banana pancakes', 'kid-friendly'),
-('Banana pancakes', 'budget-friendly'),
-('Greek chicken wraps', 'lunch'),
-('Greek chicken wraps', 'dinner'),
-('Greek chicken wraps', 'mediterranean'),
-('Greek chicken wraps', 'high-protein'),
-('Black bean quesadillas', 'lunch'),
-('Black bean quesadillas', 'vegetarian'),
-('Black bean quesadillas', 'budget-friendly'),
-('Black bean quesadillas', 'quick'),
-('Honey garlic shrimp bowls', 'dinner'),
-('Honey garlic shrimp bowls', 'asian-inspired'),
-('Honey garlic shrimp bowls', 'quick'),
-('Honey garlic shrimp bowls', 'high-protein'),
-('Loaded baked potatoes', 'dinner'),
-('Loaded baked potatoes', 'budget-friendly'),
-('Loaded baked potatoes', 'gluten-free'),
-('Loaded baked potatoes', 'comfort-food'),
-('Chicken noodle soup', 'lunch'),
-('Chicken noodle soup', 'dinner'),
-('Chicken noodle soup', 'comfort-food'),
-('Chicken noodle soup', 'freezer-friendly'),
-('Beef and broccoli stir-fry', 'dinner'),
-('Beef and broccoli stir-fry', 'asian-inspired'),
-('Beef and broccoli stir-fry', 'high-protein'),
-('Beef and broccoli stir-fry', 'quick'),
-('Spinach and cheese omelet', 'breakfast'),
-('Spinach and cheese omelet', 'vegetarian'),
-('Spinach and cheese omelet', 'quick'),
-('Spinach and cheese omelet', 'gluten-free'),
-('Baked ziti', 'dinner'),
-('Baked ziti', 'italian'),
-('Baked ziti', 'comfort-food'),
-('Baked ziti', 'freezer-friendly'),
-('Crispy chicken tenders', 'dinner'),
-('Crispy chicken tenders', 'kid-friendly'),
-('Crispy chicken tenders', 'air-fryer'),
-('Crispy chicken tenders', 'high-protein'),
-('Tuna pasta salad', 'lunch'),
-('Tuna pasta salad', 'budget-friendly'),
-('Tuna pasta salad', 'meal-prep'),
-('Lentil vegetable curry', 'dinner'),
-('Lentil vegetable curry', 'vegetarian'),
-('Lentil vegetable curry', 'vegan'),
-('Lentil vegetable curry', 'budget-friendly'),
-('Lentil vegetable curry', 'one-pot'),
-('Caprese grilled cheese', 'lunch'),
-('Caprese grilled cheese', 'vegetarian'),
-('Caprese grilled cheese', 'quick'),
-('Caprese grilled cheese', 'kid-friendly'),
-('Turkey chili', 'dinner'),
-('Turkey chili', 'one-pot'),
-('Turkey chili', 'high-protein'),
-('Turkey chili', 'freezer-friendly'),
-('Apple cinnamon overnight oats', 'breakfast'),
-('Apple cinnamon overnight oats', 'vegetarian'),
-('Apple cinnamon overnight oats', 'meal-prep'),
-('Apple cinnamon overnight oats', 'quick')
-            ) AS recipe_tags("RecipeName", "TagSlug")
-              ON lower(r."Name") = lower(recipe_tags."RecipeName")
-            CROSS JOIN LATERAL unnest(ARRAY[recipe_tags."TagSlug"]) AS tag_slug("Slug")
-            JOIN familyos."RecipeTags" t ON t."Slug" = tag_slug."Slug" AND t."FamilyId" IS NULL
-            WHERE r."FamilyId" = '00000000-0000-0000-0000-000000000000'::uuid
-              AND NOT EXISTS (SELECT 1 FROM familyos."RecipeTagLinks" l WHERE l."RecipeId" = r."Id" AND l."TagId" = t."Id" AND l."IsDeleted" = false);
-            """);
+    private static string Slug(string value)
+        => string.Join('-', value.Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries));
 
-        logger.LogInformation("Recipe catalog schema ensured; seeded {IngredientCount} common ingredients and {TagCount} tags.",
-            105, 28);
-    }
+    private sealed record BuiltInRecipe(string Name, int Servings, string Ingredients, string Instructions, string[] Tags);
 }
