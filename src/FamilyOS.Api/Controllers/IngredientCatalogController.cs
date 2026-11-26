@@ -1,4 +1,5 @@
 using FamilyOS.Application.Interfaces;
+using FamilyOS.Domain.Meals;
 using FamilyOS.Infrastructure.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
