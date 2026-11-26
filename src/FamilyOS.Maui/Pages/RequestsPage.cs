@@ -594,14 +594,14 @@ public sealed class RequestsPage : ContentPage
         {
             if (action is "conditional-approve" or "add-condition")
             {
-                if (action == "conditional-approve")
-                    await _api.RunActionAsync(id, action);
                 var name = await DisplayPromptAsync("Add an approval condition", "What must happen before this request is fully approved?",
                     "Continue", "Cancel", maxLength: 120);
                 if (string.IsNullOrWhiteSpace(name)) return;
                 var description = await DisplayPromptAsync("Condition details", "Add details (optional)",
                     "Save condition", "Cancel", maxLength: 500);
                 if (description is null) return;
+                if (action == "conditional-approve")
+                    await _api.RunActionAsync(id, action);
                 await _api.CreateConditionAsync(id, name.Trim(), description.Trim());
             }
             else
