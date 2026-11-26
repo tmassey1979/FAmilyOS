@@ -24,7 +24,7 @@ public sealed class RecipePreferencesController : ControllerBase
 
     [HttpGet("preferences")]
     public async Task<ActionResult<List<RecipeMemberPreferenceDto>>> List(
-        [FromQuery] string recipeIds, CancellationToken ct)
+        [FromQuery] string? recipeIds = null, CancellationToken ct = default)
     {
         var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
         var ids = (recipeIds ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
