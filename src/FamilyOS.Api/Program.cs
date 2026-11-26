@@ -279,6 +279,7 @@ try
         await EnsureFamilyInvitesSchema.RunAsync(db, schemaLog);
         await EnsureMealSchema.RunAsync(db, schemaLog);
         await EnsureRecipeSchema.RunAsync(db, schemaLog);
+        await EnsureRecipeCatalogSchema.RunAsync(db, schemaLog);
         await EnsureLocationSchema.RunAsync(db, schemaLog);
         await EnsureAvatarSchema.RunAsync(db, schemaLog);
         await EnsureTaskSchema.RunAsync(db, schemaLog);
