@@ -29,8 +29,8 @@ public sealed class SettingsPage : ContentPage
     private readonly Button _googleSync = new() { Text = "Sync now" };
     private readonly Button _googleDisconnect = new() { Text = "Disconnect" };
     private readonly Switch _enabled = new();
-    private readonly Entry _start = new() { Placeholder = "22:00", Keyboard = Keyboard.Numeric, MaxLength = 5, WidthRequest = 100 };
-    private readonly Entry _end = new() { Placeholder = "07:00", Keyboard = Keyboard.Numeric, MaxLength = 5, WidthRequest = 100 };
+    private readonly TimePicker _start = new() { Time = new TimeSpan(22, 0, 0), Format = "h:mm tt", WidthRequest = 120 };
+    private readonly TimePicker _end = new() { Time = new TimeSpan(7, 0, 0), Format = "h:mm tt", WidthRequest = 120 };
     private readonly Button _save = new() { Text = "Save quiet hours" };
     private readonly Button _refresh = new() { Text = "Refresh" };
     private readonly Button _resetFamily = new() { Text = "Reset family data", TextColor = Colors.White, BackgroundColor = (Color)Application.Current!.Resources["AccentDanger"], IsVisible = false };
@@ -234,8 +234,8 @@ public sealed class SettingsPage : ContentPage
             _resetFamily.IsVisible = string.Equals(me.Role, "Owner", StringComparison.OrdinalIgnoreCase);
             _resetFamily.IsVisible = string.Equals(me.Role, "Owner", StringComparison.OrdinalIgnoreCase);
             _enabled.IsToggled = quiet.Enabled;
-            _start.Text = quiet.StartLabel ?? FormatTime(quiet.StartMinutes);
-            _end.Text = quiet.EndLabel ?? FormatTime(quiet.EndMinutes);
+            _start.Time = TimeSpan.FromMinutes(quiet.StartMinutes ?? 1320);
+            _end.Time = TimeSpan.FromMinutes(quiet.EndMinutes ?? 420);
             _status.Text = "Settings loaded.";
         }
         catch (FamilyApiException ex) { _status.Text = ex.Message; }
@@ -376,13 +376,8 @@ public sealed class SettingsPage : ContentPage
     private async Task SaveAsync()
     {
         if (_busy) return;
-        var start = ParseTime(_start.Text);
-        var end = ParseTime(_end.Text);
-        if (_enabled.IsToggled && (start is null || end is null))
-        {
-            _status.Text = "Enter valid 24-hour times in HH:MM format.";
-            return;
-        }
+        var start = (int)_start.Time.TotalMinutes;
+        var end = (int)_end.Time.TotalMinutes;
         if (_enabled.IsToggled && start == end)
         {
             _status.Text = "Start and end times must be different.";
@@ -394,8 +389,8 @@ public sealed class SettingsPage : ContentPage
         {
             var saved = await _me.SetQuietHoursAsync(_enabled.IsToggled, start, end);
             _enabled.IsToggled = saved.Enabled;
-            _start.Text = saved.StartLabel ?? FormatTime(saved.StartMinutes);
-            _end.Text = saved.EndLabel ?? FormatTime(saved.EndMinutes);
+            _start.Time = TimeSpan.FromMinutes(saved.StartMinutes ?? 1320);
+            _end.Time = TimeSpan.FromMinutes(saved.EndMinutes ?? 420);
             _status.Text = "Quiet hours saved.";
         }
         catch (FamilyApiException ex) { _status.Text = ex.Message; }
@@ -403,13 +398,4 @@ public sealed class SettingsPage : ContentPage
         finally { _busy = false; _save.IsEnabled = true; }
     }
 
-    private static int? ParseTime(string? value)
-    {
-        if (!TimeSpan.TryParseExact(value?.Trim(), new[] { @"h\:mm", @"hh\:mm" }, null, out var time)
-            || time < TimeSpan.Zero || time >= TimeSpan.FromDays(1)) return null;
-        return (int)time.TotalMinutes;
-    }
-
-    private static string FormatTime(int? minutes)
-        => minutes is >= 0 and < 1440 ? $"{minutes / 60:00}:{minutes % 60:00}" : "22:00";
 }
