@@ -169,7 +169,7 @@ public sealed class TasksPage : ContentPage
         if (task.EstimatedDurationMinutes is { } est) details.Add($"Est {est} min");
         if (task.ActualDurationMinutes is { } act) details.Add($"Actual {act} min");
         if (!string.IsNullOrWhiteSpace(task.PlannedStartTime) || !string.IsNullOrWhiteSpace(task.PlannedEndTime))
-            details.Add($"Planned {task.PlannedStartTime ?? "?"}–{task.PlannedEndTime ?? "?"}");
+            details.Add($"Planned {FormatPlannedTime(task.PlannedStartTime)}–{FormatPlannedTime(task.PlannedEndTime)}");
         if (task.VarianceMinutes is { } variance)
             details.Add(variance == 0 ? "On plan" : variance > 0 ? $"+{variance} min vs plan" : $"{variance} min vs plan");
 
@@ -272,10 +272,8 @@ public sealed class TasksPage : ContentPage
     private async Task SetPlannedTimesAsync(FamilyTaskDto task)
     {
         var today = DateTime.Today;
-        var startInitial = task.PlannedStartTime is { Length: > 0 } startText && TimeOnly.TryParse(startText, out var startTime)
-            ? today.Add(startTime.ToTimeSpan()) : today.AddHours(9);
-        var endInitial = task.PlannedEndTime is { Length: > 0 } endText && TimeOnly.TryParse(endText, out var endTime)
-            ? today.Add(endTime.ToTimeSpan()) : today.AddHours(10);
+        var startInitial = ParsePlannedDateTime(task.PlannedStartTime) ?? today.AddHours(9);
+        var endInitial = ParsePlannedDateTime(task.PlannedEndTime) ?? today.AddHours(10);
 
         var start = await PickDateTimeAsync("Planned start", startInitial, allowClear: true);
         if (!start.Confirmed) return;
@@ -314,6 +312,19 @@ public sealed class TasksPage : ContentPage
         catch (FamilyApiException ex) { _status.Text = ex.Message; }
         catch (Exception) { _status.Text = "Could not update the task schedule."; }
     }
+
+    private static DateTime? ParsePlannedDateTime(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (DateTimeOffset.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed))
+            return parsed.ToLocalTime().DateTime;
+        if (TimeOnly.TryParse(value, CultureInfo.InvariantCulture, out var time))
+            return DateTime.Today.Add(time.ToTimeSpan());
+        return null;
+    }
+
+    private static string FormatPlannedTime(string? value)
+        => ParsePlannedDateTime(value)?.ToString("ddd, MMM d · h:mm tt") ?? "?";
 
     private async Task<(bool Confirmed, DateTime? Value)> PickDateTimeAsync(
         string title, DateTime initialValue, bool allowClear)
