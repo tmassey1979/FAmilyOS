@@ -36,6 +36,7 @@ public static class EnsureMealSchema
                     "UpdatedAtUtc" timestamp with time zone NULL,
                     "IsDeleted" boolean NOT NULL DEFAULT false
                 );
+                ALTER TABLE familyos."MealEntries" ADD COLUMN IF NOT EXISTS "RecipeId" uuid NULL;
                 CREATE INDEX IF NOT EXISTS "IX_MealEntries_MealPlanId_DayUtc_Slot"
                     ON familyos."MealEntries" ("MealPlanId", "DayUtc", "Slot");
                 CREATE INDEX IF NOT EXISTS "IX_MealEntries_FamilyId"
