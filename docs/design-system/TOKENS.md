@@ -6,18 +6,18 @@ All values live in MAUI resource dictionaries under `src/FamilyOS.Maui/Resources
 
 | Resource | Light | Dark |
 |----------|-------|------|
-| `BgPage` | `#F4F7FC` | `#080D1B` |
-| `BgSurface` | `#FFFFFF` | `#111B2E` |
-| `BgSurfaceAlt` | `#EAF0F8` | `#1B2940` |
-| `BgGlow` | `#E5F8FF` | `#102A42` |
-| `BorderSubtle` | `#D7E1EF` | `#30445F` |
-| `TextPrimary` | `#101A2B` | `#F3F7FF` |
-| `TextMuted` | `#60718A` | `#9BAFC9` |
-| `TextOnAccent` | `#081321` | `#081321` |
-| `AccentPrimary` | `#008DA8` | `#55E6FF` |
-| `AccentSecondary` | `#6D5CE7` | `#A78BFA` |
-| `AccentDanger` | `#D83D5B` | `#FF718B` |
-| `AccentSuccess` | `#087F61` | `#53E6B1` |
+| `BgPage` | `#F4F7FC` | `#030712` |
+| `BgSurface` | `#FFFFFF` | `#0A1020` |
+| `BgSurfaceAlt` | `#EAF0F8` | `#0E1A2E` |
+| `BgGlow` | `#E5F8FF` | `#071A2C` |
+| `BorderSubtle` | `#D7E1EF` | `#1B3552` |
+| `TextPrimary` | `#101A2B` | `#EAF6FF` |
+| `TextMuted` | `#60718A` | `#8CA7C5` |
+| `TextOnAccent` | `#04101A` | `#04101A` |
+| `AccentPrimary` | `#008DA8` | `#45F3FF` |
+| `AccentSecondary` | `#6D5CE7` | `#B18CFF` |
+| `AccentDanger` | `#D83D5B` | `#FF5D7D` |
+| `AccentSuccess` | `#087F61` | `#47F0B2` |
 | `AccentWarning` | `#956000` | `#FFC66D` |
 
 ## Spacing and geometry
