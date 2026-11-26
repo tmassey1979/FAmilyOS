@@ -206,7 +206,7 @@ jobs:
           python3 -m pip install pillow
           python3 scripts/expand-maui-graphics.py
           ls -la src/FamilyOS.Maui/Resources/AppIcon src/FamilyOS.Maui/Resources/Splash \
-            src/FamilyOS.Maui/Resources/Images/Menu src/FamilyOS.Maui/Resources/Images/Brand
+            src/FamilyOS.Maui/Resources/Images src/FamilyOS.Maui/Resources/Images/Brand
 
       - name: Resolve MAUI app version
         id: maui-version
