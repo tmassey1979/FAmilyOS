@@ -101,11 +101,12 @@ public sealed class RequestsApiClient
             "cancel" => JsonSerializer.Serialize(new { reason }, JsonOptions),
             _ => "{}"
         };
-        var allowed = new[] { "submit", "approve", "deny", "cancel" };
+        var allowed = new[] { "submit", "approve", "conditional-approve", "deny", "cancel" };
         if (!allowed.Contains(action, StringComparer.Ordinal))
             throw new ArgumentOutOfRangeException(nameof(action), "Unsupported request action.");
         var content = action == "submit" ? null : new StringContent(body, Encoding.UTF8, "application/json");
-        return SendAsync<FamilyRequestDto>(HttpMethod.Post, $"api/requests/{id:D}/{action}", content, ct);
+        var route = action == "conditional-approve" ? "approve" : action;
+        return SendAsync<FamilyRequestDto>(HttpMethod.Post, $"api/requests/{id:D}/{route}", content, ct);
     }
 
     private async Task<T> SendAsync<T>(HttpMethod method, string path, HttpContent? content, CancellationToken ct)
