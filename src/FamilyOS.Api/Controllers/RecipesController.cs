@@ -30,7 +30,7 @@ public class RecipesController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<RecipeDto>> Create([FromBody] RecipeBody body, CancellationToken ct)
         => Ok(await _mediator.Send(new CreateRecipeCommand(
-            body.Name, body.Servings ?? 4, body.IngredientsCsv, body.Instructions), ct));
+            body.Name, body.Servings ?? 4, body.IngredientsCsv, body.Instructions, body.Description, body.ImageUrl, body.SourceUrl, body.PrepMinutes, body.CookMinutes, body.Cuisine, body.Difficulty), ct));
 
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<RecipeDto>> Update(Guid id, [FromBody] RecipeBody body, CancellationToken ct)
@@ -62,7 +62,8 @@ public class RecipesController : ControllerBase
         string Name,
         int? Servings = 4,
         string? IngredientsCsv = null,
-        string? Instructions = null);
+        string? Instructions = null, string? Description = null, string? ImageUrl = null, string? SourceUrl = null,
+        int? PrepMinutes = null, int? CookMinutes = null, string? Cuisine = null, string? Difficulty = null);
 
     public record ApplyRecipeBody(
         DateTime DayUtc,
