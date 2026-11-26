@@ -156,24 +156,17 @@ public class RecipeCommandHandlers :
         }
 
         var targetDay = cmd.DayUtc.Date;
-        var matchedEntryBeforeUpsert = plan.Entries.FirstOrDefault(e =>
-            !e.IsDeleted && e.DayUtc.Date == targetDay && e.Slot == slot);
-        _logger.LogInformation(
-            "Recipe apply {OperationId}: target match before upsert. Found={Found}, EntryId={EntryId}, IsDeleted={IsDeleted}",
-            operationId, matchedEntryBeforeUpsert is not null, matchedEntryBeforeUpsert?.Id, matchedEntryBeforeUpsert?.IsDeleted);
-
-        var entry = plan.UpsertEntry(
+        var entry = plan.AddEntry(
             cmd.DayUtc, slot, recipe.Name, notes: $"{recipe.Servings} servings", ingredientsCsv: recipe.IngredientsCsv, recipeId: recipe.Id);
 
         // The aggregate owns the collection, but explicitly mark a newly-created child as Added.
         // MealEntry assigns its GUID in the domain factory; EF can otherwise classify a child
         // introduced through a tracked backing-field collection as Modified.
-        if (matchedEntryBeforeUpsert is null)
-            _db.MealEntries.Add(entry);
+        _db.MealEntries.Add(entry);
 
         _logger.LogInformation(
             "Recipe apply {OperationId}: aggregate upsert complete. EntryId={EntryId}, MealPlanId={MealPlanId}, FamilyId={FamilyId}, DayUtc={DayUtc:o}, Slot={Slot}, DishName={DishName}, IsDeleted={IsDeleted}, WasExisting={WasExisting}",
-            operationId, entry.Id, entry.MealPlanId, entry.FamilyId, entry.DayUtc, entry.Slot, entry.DishName, entry.IsDeleted, matchedEntryBeforeUpsert is not null);
+            operationId, entry.Id, entry.MealPlanId, entry.FamilyId, entry.DayUtc, entry.Slot, entry.DishName, entry.IsDeleted, false);
 
         // Query the database directly (ignoring soft-delete filters) before SaveChanges.
         // This distinguishes a new child from a stale/deleted child being updated.
@@ -192,7 +185,7 @@ public class RecipeCommandHandlers :
             await _db.SaveChangesAsync(ct);
             _logger.LogInformation(
                 "Recipe apply {OperationId} saved successfully. EntryId={EntryId}, WasExisting={WasExisting}, ElapsedMs={ElapsedMs}",
-                operationId, entry.Id, matchedEntryBeforeUpsert is not null, startedAt.Elapsed.TotalMilliseconds);
+                operationId, entry.Id, false, startedAt.Elapsed.TotalMilliseconds);
         }
         catch (DbUpdateConcurrencyException ex)
         {
@@ -213,7 +206,7 @@ public class RecipeCommandHandlers :
 
             _logger.LogError(ex,
                 "Recipe apply {OperationId} concurrency failure. RecipeId={RecipeId}, FamilyId={FamilyId}, MealPlanId={MealPlanId}, EntryId={EntryId}, WasExisting={WasExisting}, PersistedBeforeSave={PersistedBeforeSave}, StateAfterFailure={StateAfterFailure}, ElapsedMs={ElapsedMs}, FailedEntries={FailedEntries}",
-                operationId, recipe.Id, _current.FamilyId, plan.Id, entry.Id, matchedEntryBeforeUpsert is not null,
+                operationId, recipe.Id, _current.FamilyId, plan.Id, entry.Id, false,
                 persistedBeforeSave is null ? "missing" : $"present;deleted={persistedBeforeSave.IsDeleted};plan={persistedBeforeSave.MealPlanId}",
                 postFailureState, startedAt.Elapsed.TotalMilliseconds,
                 string.Join("; ", ex.Entries.Select(e => $"{e.Metadata.ClrType.Name}:{e.State}")));
