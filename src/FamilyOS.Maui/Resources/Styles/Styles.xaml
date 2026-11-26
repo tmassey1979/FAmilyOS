@@ -45,6 +45,11 @@
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BgSurface}, Dark={StaticResource BgSurface}}" />
         <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource BorderSubtle}, Dark={StaticResource BorderSubtle}}" />
         <Setter Property="StrokeThickness" Value="1" />
+        <Setter Property="Shadow">
+            <Setter.Value>
+                <Shadow Brush="#55000000" Offset="0,6" Radius="18" Opacity="0.22" />
+            </Setter.Value>
+        </Setter>
         <Setter Property="Padding" Value="16" />
         <Setter Property="StrokeShape">
             <Setter.Value>
