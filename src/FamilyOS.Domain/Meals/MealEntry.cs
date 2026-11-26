@@ -11,7 +11,8 @@ public class MealEntry : Entity
     public string DishName { get; private set; } = string.Empty;
     public string? Notes { get; private set; }
     /// <summary>Comma-separated ingredient hints for shopping list generation.</summary>
-    public string? IngredientsCsv { get; private set; }\n    public Guid? RecipeId { get; private set; }
+    public string? IngredientsCsv { get; private set; }
+    public Guid? RecipeId { get; private set; }
 
     private MealEntry() { }
 
@@ -22,7 +23,8 @@ public class MealEntry : Entity
         MealSlot slot,
         string dishName,
         string? notes = null,
-        string? ingredientsCsv = null,\n        Guid? recipeId = null)
+        string? ingredientsCsv = null,
+        Guid? recipeId = null)
     {
         return new MealEntry
         {
@@ -32,7 +34,8 @@ public class MealEntry : Entity
             Slot = slot,
             DishName = dishName.Trim(),
             Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
-            IngredientsCsv = NormalizeIngredients(ingredientsCsv),\n            RecipeId = recipeId
+            IngredientsCsv = NormalizeIngredients(ingredientsCsv),
+            RecipeId = recipeId
         };
     }
 
@@ -43,6 +46,7 @@ public class MealEntry : Entity
         DishName = dishName.Trim();
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
         IngredientsCsv = NormalizeIngredients(ingredientsCsv);
+        RecipeId = recipeId;
         MarkUpdated();
     }
 
