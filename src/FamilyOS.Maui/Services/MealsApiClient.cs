@@ -33,6 +33,10 @@ public sealed class MealsApiClient
         => SendAsync<MealShoppingResultDto>(HttpMethod.Post,
             $"api/meals/week/to-shopping?weekStart={Uri.EscapeDataString(weekStartUtc.ToUniversalTime().ToString("O"))}", null, ct);
 
+    public Task<MealShoppingResultDto> AddDayToShoppingAsync(DateTime dayUtc, CancellationToken ct = default)
+        => SendAsync<MealShoppingResultDto>(HttpMethod.Post,
+            $"api/meals/day/to-shopping?day={Uri.EscapeDataString(dayUtc.ToUniversalTime().ToString("O"))}", null, ct);
+
     public Task<List<RecipeDto>> GetRecipesAsync(CancellationToken ct = default)
         => SendAsync<List<RecipeDto>>(HttpMethod.Get, "api/recipes", null, ct);
 
