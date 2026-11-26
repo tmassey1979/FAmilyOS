@@ -9,6 +9,10 @@ public sealed class MealsPage : ContentPage
     private readonly MealsApiClient _api;
     private readonly VerticalStackLayout _planItems = new() { Spacing = 12 };
     private readonly VerticalStackLayout _recipeItems = new() { Spacing = 10 };
+    private readonly SearchBar _recipeSearch = new() { Placeholder = "Search meals, ingredients, or cuisine…", FontSize = 14 };
+    private readonly HorizontalStackLayout _recipeFilters = new() { Spacing = 8 };
+    private List<RecipeDto> _allRecipes = new();
+    private string _activeRecipeFilter = "All";
     private readonly Label _status = new() { FontSize = 13 };
     private readonly Button _previous = new() { Text = "‹ Previous" };
     private readonly Button _next = new() { Text = "Next ›" };
@@ -46,11 +50,26 @@ public sealed class MealsPage : ContentPage
         _next.Clicked += (_, _) => weekLabel.Text = WeekLabel();
         _today.Clicked += (_, _) => weekLabel.Text = WeekLabel();
 
-        var recipeHeading = new Label { Text = "Saved recipes", FontSize = 20, FontAttributes = FontAttributes.Bold };
+        var recipeHeading = new Label { Text = "Discover meals", FontSize = 22, FontAttributes = FontAttributes.Bold };
         recipeHeading.SetDynamicResource(VisualElement.StyleProperty, "TextTitle");
-        var newRecipe = new Button { Text = "New recipe" };
+        var newRecipe = new Button { Text = "＋ Create a recipe" };
         newRecipe.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         newRecipe.Clicked += async (_, _) => await CreateRecipeAsync();
+        _recipeSearch.TextChanged += (_, _) => RenderRecipes();
+        foreach (var filter in new[] { "All", "Dinner", "Breakfast", "Quick", "Vegetarian", "Kid-Friendly" })
+        {
+            var chip = new Button { Text = filter, FontSize = 12, Padding = new Thickness(14, 7), CornerRadius = 18 };
+            chip.SetDynamicResource(VisualElement.StyleProperty, filter == "All" ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle");
+            chip.Clicked += (_, _) =>
+            {
+                _activeRecipeFilter = filter;
+                foreach (var child in _recipeFilters.Children.OfType<Button>())
+                    child.SetDynamicResource(VisualElement.StyleProperty,
+                        child.Text == filter ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle");
+                RenderRecipes();
+            };
+            _recipeFilters.Children.Add(chip);
+        }
 
         var content = new VerticalStackLayout
         {
@@ -60,7 +79,7 @@ public sealed class MealsPage : ContentPage
             {
                 heading, range, _today, _shopping, _status, _planItems,
                 new BoxView { HeightRequest = 1, Opacity = 0.25 },
-                recipeHeading, newRecipe, _recipeItems
+                recipeHeading, _recipeSearch, new ScrollView { Orientation = ScrollOrientation.Horizontal, Content = _recipeFilters, HeightRequest = 48 }, newRecipe, _recipeItems
             }
         };
         Content = new RefreshView
@@ -114,13 +133,10 @@ public sealed class MealsPage : ContentPage
                 _planItems.Children.Add(card);
             }
 
-            if (recipes.Count == 0)
-                AddInfo(_recipeItems, "No saved recipes", "Save recipes here and apply them to a meal or shopping list.");
-            else
-                foreach (var recipe in recipes)
-                    AddRecipeCard(recipe);
+            _allRecipes = recipes;
+            RenderRecipes();
 
-            _status.Text = $"{plan.Entries.Count} planned meal{(plan.Entries.Count == 1 ? "" : "s")} · {recipes.Count} saved recipe{(recipes.Count == 1 ? "" : "s")}";
+            _status.Text = $"{plan.Entries.Count} planned meal{(plan.Entries.Count == 1 ? "" : "s")} · {recipes.Count} recipes to discover";
         }
         catch (OperationCanceledException)
         {
@@ -227,22 +243,50 @@ public sealed class MealsPage : ContentPage
         }
 
         var actions = new HorizontalStackLayout { Spacing = 8 };
-        var apply = new Button { Text = "Add to dinner", FontSize = 12 };
+        var apply = new Button { Text = "Add to plan", FontSize = 12 };
         apply.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         apply.Clicked += async (_, _) => await ApplyRecipeAsync(recipe);
         var shop = new Button { Text = "Shopping list", FontSize = 12 };
         shop.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         shop.Clicked += async (_, _) => await AddRecipeToShoppingAsync(recipe);
-        var delete = new Button { Text = "Delete", FontSize = 12 };
-        delete.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
-        delete.Clicked += async (_, _) => await DeleteRecipeAsync(recipe);
         actions.Children.Add(apply);
         actions.Children.Add(shop);
-        actions.Children.Add(delete);
+        if (!recipe.IsBuiltIn)
+        {
+            var delete = new Button { Text = "Delete", FontSize = 12 };
+            delete.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+            delete.Clicked += async (_, _) => await DeleteRecipeAsync(recipe);
+            actions.Children.Add(delete);
+        }
         stack.Children.Add(actions);
         var card = new Border { Padding = 14, Content = stack };
         card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
         _recipeItems.Children.Add(card);
+    }
+
+    private void RenderRecipes()
+    {
+        _recipeItems.Children.Clear();
+        var term = _recipeSearch.Text?.Trim() ?? string.Empty;
+        var results = _allRecipes.Where(recipe =>
+        {
+            var textMatch = string.IsNullOrWhiteSpace(term)
+                || recipe.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || (recipe.IngredientsCsv?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (recipe.Tags?.Any(tag => tag.Contains(term, StringComparison.OrdinalIgnoreCase)) ?? false);
+            var tagMatch = _activeRecipeFilter == "All"
+                || (recipe.Tags?.Any(tag => string.Equals(tag, _activeRecipeFilter, StringComparison.OrdinalIgnoreCase)) ?? false);
+            return textMatch && tagMatch;
+        }).ToList();
+
+        if (results.Count == 0)
+        {
+            AddInfo(_recipeItems, "No matching meals", "Try another search or switch the category filter.");
+            return;
+        }
+
+        foreach (var recipe in results)
+            AddRecipeCard(recipe);
     }
 
     private async Task ApplyRecipeAsync(RecipeDto recipe)
