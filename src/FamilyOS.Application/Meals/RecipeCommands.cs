@@ -165,6 +165,12 @@ public class RecipeCommandHandlers :
         var entry = plan.UpsertEntry(
             cmd.DayUtc, slot, recipe.Name, notes: $"{recipe.Servings} servings", ingredientsCsv: recipe.IngredientsCsv, recipeId: recipe.Id);
 
+        // The aggregate owns the collection, but explicitly mark a newly-created child as Added.
+        // MealEntry assigns its GUID in the domain factory; EF can otherwise classify a child
+        // introduced through a tracked backing-field collection as Modified.
+        if (matchedEntryBeforeUpsert is null)
+            _db.MealEntries.Add(entry);
+
         _logger.LogInformation(
             "Recipe apply {OperationId}: aggregate upsert complete. EntryId={EntryId}, MealPlanId={MealPlanId}, FamilyId={FamilyId}, DayUtc={DayUtc:o}, Slot={Slot}, DishName={DishName}, IsDeleted={IsDeleted}, WasExisting={WasExisting}",
             operationId, entry.Id, entry.MealPlanId, entry.FamilyId, entry.DayUtc, entry.Slot, entry.DishName, entry.IsDeleted, matchedEntryBeforeUpsert is not null);
