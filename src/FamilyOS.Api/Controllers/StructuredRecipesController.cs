@@ -41,7 +41,7 @@ public sealed class StructuredRecipesController : ControllerBase
                 x => x.Id == id && x.FamilyId == _current.FamilyId, ct)
                 ?? throw new InvalidOperationException("Recipe not found.");
             recipe.Update(body.Name, body.Servings, null,
-                string.Join(Environment.NewLine, body.Steps.Select(x => x.Text)));
+                string.Join(Environment.NewLine, body.Steps.Select(x => x.Text)), body.Description, body.ImageUrl, body.SourceUrl, body.PrepMinutes, body.CookMinutes, body.Cuisine, body.Difficulty);
             _db.RecipeIngredients.RemoveRange(await _db.RecipeIngredients.Where(x => x.RecipeId == id).ToListAsync(ct));
             _db.RecipeInstructionSteps.RemoveRange(await _db.RecipeInstructionSteps.Where(x => x.RecipeId == id).ToListAsync(ct));
             _db.RecipeTagLinks.RemoveRange(await _db.RecipeTagLinks.Where(x => x.RecipeId == id).ToListAsync(ct));
@@ -49,7 +49,7 @@ public sealed class StructuredRecipesController : ControllerBase
         else
         {
             recipe = Recipe.Create(_current.FamilyId.Value, body.Name, body.Servings, null,
-                string.Join(Environment.NewLine, body.Steps.Select(x => x.Text)));
+                string.Join(Environment.NewLine, body.Steps.Select(x => x.Text)), body.Description, body.ImageUrl, body.SourceUrl, body.PrepMinutes, body.CookMinutes, body.Cuisine, body.Difficulty);
             _db.Recipes.Add(recipe);
             await _db.SaveChangesAsync(ct);
         }
@@ -117,7 +117,7 @@ public sealed class StructuredRecipesController : ControllerBase
                           where link.RecipeId == id
                           select tag.Name).ToListAsync(ct);
         return new StructuredRecipeDto(recipe.Id, recipe.Name, recipe.Servings, recipe.FamilyId == Guid.Empty,
-            recipe.IngredientsCsv, ingredients, steps, tags);
+            recipe.IngredientsCsv, ingredients, steps, tags, recipe.Description, recipe.ImageUrl, recipe.SourceUrl, recipe.PrepMinutes, recipe.CookMinutes, recipe.Cuisine, recipe.Difficulty);
     }
 }
 
@@ -125,7 +125,9 @@ public sealed record SaveStructuredRecipeBody(
     Guid? Id, string Name, int Servings,
     List<SaveRecipeIngredientBody> Ingredients,
     List<SaveRecipeStepBody> Steps,
-    List<string> Tags);
+    List<string> Tags,
+    string? Description = null, string? ImageUrl = null, string? SourceUrl = null,
+    int? PrepMinutes = null, int? CookMinutes = null, string? Cuisine = null, string? Difficulty = null);
 
 public sealed record SaveRecipeIngredientBody(
     Guid IngredientId, decimal? Quantity, string? Unit, string? PreparationNote, string? Section, int SortOrder);
@@ -137,4 +139,5 @@ public sealed record StructuredRecipeIngredientDto(
 public sealed record StructuredRecipeStepDto(int StepNumber, string Text, int? DurationMinutes);
 public sealed record StructuredRecipeDto(
     Guid Id, string Name, int Servings, bool IsBuiltIn, string? LegacyIngredientsCsv,
-    List<StructuredRecipeIngredientDto> Ingredients, List<StructuredRecipeStepDto> Steps, List<string> Tags);
+    List<StructuredRecipeIngredientDto> Ingredients, List<StructuredRecipeStepDto> Steps, List<string> Tags,
+    string? Description, string? ImageUrl, string? SourceUrl, int? PrepMinutes, int? CookMinutes, string? Cuisine, string? Difficulty);
