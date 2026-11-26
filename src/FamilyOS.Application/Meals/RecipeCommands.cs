@@ -5,6 +5,7 @@ using FamilyOS.Domain.Meals;
 using FamilyOS.Domain.Procurement;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace FamilyOS.Application.Meals;
 
@@ -40,11 +41,13 @@ public class RecipeCommandHandlers :
 {
     private readonly IFamilyOsDbContext _db;
     private readonly ICurrentUserService _current;
+    private readonly ILogger<RecipeCommandHandlers> _logger;
 
-    public RecipeCommandHandlers(IFamilyOsDbContext db, ICurrentUserService current)
+    public RecipeCommandHandlers(IFamilyOsDbContext db, ICurrentUserService current, ILogger<RecipeCommandHandlers> logger)
     {
         _db = db;
         _current = current;
+        _logger = logger;
     }
 
     public async Task<List<RecipeDto>> Handle(ListRecipesQuery query, CancellationToken ct)
@@ -114,28 +117,103 @@ public class RecipeCommandHandlers :
 
     public async Task<MealEntryDto> Handle(ApplyRecipeToMealCommand cmd, CancellationToken ct)
     {
+        var operationId = Guid.NewGuid();
+        var startedAt = System.Diagnostics.Stopwatch.StartNew();
         await EnsureFamilyAsync(ct);
+        _logger.LogInformation(
+            "Recipe apply {OperationId} started. RecipeId={RecipeId}, FamilyId={FamilyId}, MemberId={MemberId}, DayUtc={DayUtc:o}, RequestedWeekStartUtc={WeekStartUtc:o}, Slot={Slot}",
+            operationId, cmd.RecipeId, _current.FamilyId, _current.MemberId, cmd.DayUtc, cmd.WeekStartUtc, cmd.Slot);
+
         if (!Enum.TryParse<MealSlot>(cmd.Slot, ignoreCase: true, out var slot))
             throw new ValidationException("Slot", "Slot must be Breakfast, Lunch, Dinner, or Snack.");
 
         var recipe = await _db.Recipes.AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == cmd.RecipeId && (x.FamilyId == _current.FamilyId || x.FamilyId == Guid.Empty), ct)
             ?? throw new NotFoundException("Recipe", cmd.RecipeId);
+        _logger.LogInformation(
+            "Recipe apply {OperationId}: recipe loaded. RecipeId={RecipeId}, RecipeFamilyId={RecipeFamilyId}, Name={RecipeName}",
+            operationId, recipe.Id, recipe.FamilyId, recipe.Name);
 
         var week = MealPlan.ToMonday(cmd.WeekStartUtc ?? cmd.DayUtc);
         var plan = await _db.MealPlans
             .Include(p => p.Entries)
             .FirstOrDefaultAsync(p => p.FamilyId == _current.FamilyId && p.WeekStartUtc == week, ct);
+
         if (plan is null)
         {
+            _logger.LogInformation("Recipe apply {OperationId}: no meal plan found; creating one for {WeekStartUtc:o}", operationId, week);
             plan = MealPlan.Create(_current.FamilyId!.Value, week);
             _db.MealPlans.Add(plan);
             await _db.SaveChangesAsync(ct);
+            _logger.LogInformation("Recipe apply {OperationId}: new meal plan persisted. MealPlanId={MealPlanId}", operationId, plan.Id);
         }
+        else
+        {
+            _logger.LogInformation(
+                "Recipe apply {OperationId}: meal plan loaded. MealPlanId={MealPlanId}, WeekStartUtc={WeekStartUtc:o}, EntryCount={EntryCount}, Entries={Entries}",
+                operationId, plan.Id, plan.WeekStartUtc, plan.Entries.Count,
+                string.Join("; ", plan.Entries.Select(e => $"{e.Id}|{e.DayUtc:o}|{e.Slot}|deleted={e.IsDeleted}|recipe={e.RecipeId}")));
+        }
+
+        var targetDay = cmd.DayUtc.Date;
+        var matchedEntryBeforeUpsert = plan.Entries.FirstOrDefault(e =>
+            !e.IsDeleted && e.DayUtc.Date == targetDay && e.Slot == slot);
+        _logger.LogInformation(
+            "Recipe apply {OperationId}: target match before upsert. Found={Found}, EntryId={EntryId}, IsDeleted={IsDeleted}",
+            operationId, matchedEntryBeforeUpsert is not null, matchedEntryBeforeUpsert?.Id, matchedEntryBeforeUpsert?.IsDeleted);
 
         var entry = plan.UpsertEntry(
             cmd.DayUtc, slot, recipe.Name, notes: $"{recipe.Servings} servings", ingredientsCsv: recipe.IngredientsCsv, recipeId: recipe.Id);
-        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "Recipe apply {OperationId}: aggregate upsert complete. EntryId={EntryId}, MealPlanId={MealPlanId}, FamilyId={FamilyId}, DayUtc={DayUtc:o}, Slot={Slot}, DishName={DishName}, IsDeleted={IsDeleted}, WasExisting={WasExisting}",
+            operationId, entry.Id, entry.MealPlanId, entry.FamilyId, entry.DayUtc, entry.Slot, entry.DishName, entry.IsDeleted, matchedEntryBeforeUpsert is not null);
+
+        // Query the database directly (ignoring soft-delete filters) before SaveChanges.
+        // This distinguishes a new child from a stale/deleted child being updated.
+        var persistedBeforeSave = await _db.MealEntries.IgnoreQueryFilters().AsNoTracking()
+            .Where(e => e.Id == entry.Id)
+            .Select(e => new { e.Id, e.MealPlanId, e.FamilyId, e.DayUtc, e.Slot, e.IsDeleted, e.UpdatedAtUtc })
+            .SingleOrDefaultAsync(ct);
+        _logger.LogInformation(
+            "Recipe apply {OperationId}: target row immediately before save. Exists={Exists}, Persisted={Persisted}",
+            operationId, persistedBeforeSave is not null,
+            persistedBeforeSave is null ? "none" :
+                $"id={persistedBeforeSave.Id};plan={persistedBeforeSave.MealPlanId};family={persistedBeforeSave.FamilyId};day={persistedBeforeSave.DayUtc:o};slot={persistedBeforeSave.Slot};deleted={persistedBeforeSave.IsDeleted};updated={persistedBeforeSave.UpdatedAtUtc:o}");
+
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            _logger.LogInformation(
+                "Recipe apply {OperationId} saved successfully. EntryId={EntryId}, WasExisting={WasExisting}, ElapsedMs={ElapsedMs}",
+                operationId, entry.Id, matchedEntryBeforeUpsert is not null, startedAt.Elapsed.TotalMilliseconds);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            string postFailureState;
+            try
+            {
+                var rowAfterFailure = await _db.MealEntries.IgnoreQueryFilters().AsNoTracking()
+                    .Where(e => e.Id == entry.Id)
+                    .Select(e => new { e.Id, e.MealPlanId, e.FamilyId, e.DayUtc, e.Slot, e.IsDeleted, e.UpdatedAtUtc })
+                    .SingleOrDefaultAsync(ct);
+                postFailureState = rowAfterFailure is null ? "row-missing" :
+                    $"row-present;plan={rowAfterFailure.MealPlanId};family={rowAfterFailure.FamilyId};day={rowAfterFailure.DayUtc:o};slot={rowAfterFailure.Slot};deleted={rowAfterFailure.IsDeleted};updated={rowAfterFailure.UpdatedAtUtc:o}";
+            }
+            catch (Exception diagnosticException)
+            {
+                postFailureState = $"diagnostic-query-failed:{diagnosticException.GetType().Name}:{diagnosticException.Message}";
+            }
+
+            _logger.LogError(ex,
+                "Recipe apply {OperationId} concurrency failure. RecipeId={RecipeId}, FamilyId={FamilyId}, MealPlanId={MealPlanId}, EntryId={EntryId}, WasExisting={WasExisting}, PersistedBeforeSave={PersistedBeforeSave}, StateAfterFailure={StateAfterFailure}, ElapsedMs={ElapsedMs}, FailedEntries={FailedEntries}",
+                operationId, recipe.Id, _current.FamilyId, plan.Id, entry.Id, matchedEntryBeforeUpsert is not null,
+                persistedBeforeSave is null ? "missing" : $"present;deleted={persistedBeforeSave.IsDeleted};plan={persistedBeforeSave.MealPlanId}",
+                postFailureState, startedAt.Elapsed.TotalMilliseconds,
+                string.Join("; ", ex.Entries.Select(e => $"{e.Metadata.ClrType.Name}:{e.State}")));
+            throw;
+        }
+
         return new MealEntryDto(
             entry.Id, entry.DayUtc, entry.Slot.ToString(), entry.DishName, entry.Notes, entry.IngredientsCsv, entry.RecipeId);
     }
