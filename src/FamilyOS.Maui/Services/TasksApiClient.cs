@@ -74,6 +74,9 @@ public sealed class TasksApiClient
     public Task<FamilyTaskDto> SkipAsync(Guid taskId, string? note = null, CancellationToken cancellationToken = default)
         => SendAsync<FamilyTaskDto>(HttpMethod.Post, $"api/tasks/{taskId:D}/skip", JsonBody(new NoteBody(note, null)), cancellationToken);
 
+    public Task<FamilyTaskDto> DeclineAsync(Guid taskId, string? note = null, CancellationToken cancellationToken = default)
+        => SendAsync<FamilyTaskDto>(HttpMethod.Post, $"api/tasks/{taskId:D}/decline", JsonBody(new DeclineTaskBody(null, note)), cancellationToken);
+
     private static StringContent JsonBody<T>(T value)
         => new(JsonSerializer.Serialize(value, JsonOptions), Encoding.UTF8, "application/json");
 
@@ -173,4 +176,5 @@ public sealed record TaskHistoryDto(
     string? ActorName = null);
 
 internal sealed record NoteBody(string? Note, string? Reason);
+internal sealed record DeclineTaskBody(Guid? ReasonId, string? Note);
 internal sealed record AssignTaskBody(Guid AssignToMemberId);

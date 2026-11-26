@@ -210,6 +210,7 @@ public sealed class TasksPage : ContentPage
         "Assigned" or "Reassigned" => new[]
         {
             ("accept", "Accept", true),
+            ("decline", "Decline", false),
             ("defer", "Defer", false),
             ("cancel", "Cancel", false)
         },
@@ -217,6 +218,7 @@ public sealed class TasksPage : ContentPage
         {
             ("start", "Start", true),
             ("complete", "Complete", false),
+            ("decline", "Decline", false),
             ("defer", "Defer", false),
             ("skip", "Skip", false),
             ("cancel", "Cancel", false)
@@ -275,9 +277,23 @@ public sealed class TasksPage : ContentPage
         var end = await DisplayPromptAsync("Plan task", "Planned end (24-hour HH:mm, optional)",
             initialValue: task.PlannedEndTime ?? "", maxLength: 5, keyboard: Keyboard.Text);
         if (end is null) return;
+        var estimateText = await DisplayPromptAsync("Time estimate", "Estimated minutes (optional)",
+            initialValue: task.EstimatedDurationMinutes?.ToString(CultureInfo.InvariantCulture) ?? "",
+            maxLength: 5, keyboard: Keyboard.Numeric);
+        if (estimateText is null) return;
 
         start = start.Trim();
         end = end.Trim();
+        int? estimate = task.EstimatedDurationMinutes;
+        if (!string.IsNullOrWhiteSpace(estimateText))
+        {
+            if (!int.TryParse(estimateText, NumberStyles.None, CultureInfo.InvariantCulture, out var minutes) || minutes is < 1 or > 10080)
+            {
+                await DisplayAlertAsync("Invalid estimate", "Enter a whole number from 1 to 10080 minutes, or leave it blank.", "OK");
+                return;
+            }
+            estimate = minutes;
+        }
         if (start.Length > 0 && !TimeOnly.TryParseExact(start, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
         {
             await DisplayAlertAsync("Invalid time", "Use 24-hour time such as 09:30.", "OK");
@@ -300,7 +316,7 @@ public sealed class TasksPage : ContentPage
             await _tasks.SetPlannedTimesAsync(task.Id, new PlannedTimesBody(
                 string.IsNullOrEmpty(start) ? null : start,
                 string.IsNullOrEmpty(end) ? null : end,
-                task.EstimatedDurationMinutes));
+                estimate));
             _status.Text = "Task schedule updated.";
             await LoadAsync();
         }
@@ -322,6 +338,9 @@ public sealed class TasksPage : ContentPage
         if (string.IsNullOrWhiteSpace(title)) return;
         var description = await DisplayPromptAsync("Description", "Task details (optional)", initialValue: task.Description ?? "", maxLength: 1000);
         var category = await DisplayPromptAsync("Category", "Category (optional)", initialValue: task.Category ?? "", maxLength: 60);
+        var priority = await DisplayActionSheetAsync("Priority", "Keep current", null, "Low", "Normal", "High", "Urgent");
+        if (priority is null or "Cancel") return;
+        if (priority == "Keep current") priority = task.Priority;
         var dueText = await DisplayPromptAsync("Due date", "YYYY-MM-DD, or leave blank to clear the due date",
             initialValue: task.DueDate?.ToLocalTime().ToString("yyyy-MM-dd") ?? "", maxLength: 10);
         DateTime? dueDate = null;
@@ -342,6 +361,7 @@ public sealed class TasksPage : ContentPage
             await _tasks.UpdateDetailsAsync(task.Id, new UpdateTaskDetailsBody(
                 Title: title.Trim(),
                 Description: string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+                Priority: priority,
                 Category: string.IsNullOrWhiteSpace(category) ? null : category.Trim(),
                 DueDate: dueDate,
                 ClearDueDate: clearDueDate));
@@ -390,29 +410,26 @@ public sealed class TasksPage : ContentPage
     {
         try
         {
-            if (action is "defer" or "skip" or "cancel")
+            if (action is "defer" or "skip" or "cancel" or "decline")
             {
                 var prompt = action switch
                 {
                     "defer" => "Optional note for deferring this task:",
                     "skip" => "Optional note for skipping this instance:",
+                    "decline" => "Why are you declining this task? (optional)",
                     _ => "Optional reason for cancelling:"
                 };
                 var note = await DisplayPromptAsync(action[..1].ToUpper() + action[1..], prompt, "Confirm", "Cancel", maxLength: 200);
                 // null = user cancelled dialog
-                if (note is null && action == "cancel")
+                if (note is null)
                     return;
-                if (note is null && action is "defer" or "skip")
-                {
-                    // Allow empty note via blank confirm is DisplayPrompt returns "" on empty — null means cancel.
-                    return;
-                }
 
                 _ = action switch
                 {
                     "defer" => await _tasks.DeferAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
                     "skip" => await _tasks.SkipAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
                     "cancel" => await _tasks.CancelAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
+                    "decline" => await _tasks.DeclineAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
                     _ => throw new InvalidOperationException()
                 };
             }
@@ -421,7 +438,19 @@ public sealed class TasksPage : ContentPage
                 await _tasks.RunActionAsync(taskId, action);
             }
 
-            _status.Text = $"Task {action}ed.";
+            _status.Text = action switch
+            {
+                "accept" => "Task accepted.",
+                "start" => "Task started.",
+                "pause" => "Task paused.",
+                "resume" => "Task resumed.",
+                "complete" => "Task completed.",
+                "defer" => "Task deferred.",
+                "skip" => "Task instance skipped.",
+                "cancel" => "Task cancelled.",
+                "decline" => "Task declined.",
+                _ => "Task updated."
+            };
             await LoadAsync();
         }
         catch (FamilyApiException ex)
