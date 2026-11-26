@@ -3,6 +3,7 @@ using FamilyOS.Infrastructure.Identity;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace FamilyOS.Api.Controllers;
 
@@ -12,8 +13,13 @@ namespace FamilyOS.Api.Controllers;
 public class RecipesController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly ILogger<RecipesController> _logger;
 
-    public RecipesController(IMediator mediator) => _mediator = mediator;
+    public RecipesController(IMediator mediator, ILogger<RecipesController> logger)
+    {
+        _mediator = mediator;
+        _logger = logger;
+    }
 
     [HttpGet]
     public async Task<ActionResult<List<RecipeDto>>> List(CancellationToken ct)
@@ -51,8 +57,30 @@ public class RecipesController : ControllerBase
 
     [HttpPost("{id:guid}/apply")]
     public async Task<ActionResult<MealEntryDto>> Apply(Guid id, [FromBody] ApplyRecipeBody body, CancellationToken ct)
-        => Ok(await _mediator.Send(new ApplyRecipeToMealCommand(
-            id, body.DayUtc, body.Slot, body.WeekStartUtc), ct));
+    {
+        try
+        {
+            return Ok(await _mediator.Send(new ApplyRecipeToMealCommand(
+                id, body.DayUtc, body.Slot, body.WeekStartUtc), ct));
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            var failedEntries = ex.Entries.Select(entry =>
+            {
+                var key = entry.Metadata.FindPrimaryKey();
+                var keyValues = key is null
+                    ? "unknown"
+                    : string.Join(", ", key.Properties.Select(property =>
+                        $"{property.Name}={entry.Property(property.Name).CurrentValue ?? "null"}"));
+                return $"{entry.Metadata.ClrType.Name} [{keyValues}] state={entry.State}";
+            }).ToArray();
+
+            _logger.LogError(ex,
+                "Applying recipe {RecipeId} to {DayUtc}/{Slot} hit an EF concurrency failure. Entries: {Entries}",
+                id, body.DayUtc, body.Slot, string.Join("; ", failedEntries));
+            throw;
+        }
+    }
 
     [HttpPost("{id:guid}/to-shopping")]
     public async Task<ActionResult<object>> ToShopping(
