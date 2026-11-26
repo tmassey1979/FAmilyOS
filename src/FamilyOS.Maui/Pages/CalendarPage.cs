@@ -215,7 +215,7 @@ public sealed class CalendarPage : ContentPage
         save.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
         save.Clicked += async (_, _) =>
         {
-            completion.TrySetResult(date.Date.Date + time.Time);
+            completion.TrySetResult((date.Date ?? initialValue.Date).Date + (time.Time ?? initialValue.TimeOfDay));
             await Navigation.PopModalAsync();
         };
         page.Content = new VerticalStackLayout
