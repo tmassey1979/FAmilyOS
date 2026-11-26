@@ -125,7 +125,7 @@ public class MealCommandHandlers :
                 var quantity = row.Quantity is null ? null : row.Quantity.Value * uses;
                 if (aggregate.TryGetValue(key, out var current))
                     aggregate[key] = (current.Name, current.Quantity is null || quantity is null
-                        ? null : current.Quantity.Value + quantity.Value);
+                        ? null : current.Quantity.Value + quantity.Value, current.Unit);
                 else
                     aggregate[key] = (row.Name, quantity, unit);
             }
