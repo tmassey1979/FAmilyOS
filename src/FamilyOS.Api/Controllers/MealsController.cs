@@ -51,5 +51,6 @@ public class MealsController : ControllerBase
         string DishName,
         string? Notes = null,
         string? IngredientsCsv = null,
-        DateTime? WeekStartUtc = null,\n        Guid? RecipeId = null);
+        DateTime? WeekStartUtc = null,
+        Guid? RecipeId = null);
 }
