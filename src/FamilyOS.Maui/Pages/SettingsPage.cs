@@ -9,7 +9,18 @@ public sealed class SettingsPage : ContentPage
     private readonly FamilyApiClient _family;
     private readonly Label _account = new() { FontSize = 14 };
     private readonly Label _profileName = new() { FontSize = 20, FontAttributes = FontAttributes.Bold };
-    private readonly Image _profilePhoto = new() { WidthRequest = 76, HeightRequest = 76, Aspect = Aspect.AspectFill };
+    private readonly Image _profilePhoto = new()
+    {
+        WidthRequest = 76,
+        HeightRequest = 76,
+        Aspect = Aspect.AspectFill,
+        Clip = new Microsoft.Maui.Controls.Shapes.EllipseGeometry
+        {
+            Center = new Point(38, 38),
+            RadiusX = 38,
+            RadiusY = 38
+        }
+    };
     private ProfileDto? _profile;
     private readonly Label _household = new() { FontSize = 14 };
     private readonly Label _status = new() { FontSize = 12 };
