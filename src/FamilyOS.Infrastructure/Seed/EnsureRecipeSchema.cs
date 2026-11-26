@@ -23,6 +23,13 @@ public static class EnsureRecipeSchema
                     "UpdatedAtUtc" timestamp with time zone NULL,
                     "IsDeleted" boolean NOT NULL DEFAULT false
                 );
+                ALTER TABLE familyos."Recipes" ADD COLUMN IF NOT EXISTS "Description" character varying(1000) NULL;
+                ALTER TABLE familyos."Recipes" ADD COLUMN IF NOT EXISTS "ImageUrl" character varying(1000) NULL;
+                ALTER TABLE familyos."Recipes" ADD COLUMN IF NOT EXISTS "SourceUrl" character varying(1000) NULL;
+                ALTER TABLE familyos."Recipes" ADD COLUMN IF NOT EXISTS "PrepMinutes" integer NULL;
+                ALTER TABLE familyos."Recipes" ADD COLUMN IF NOT EXISTS "CookMinutes" integer NULL;
+                ALTER TABLE familyos."Recipes" ADD COLUMN IF NOT EXISTS "Cuisine" character varying(100) NULL;
+                ALTER TABLE familyos."Recipes" ADD COLUMN IF NOT EXISTS "Difficulty" character varying(40) NULL;
                 CREATE INDEX IF NOT EXISTS "IX_Recipes_FamilyId_Name"
                     ON familyos."Recipes" ("FamilyId", "Name");
                 """);
