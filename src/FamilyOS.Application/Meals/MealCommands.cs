@@ -27,7 +27,7 @@ public record UpsertMealEntryCommand(
 
 public record RemoveMealEntryCommand(Guid EntryId) : IRequest;
 
-public record PushMealIngredientsToQueueCommand(DateTime? WeekStartUtc = null) : IRequest<int>;
+public record PushMealIngredientsToQueueCommand(DateTime? WeekStartUtc = null, DateTime? DayUtc = null) : IRequest<int>;
 
 public class MealCommandHandlers :
     IRequestHandler<GetMealPlanWeekQuery, MealPlanDto>,
@@ -93,7 +93,7 @@ public class MealCommandHandlers :
             .FirstOrDefaultAsync(p => p.FamilyId == _current.FamilyId && p.WeekStartUtc == week, ct);
         if (plan is null) return 0;
 
-        var plannedEntries = plan.Entries.Where(e => !e.IsDeleted).ToList();
+        var plannedEntries = plan.Entries.Where(e => !e.IsDeleted\n            && (cmd.DayUtc is null || e.DayUtc.Date == cmd.DayUtc.Value.Date)).ToList();
         var names = plannedEntries.SelectMany(e => e.IngredientList()).ToList();
 
         var recipeIds = plannedEntries.Where(e => e.RecipeId.HasValue)
