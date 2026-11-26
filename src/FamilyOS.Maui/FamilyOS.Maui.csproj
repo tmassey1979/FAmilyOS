@@ -25,6 +25,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The release workflow stages these two canonical FamilyOS PNG assets before MAUI build. -->
+    <MauiIcon Include="Resources\AppIcon\appicon.png"
+              ForegroundFile="Resources\AppIcon\appicon_foreground.png"
+              Color="#0F172A" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="11.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.0" />
