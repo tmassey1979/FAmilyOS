@@ -278,9 +278,18 @@ public class RequestCommandHandlers :
             .Include(r => r.PendingQuestions)
             .Where(r => r.FamilyId == _current.FamilyId &&
                         (r.Status == RequestStatus.Submitted
+                         || r.Status == RequestStatus.PendingApproval
                          || r.Status == RequestStatus.UnderReview
-                         || r.Status == RequestStatus.WaitingForInformation))
-            .OrderBy(r => r.CreatedAtUtc)
+                         || r.Status == RequestStatus.WaitingForInformation
+                         || r.Status == RequestStatus.Approved
+                         || r.Status == RequestStatus.ConditionallyApproved
+                         || r.Status == RequestStatus.Executable
+                         || r.Status == RequestStatus.InExecution))
+            .OrderBy(r => r.Status == RequestStatus.Submitted
+                       || r.Status == RequestStatus.PendingApproval
+                       || r.Status == RequestStatus.UnderReview
+                       || r.Status == RequestStatus.WaitingForInformation ? 0 : 1)
+            .ThenBy(r => r.CreatedAtUtc)
             .ToListAsync(ct);
         var result = new List<RequestDto>();
         foreach (var r in list) result.Add(await ToDto(r, ct));
@@ -409,8 +418,6 @@ public class RequestCommandHandlers :
 
         var plan = ExecutionPlan.Create(_current.FamilyId!.Value, request.Id, _current.MemberId!.Value);
         plan.AddItem(ExecutionItemType.Task, $"Execute: {request.Title}", _current.MemberId);
-        if (request.Type == RequestTypeCode.Ride || request.NeededByUtc.HasValue)
-            plan.AddItem(ExecutionItemType.CalendarEvent, request.Title, _current.MemberId);
 
         _db.ExecutionPlans.Add(plan);
         request.LinkExecutionPlan(plan.Id);
