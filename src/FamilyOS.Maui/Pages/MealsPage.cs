@@ -8,6 +8,7 @@ public sealed class MealsPage : ContentPage
     private static readonly string[] Slots = ["Breakfast", "Lunch", "Dinner", "Snack"];
     private readonly MealsApiClient _api;
     private readonly VerticalStackLayout _planItems = new() { Spacing = 12 };
+    private readonly VerticalStackLayout _nominationItems = new() { Spacing = 9 };
     private readonly VerticalStackLayout _recipeItems = new() { Spacing = 10 };
     private readonly SearchBar _recipeSearch = new() { Placeholder = "Search meals, ingredients, or cuisine…", FontSize = 14 };
     private readonly HorizontalStackLayout _recipeFilters = new() { Spacing = 8 };
@@ -51,6 +52,11 @@ public sealed class MealsPage : ContentPage
         _next.Clicked += (_, _) => weekLabel.Text = WeekLabel();
         _today.Clicked += (_, _) => weekLabel.Text = WeekLabel();
 
+        var nominationHeading = new Label { Text = "Family meal vote", FontSize = 22, FontAttributes = FontAttributes.Bold };
+        nominationHeading.SetDynamicResource(VisualElement.StyleProperty, "TextTitle");
+        var nominateMeal = new Button { Text = "＋ Suggest a meal for this week" };
+        nominateMeal.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+        nominateMeal.Clicked += async (_, _) => await NominateMealAsync(null);
         var recipeHeading = new Label { Text = "Discover meals", FontSize = 22, FontAttributes = FontAttributes.Bold };
         recipeHeading.SetDynamicResource(VisualElement.StyleProperty, "TextTitle");
         var newRecipe = new Button { Text = "＋ Create a recipe" };
@@ -85,6 +91,8 @@ public sealed class MealsPage : ContentPage
             {
                 heading, range, _today, _shopping, _status, _planItems,
                 new BoxView { HeightRequest = 1, Opacity = 0.25 },
+                nominationHeading, new Label { Text = "Everyone can suggest and vote. Parents make the final plan.", FontSize = 12 }, nominateMeal, _nominationItems,
+                new BoxView { HeightRequest = 1, Opacity = 0.25 },
                 recipeHeading, _recipeSearch, new ScrollView { Orientation = ScrollOrientation.Horizontal, Content = _recipeFilters, HeightRequest = 48 }, _recipeSort, newRecipe, _recipeItems
             }
         };
@@ -112,8 +120,11 @@ public sealed class MealsPage : ContentPage
         {
             var plan = await _api.GetWeekAsync(_weekStart);
             var recipes = await _api.GetRecipesAsync();
+            var nominations = await _api.GetNominationsAsync(_weekStart);
             _planItems.Children.Clear();
+            _nominationItems.Children.Clear();
             _recipeItems.Children.Clear();
+            RenderNominations(nominations);
             foreach (var dayOffset in Enumerable.Range(0, 7))
             {
                 var day = _weekStart.AddDays(dayOffset);
@@ -168,6 +179,107 @@ public sealed class MealsPage : ContentPage
         {
             _loading = false;
             SetBusy(false);
+        }
+    }
+
+
+    private void RenderNominations(IReadOnlyList<MealNominationDto> nominations)
+    {
+        if (nominations.Count == 0)
+        {
+            var empty = new Label { Text = "No suggestions yet. Be the first to pick a family favorite!", FontSize = 13 };
+            empty.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+            _nominationItems.Children.Add(empty);
+            return;
+        }
+
+        foreach (var nomination in nominations)
+        {
+            var stack = new VerticalStackLayout { Spacing = 6 };
+            var title = new Label { Text = nomination.Title, FontSize = 16, FontAttributes = FontAttributes.Bold };
+            title.SetDynamicResource(VisualElement.StyleProperty, "TextBodyStrong");
+            stack.Children.Add(title);
+            if (!string.IsNullOrWhiteSpace(nomination.Note))
+            {
+                var note = new Label { Text = nomination.Note, FontSize = 12 };
+                note.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+                stack.Children.Add(note);
+            }
+            var status = nomination.Status == "Open"
+                ? $"{nomination.VoteCount} vote{(nomination.VoteCount == 1 ? "" : "s")} · voting open"
+                : nomination.Status == "Selected"
+                    ? $"✓ Added to plan{(nomination.PlannedDayUtc is DateTime day ? $" · {day:ddd}" : "")}"
+                    : "Not selected this week";
+            var meta = new Label { Text = status, FontSize = 11 };
+            meta.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+            stack.Children.Add(meta);
+
+            if (nomination.Status == "Open")
+            {
+                var actions = new HorizontalStackLayout { Spacing = 8 };
+                var vote = new Button { Text = nomination.HasVoted ? "♥ Voted" : "♡ Vote", FontSize = 12 };
+                vote.SetDynamicResource(VisualElement.StyleProperty, nomination.HasVoted ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle");
+                vote.Clicked += async (_, _) =>
+                {
+                    try { await _api.VoteForMealAsync(nomination.Id, nomination.HasVoted); await LoadAsync(); }
+                    catch (Exception ex) { await DisplayAlertAsync("Vote not saved", ex is FamilyApiException ? ex.Message : "Please try again.", "OK"); }
+                };
+                var decide = new Button { Text = "Parent review", FontSize = 12 };
+                decide.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+                decide.Clicked += async (_, _) => await ReviewNominationAsync(nomination);
+                actions.Children.Add(vote);
+                actions.Children.Add(decide);
+                stack.Children.Add(actions);
+            }
+            var card = new Border { Padding = 12, Content = stack };
+            card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
+            _nominationItems.Children.Add(card);
+        }
+    }
+
+    private async Task NominateMealAsync(RecipeDto? recipe)
+    {
+        var title = recipe?.Name ?? await DisplayPromptAsync("Suggest a meal", "What should the family eat?", maxLength: 160);
+        if (string.IsNullOrWhiteSpace(title)) return;
+        var note = await DisplayPromptAsync("Add a note (optional)", "Anything the family should know?", maxLength: 300);
+        try
+        {
+            await _api.NominateMealAsync(new NominateMealDto(title.Trim(), _weekStart, recipe?.Id,
+                string.IsNullOrWhiteSpace(note) ? null : note.Trim()));
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlertAsync("Suggestion not added", ex is FamilyApiException ? ex.Message : "Please try again.", "OK");
+        }
+    }
+
+    private async Task ReviewNominationAsync(MealNominationDto nomination)
+    {
+        var choice = await DisplayActionSheetAsync("Parent decision", "Cancel", null, "Add to this week's plan", "Decline suggestion");
+        if (choice == "Cancel" || string.IsNullOrWhiteSpace(choice)) return;
+        try
+        {
+            if (choice == "Decline suggestion")
+            {
+                await _api.DecideNominationAsync(nomination.Id, new DecideMealNominationDto(false));
+            }
+            else
+            {
+                var dayNames = Enumerable.Range(0, 7).Select(i => _weekStart.AddDays(i).ToString("dddd")).ToArray();
+                var dayName = await DisplayActionSheetAsync("Choose a day", "Cancel", null, dayNames);
+                if (string.IsNullOrWhiteSpace(dayName) || dayName == "Cancel") return;
+                var day = _weekStart.AddDays(Array.IndexOf(dayNames, dayName));
+                var slot = await DisplayActionSheetAsync("Choose a meal", "Cancel", null, "Breakfast", "Lunch", "Dinner", "Snack");
+                if (string.IsNullOrWhiteSpace(slot) || slot == "Cancel") return;
+                await _api.DecideNominationAsync(nomination.Id,
+                    new DecideMealNominationDto(true, DateTime.SpecifyKind(day.Date, DateTimeKind.Utc), slot));
+            }
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlertAsync("Decision not saved", ex is FamilyApiException ? ex.Message : "Only a parent can finalize a suggestion. Please try again.", "OK");
         }
     }
 
@@ -262,6 +374,10 @@ public sealed class MealsPage : ContentPage
         }
 
         var actions = new HorizontalStackLayout { Spacing = 8 };
+        var nominate = new Button { Text = "Nominate" , FontSize = 12 };
+        nominate.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+        nominate.Clicked += async (_, _) => await NominateMealAsync(recipe);
+        actions.Children.Add(nominate);
         var apply = new Button { Text = "Add to plan", FontSize = 12 };
         apply.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         apply.Clicked += async (_, _) => await ApplyRecipeAsync(recipe);
