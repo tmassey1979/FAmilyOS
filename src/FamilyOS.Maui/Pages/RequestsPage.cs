@@ -14,7 +14,7 @@ public sealed class RequestsPage : ContentPage
     private readonly VerticalStackLayout _items = new() { Spacing = 12 };
     private readonly Label _status = new() { FontSize = 13 };
     private readonly Button _mineButton = new() { Text = "My requests" };
-    private readonly Button _queueButton = new() { Text = "Approval queue" };
+    private readonly Button _queueButton = new() { Text = "Family queue" };
     private readonly Button _refreshButton = new() { Text = "Refresh" };
     private readonly Button _createButton = new() { Text = "New request" };
     private bool _showQueue;
@@ -80,8 +80,8 @@ public sealed class RequestsPage : ContentPage
             _items.Children.Clear();
             if (rows.Count == 0)
             {
-                AddCard(_showQueue ? "No requests awaiting your review" : "No requests yet",
-                    _showQueue ? "New requests requiring your approval will appear here." : "Requests you create will appear here.");
+                AddCard(_showQueue ? "No family requests to review" : "No requests yet",
+                    _showQueue ? "New submissions and approved requests ready for follow-up will appear here." : "Requests you create will appear here.");
                 _status.Text = "You're all caught up.";
             }
             else
@@ -579,13 +579,13 @@ public sealed class RequestsPage : ContentPage
                         return;
                     }
                     commit.IsEnabled = false;
-                    message.Text = "Creating tasks, events and shopping items…";
+                    message.Text = "Creating selected tasks…";
                     try
                     {
                         var committed = await _api.CommitExecutionPlanAsync(plan.Id, deselected);
                         planStatus.Text = $"Status: {committed.Status}";
                         foreach (var pair in switches) pair.Value.IsEnabled = false;
-                        message.Text = $"{committed.Items.Count(i => i.ResultingEntityId.HasValue)} item(s) created. Your plan is saved.";
+                        message.Text = $"{committed.Items.Count(i => i.ResultingEntityId.HasValue)} task(s) created. Your plan is saved.";
                         commit.IsVisible = false;
                         cancel.Text = "Done";
                     }
@@ -604,7 +604,7 @@ public sealed class RequestsPage : ContentPage
             }
             else
             {
-                message.Text = $"{plan.Items.Count(i => i.ResultingEntityId.HasValue)} item(s) were created from this plan.";
+                message.Text = $"{plan.Items.Count(i => i.ResultingEntityId.HasValue)} task(s) were created from this plan.";
             }
 
             content.Children.Add(buttons);
