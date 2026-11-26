@@ -543,7 +543,7 @@ public sealed class MealsPage : ContentPage
     {
         try
         {
-            var updated = await _api.SetRecipePreferenceAsync(recipe.Id,
+            await _api.SetRecipePreferenceAsync(recipe.Id,
                 new RecipeMemberPreferenceWriteDto(preference, isFavorite));
             var rows = await _api.GetRecipePreferencesAsync([recipe.Id]);
             _recipePreferences.RemoveAll(x => x.RecipeId == recipe.Id);
