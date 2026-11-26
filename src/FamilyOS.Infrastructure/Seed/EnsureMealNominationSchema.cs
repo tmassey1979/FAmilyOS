@@ -38,7 +38,7 @@ public static class EnsureMealNominationSchema
                 "IsDeleted" boolean NOT NULL DEFAULT false
             );
             CREATE UNIQUE INDEX IF NOT EXISTS "IX_MealNominationVotes_NominationId_MemberId"
-                ON familyos."MealNominationVotes" ("NominationId", "MemberId");
+                ON familyos."MealNominationVotes" ("NominationId", "MemberId") WHERE "IsDeleted" = false;
             CREATE INDEX IF NOT EXISTS "IX_MealNominationVotes_FamilyId"
                 ON familyos."MealNominationVotes" ("FamilyId");
             """);
