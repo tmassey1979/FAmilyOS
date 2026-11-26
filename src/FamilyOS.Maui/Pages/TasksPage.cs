@@ -271,46 +271,110 @@ public sealed class TasksPage : ContentPage
 
     private async Task SetPlannedTimesAsync(FamilyTaskDto task)
     {
-        var today = DateTime.Today;
-        var startInitial = ParsePlannedDateTime(task.PlannedStartTime) ?? today.AddHours(9);
-        var endInitial = ParsePlannedDateTime(task.PlannedEndTime) ?? today.AddHours(10);
+        await ShowPlannedScheduleFormAsync(task.Id,
+            ParsePlannedDateTime(task.PlannedStartTime),
+            ParsePlannedDateTime(task.PlannedEndTime),
+            task.EstimatedDurationMinutes);
+    }
 
-        var start = await PickDateTimeAsync("Planned start", startInitial, allowClear: true);
-        if (!start.Confirmed) return;
-        var end = await PickDateTimeAsync("Planned end", endInitial, allowClear: true);
-        if (!end.Confirmed) return;
-        if (start.Value.HasValue && end.Value.HasValue && end.Value <= start.Value)
+    private async Task<bool> ShowPlannedScheduleFormAsync(
+        Guid taskId, DateTime? startInitial, DateTime? endInitial, int? estimateInitial)
+    {
+        var startEnabled = new Switch { IsToggled = startInitial.HasValue };
+        var endEnabled = new Switch { IsToggled = endInitial.HasValue };
+        var startDate = new DatePicker { Date = (startInitial ?? DateTime.Today.AddHours(9)).Date, Format = "ddd, MMM d, yyyy" };
+        var startTime = new TimePicker { Time = (startInitial ?? DateTime.Today.AddHours(9)).TimeOfDay, Format = "h:mm tt" };
+        var endDate = new DatePicker { Date = (endInitial ?? DateTime.Today.AddHours(10)).Date, Format = "ddd, MMM d, yyyy" };
+        var endTime = new TimePicker { Time = (endInitial ?? DateTime.Today.AddHours(10)).TimeOfDay, Format = "h:mm tt" };
+        var estimate = new Entry { Placeholder = "Estimated minutes (optional)", Keyboard = Keyboard.Numeric,
+            MaxLength = 5, Text = estimateInitial?.ToString(CultureInfo.InvariantCulture) ?? "" };
+        var completion = new TaskCompletionSource<bool>();
+        var page = new ContentPage { Title = "Plan task time" };
+
+        static View DateTimeField(string label, Switch enabled, DatePicker date, TimePicker time)
         {
-            await DisplayAlertAsync("Invalid schedule", "The planned end must be after the planned start.", "OK");
-            return;
+            var header = new Grid
+            {
+                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+                Children = { new Label { Text = label, FontAttributes = FontAttributes.Bold, VerticalOptions = LayoutOptions.Center }, enabled }
+            };
+            var controls = new Grid
+            {
+                ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Star) },
+                ColumnSpacing = 10,
+                Children = { date, time }
+            };
+            date.SetBinding(VisualElement.IsEnabledProperty, new Binding(nameof(Switch.IsToggled), source: enabled));
+            time.SetBinding(VisualElement.IsEnabledProperty, new Binding(nameof(Switch.IsToggled), source: enabled));
+            return new VerticalStackLayout { Spacing = 6, Children = { header, controls } };
         }
 
-        var estimateText = await DisplayPromptAsync("Time estimate", "Estimated minutes (optional)",
-            initialValue: task.EstimatedDurationMinutes?.ToString(CultureInfo.InvariantCulture) ?? "",
-            maxLength: 5, keyboard: Keyboard.Numeric);
-        if (estimateText is null) return;
-        int? estimate = task.EstimatedDurationMinutes;
-        if (!string.IsNullOrWhiteSpace(estimateText))
+        var cancel = new Button { Text = "Not now" };
+        cancel.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+        cancel.Clicked += async (_, _) => { completion.TrySetResult(false); await Navigation.PopModalAsync(); };
+        var save = new Button { Text = "Save schedule" };
+        save.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
+        save.Clicked += async (_, _) =>
         {
-            if (!int.TryParse(estimateText, NumberStyles.None, CultureInfo.InvariantCulture, out var minutes) || minutes is < 1 or > 10080)
+            DateTime? start = startEnabled.IsToggled ? startDate.Date + startTime.Time : null;
+            DateTime? end = endEnabled.IsToggled ? endDate.Date + endTime.Time : null;
+            if (start.HasValue != end.HasValue)
             {
-                await DisplayAlertAsync("Invalid estimate", "Enter a whole number from 1 to 10080 minutes, or leave it blank.", "OK");
+                await DisplayAlertAsync("Incomplete schedule", "Choose both a planned start and end, or turn both off.", "OK");
                 return;
             }
-            estimate = minutes;
-        }
+            if (start.HasValue && end.HasValue && end.Value <= start.Value)
+            {
+                await DisplayAlertAsync("Invalid schedule", "The planned end must be after the planned start.", "OK");
+                return;
+            }
+            int? minutes = null;
+            if (!string.IsNullOrWhiteSpace(estimate.Text))
+            {
+                if (!int.TryParse(estimate.Text, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed) || parsed is < 1 or > 10080)
+                {
+                    await DisplayAlertAsync("Invalid estimate", "Enter a whole number from 1 to 10080 minutes.", "OK");
+                    return;
+                }
+                minutes = parsed;
+            }
+            try
+            {
+                await _tasks.SetPlannedTimesAsync(taskId, new PlannedTimesBody(
+                    start?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+                    end?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+                    minutes));
+                completion.TrySetResult(true);
+                await Navigation.PopModalAsync();
+            }
+            catch (FamilyApiException ex) { await DisplayAlertAsync("Couldn't save schedule", ex.Message, "OK"); }
+            catch (Exception) { await DisplayAlertAsync("Couldn't save schedule", "Please try again.", "OK"); }
+        };
 
-        try
+        page.Content = new ScrollView
         {
-            await _tasks.SetPlannedTimesAsync(task.Id, new PlannedTimesBody(
-                start.Value?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
-                end.Value?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
-                estimate));
+            Content = new VerticalStackLayout
+            {
+                Padding = 20, Spacing = 16,
+                Children =
+                {
+                    new Label { Text = "Choose when this task should happen", FontSize = 18, FontAttributes = FontAttributes.Bold },
+                    DateTimeField("Planned start", startEnabled, startDate, startTime),
+                    DateTimeField("Planned end", endEnabled, endDate, endTime),
+                    new Label { Text = "Estimated duration (minutes)", FontSize = 12 },
+                    estimate,
+                    new HorizontalStackLayout { Spacing = 10, Children = { cancel, save } }
+                }
+            }
+        };
+        await Navigation.PushModalAsync(new NavigationPage(page));
+        var saved = await completion.Task;
+        if (saved)
+        {
             _status.Text = "Task schedule updated.";
             await LoadAsync();
         }
-        catch (FamilyApiException ex) { _status.Text = ex.Message; }
-        catch (Exception) { _status.Text = "Could not update the task schedule."; }
+        return saved;
     }
 
     private static DateTime? ParsePlannedDateTime(string? value)
@@ -513,35 +577,8 @@ public sealed class TasksPage : ContentPage
 
     private async Task ConfigureAcceptedTaskScheduleAsync(Guid taskId)
     {
-        var configure = await DisplayAlertAsync("Task accepted",
-            "Would you like to choose when you'll work on this task?", "Set schedule", "Not now");
-        if (!configure) return;
-
-        var start = await PickDateTimeAsync("Planned start", DateTime.Today.AddHours(9), allowClear: false);
-        if (!start.Confirmed || !start.Value.HasValue) return;
-        var end = await PickDateTimeAsync("Planned end", start.Value.Value.AddHours(1), allowClear: false);
-        if (!end.Confirmed || !end.Value.HasValue) return;
-        if (end.Value <= start.Value)
-        {
-            await DisplayAlertAsync("Invalid schedule", "The planned end must be after the planned start.", "OK");
-            return;
-        }
-
-        try
-        {
-            await _tasks.SetPlannedTimesAsync(taskId, new PlannedTimesBody(
-                start.Value.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
-                end.Value.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
-                null));
-        }
-        catch (FamilyApiException ex)
-        {
-            _status.Text = $"Task accepted, but its schedule could not be saved: {ex.Message}";
-        }
-        catch (Exception)
-        {
-            _status.Text = "Task accepted, but its schedule could not be saved.";
-        }
+        await ShowPlannedScheduleFormAsync(taskId,
+            DateTime.Today.AddHours(9), DateTime.Today.AddHours(10), null);
     }
 
     private async Task ShowHistoryAsync(Guid taskId, string title)
@@ -653,7 +690,7 @@ public sealed class TasksPage : ContentPage
                     await DisplayAlertAsync("Incomplete schedule", "Choose both a planned start and end, or leave both off.", "OK");
                     return;
                 }
-                if (startAt.HasValue && endAt <= startAt)
+                if (startAt.HasValue && endAt.HasValue && endAt.Value <= startAt.Value)
                 {
                     await DisplayAlertAsync("Invalid schedule", "The planned end must be after the planned start.", "OK");
                     return;
