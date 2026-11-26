@@ -132,65 +132,204 @@ public sealed class RequestsPage : ContentPage
                 return;
             }
 
-            var labels = types.Select(x => x.Name).ToArray();
-            var selected = await DisplayActionSheetAsync("Choose a request type", "Cancel", null, labels);
+            var selected = await DisplayActionSheetAsync("Choose a request type", "Cancel", null,
+                types.Select(x => x.Name).ToArray());
             var type = types.FirstOrDefault(x => string.Equals(x.Name, selected, StringComparison.Ordinal));
             if (type is null) return;
 
-            var title = await DisplayPromptAsync("New request", "What do you need?", "Create", "Cancel",
-                placeholder: type.Description ?? type.Name, maxLength: 120);
-            if (string.IsNullOrWhiteSpace(title)) return;
+            await ShowCreateRequestFormAsync(type);
+        }
+        catch (FamilyApiException ex)
+        {
+            _status.Text = ex.Message;
+        }
+        catch (OperationCanceledException)
+        {
+            _status.Text = "Loading request types timed out. Try again.";
+        }
+        catch (Exception)
+        {
+            _status.Text = "The request form could not be opened. Try again.";
+        }
+        finally
+        {
+            _createButton.IsEnabled = true;
+        }
+    }
+
+    private async Task ShowCreateRequestFormAsync(RequestTypeOptionDto type)
+    {
+        var title = new Entry { Placeholder = "Give your request a short title", MaxLength = 120 };
+        var fields = new List<(string Key, string Label, bool Required, int Kind, View Control, TimePicker? Time)>();
+        var form = new VerticalStackLayout { Padding = 20, Spacing = 14 };
+        form.Children.Add(new Label
+        {
+            Text = type.Name,
+            FontSize = 24,
+            FontAttributes = FontAttributes.Bold
+        });
+        if (!string.IsNullOrWhiteSpace(type.Description))
+            form.Children.Add(new Label { Text = type.Description, FontSize = 13 });
+        form.Children.Add(new Label { Text = "Request title", FontAttributes = FontAttributes.Bold });
+        form.Children.Add(title);
+
+        foreach (var question in type.Questions.OrderBy(q => ReadInt(q, "sortOrder")))
+        {
+            var key = ReadString(question, "key");
+            var label = ReadString(question, "label");
+            if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(label)) continue;
+
+            var required = ReadBool(question, "required");
+            var kind = ReadInt(question, "type");
+            var placeholder = ReadString(question, "placeholder");
+            View control;
+            TimePicker? time = null;
+
+            switch (kind)
+            {
+                case 2:
+                case 8:
+                    control = new Switch { IsToggled = false, HorizontalOptions = LayoutOptions.Start };
+                    break;
+                case 3:
+                    var options = ReadStringArray(question, "options");
+                    var picker = new Picker { Title = placeholder.Length > 0 ? placeholder : "Choose an option" };
+                    foreach (var option in options) picker.Items.Add(option);
+                    control = picker;
+                    break;
+                case 4:
+                    var dateTimeGrid = new Grid
+                    {
+                        ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Star) },
+                        ColumnSpacing = 10
+                    };
+                    var dateTimeDate = new DatePicker { Date = DateTime.Today, Format = "ddd, MMM d, yyyy" };
+                    time = new TimePicker { Time = DateTime.Now.TimeOfDay, Format = "h:mm tt" };
+                    dateTimeGrid.Children.Add(dateTimeDate);
+                    dateTimeGrid.Children.Add(time);
+                    Grid.SetColumn(time, 1);
+                    control = dateTimeGrid;
+                    break;
+                case 10:
+                    control = new DatePicker { Date = DateTime.Today, Format = "ddd, MMM d, yyyy" };
+                    break;
+                case 5:
+                    control = new Editor
+                    {
+                        Placeholder = placeholder.Length > 0 ? placeholder : label,
+                        AutoSize = EditorAutoSizeOption.TextChanges,
+                        MinimumHeightRequest = 88,
+                        MaxLength = 2000
+                    };
+                    break;
+                default:
+                    control = new Entry
+                    {
+                        Placeholder = placeholder.Length > 0 ? placeholder : label,
+                        Keyboard = kind is 1 or 9 ? Keyboard.Numeric : Keyboard.Default,
+                        MaxLength = 500
+                    };
+                    break;
+            }
+
+            var caption = new Label
+            {
+                Text = required ? $"{label} *" : label,
+                FontAttributes = FontAttributes.Bold,
+                FontSize = 14
+            };
+            form.Children.Add(caption);
+            form.Children.Add(control);
+            fields.Add((key, label, required, kind, control, time));
+        }
+
+        var status = new Label { FontSize = 12 };
+        status.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+        form.Children.Add(status);
+
+        var completion = new TaskCompletionSource<bool>();
+        var page = new ContentPage { Title = "New request" };
+        var cancel = new Button { Text = "Cancel" };
+        cancel.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+        cancel.Clicked += async (_, _) =>
+        {
+            completion.TrySetResult(false);
+            await Navigation.PopModalAsync();
+        };
+
+        var submit = new Button { Text = "Create request" };
+        submit.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
+        submit.Clicked += async (_, _) =>
+        {
+            if (string.IsNullOrWhiteSpace(title.Text))
+            {
+                status.Text = "A short request title is required.";
+                return;
+            }
 
             var answers = new Dictionary<string, object?>();
             decimal? amount = null;
-            foreach (var question in type.Questions.OrderBy(q => ReadInt(q, "sortOrder")))
+            DateTime? neededBy = null;
+
+            foreach (var field in fields)
             {
-                var key = ReadString(question, "key");
-                var label = ReadString(question, "label");
-                if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(label)) continue;
-                var required = ReadBool(question, "required");
-                var questionType = ReadInt(question, "type");
-                var placeholder = ReadString(question, "placeholder");
-                var options = ReadStringArray(question, "options");
-                string? value;
-
-                if (questionType == 2 || questionType == 8)
+                object? value = null;
+                switch (field.Kind)
                 {
-                    var choice = await DisplayActionSheetAsync(label, "Skip", null, "Yes", "No");
-                    value = choice == "Yes" ? "true" : choice == "No" ? "false" : null;
+                    case 2:
+                    case 8:
+                        value = ((Switch)field.Control).IsToggled;
+                        break;
+                    case 3:
+                        value = ((Picker)field.Control).SelectedItem?.ToString();
+                        break;
+                    case 4:
+                        var dateTimeGrid = (Grid)field.Control;
+                        var pickedDate = (DatePicker)dateTimeGrid.Children[0];
+                        var pickedTime = field.Time!;
+                        var dateTime = pickedDate.Date + pickedTime.Time;
+                        value = dateTime.ToUniversalTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture);
+                        if (field.Key.Equals("when", StringComparison.OrdinalIgnoreCase)
+                            || field.Key.Equals("leave", StringComparison.OrdinalIgnoreCase))
+                            neededBy = dateTime.ToUniversalTime();
+                        break;
+                    case 10:
+                        var date = ((DatePicker)field.Control).Date;
+                        value = date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+                        if (field.Key.Equals("due", StringComparison.OrdinalIgnoreCase))
+                            neededBy = date.ToUniversalTime();
+                        break;
+                    case 5:
+                        value = ((Editor)field.Control).Text?.Trim();
+                        break;
+                    case 1:
+                    case 9:
+                        var numericText = ((Entry)field.Control).Text?.Trim();
+                        if (!string.IsNullOrWhiteSpace(numericText))
+                        {
+                            if (!decimal.TryParse(numericText, System.Globalization.NumberStyles.Number,
+                                System.Globalization.CultureInfo.CurrentCulture, out var number))
+                            {
+                                status.Text = $"{field.Label} must be a valid number.";
+                                return;
+                            }
+                            value = number;
+                            if (field.Kind == 9 || field.Key.Equals("amount", StringComparison.OrdinalIgnoreCase))
+                                amount = number;
+                        }
+                        break;
+                    default:
+                        value = ((Entry)field.Control).Text?.Trim();
+                        break;
                 }
-                else if (questionType == 3 && options.Length > 0)
-                    value = await DisplayActionSheetAsync(label, "Skip", null, options);
-                else
-                    value = await DisplayPromptAsync(label, placeholder ?? label, "Continue", "Skip",
-                        placeholder: placeholder, maxLength: 500,
-                        keyboard: questionType == 1 || questionType == 9 ? Keyboard.Numeric : Keyboard.Default);
 
-                if (string.IsNullOrWhiteSpace(value))
+                var isEmpty = value is null || value is string textValue && string.IsNullOrWhiteSpace(textValue);
+                if (isEmpty && field.Required)
                 {
-                    if (required)
-                    {
-                        _status.Text = $"{label} is required. The request was not created.";
-                        return;
-                    }
-                    continue;
+                    status.Text = $"{field.Label} is required.";
+                    return;
                 }
-
-                if (questionType == 2 || questionType == 8)
-                    answers[key] = value == "true";
-                else if (questionType == 1 || questionType == 9)
-                {
-                    if (!decimal.TryParse(value, System.Globalization.NumberStyles.Number,
-                        System.Globalization.CultureInfo.CurrentCulture, out var number))
-                    {
-                        _status.Text = $"{label} must be a valid number.";
-                        return;
-                    }
-                    answers[key] = number;
-                    if (questionType == 9 || key.Equals("amount", StringComparison.OrdinalIgnoreCase))
-                        amount = number;
-                }
-                else answers[key] = value.Trim();
+                if (!isEmpty) answers[field.Key] = value;
             }
 
             if (answers.TryGetValue("where", out var where) && !answers.ContainsKey("location"))
@@ -200,26 +339,34 @@ public sealed class RequestsPage : ContentPage
             if (answers.TryGetValue("item", out var item) && !answers.ContainsKey("items"))
                 answers["items"] = item;
 
-            _status.Text = "Creating request…";
-            await _api.CreateAsync(type.Code, title.Trim(), answers, amount);
+            submit.IsEnabled = false;
+            status.Text = "Creating request…";
+            try
+            {
+                await _api.CreateAsync(type.Code, title.Text.Trim(), answers, amount, neededBy);
+                completion.TrySetResult(true);
+                await Navigation.PopModalAsync();
+            }
+            catch (FamilyApiException ex)
+            {
+                status.Text = ex.Message;
+                submit.IsEnabled = true;
+            }
+            catch (Exception)
+            {
+                status.Text = "The request could not be created. Check your connection and try again.";
+                submit.IsEnabled = true;
+            }
+        };
+
+        form.Children.Add(new HorizontalStackLayout { Spacing = 10, Children = { cancel, submit } });
+        page.Content = new ScrollView { Content = form };
+        await Navigation.PushModalAsync(new NavigationPage(page));
+        var created = await completion.Task;
+        if (created)
+        {
             _showQueue = false;
             await LoadAsync();
-        }
-        catch (FamilyApiException ex)
-        {
-            _status.Text = ex.Message;
-        }
-        catch (OperationCanceledException)
-        {
-            _status.Text = "Creating the request timed out. Try again.";
-        }
-        catch (Exception)
-        {
-            _status.Text = "The request could not be created. Try again.";
-        }
-        finally
-        {
-            _createButton.IsEnabled = true;
         }
     }
 
