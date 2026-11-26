@@ -283,6 +283,9 @@ public sealed class MealsPage : ContentPage
             var textMatch = string.IsNullOrWhiteSpace(term)
                 || recipe.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
                 || (recipe.IngredientsCsv?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (recipe.IngredientNames?.Any(x => x.Contains(term, StringComparison.OrdinalIgnoreCase)) ?? false)
+                || (recipe.Cuisine?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
+                || (recipe.Description?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
                 || (recipe.Tags?.Any(tag => tag.Contains(term, StringComparison.OrdinalIgnoreCase)) ?? false);
             var tagMatch = _activeRecipeFilter == "All"
                 || (recipe.Tags?.Any(tag => string.Equals(tag, _activeRecipeFilter, StringComparison.OrdinalIgnoreCase)) ?? false);
