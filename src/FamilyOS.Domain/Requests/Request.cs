@@ -136,7 +136,7 @@ public class Request : Entity
         if (Status != RequestStatus.ConditionallyApproved)
             throw new InvalidOperationException($"Cannot promote from status {Status}; expected ConditionallyApproved.");
         Status = RequestStatus.Approved;
-        AddHistory(RequestStatus.Approved, actorMemberId, "All conditions satisfied — fully approved");
+        AddHistory(RequestStatus.Approved, actorMemberId, "Approval conditions satisfied — fully approved");
         MarkUpdated();
     }
 
