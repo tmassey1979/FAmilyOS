@@ -117,14 +117,21 @@ public class ConditionHandlers :
         if (condition.RequestId.HasValue)
         {
             var requestId = condition.RequestId.Value;
-            var stillPending = await _db.Conditions.AnyAsync(
-                c => c.RequestId == requestId
-                     && c.FamilyId == familyId
-                     && c.Status == ConditionStatus.Pending
-                     && c.Id != condition.Id,
-                ct);
+            var linkedConditions = await _db.Conditions
+                .Where(c => c.RequestId == requestId && c.FamilyId == familyId)
+                .OrderBy(c => c.GroupOrder)
+                .ThenBy(c => c.CreatedAtUtc)
+                .ToListAsync(ct);
 
-            if (!stillPending)
+            // Each GroupOrder is a condition group. Groups are ANDed together;
+            // conditions inside an Any group are ORed, otherwise all must pass.
+            var allGroupsSatisfied = linkedConditions.Count > 0 && linkedConditions
+                .GroupBy(c => c.GroupOrder)
+                .All(group => group.First().LogicGroup == ConditionLogic.Any
+                    ? group.Any(x => x.Status == ConditionStatus.Satisfied)
+                    : group.All(x => x.Status == ConditionStatus.Satisfied));
+
+            if (allGroupsSatisfied)
             {
                 var request = await _db.Requests
                     .Include(r => r.History)
