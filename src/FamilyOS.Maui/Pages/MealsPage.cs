@@ -216,6 +216,12 @@ public sealed class MealsPage : ContentPage
         var stack = new VerticalStackLayout { Spacing = 6 };
         var title = new Label { Text = recipe.Name, FontSize = 16, FontAttributes = FontAttributes.Bold };
         title.SetDynamicResource(VisualElement.StyleProperty, "TextBodyStrong");
+        if (Uri.TryCreate(recipe.ImageUrl, UriKind.Absolute, out var imageUri)
+            && (imageUri.Scheme == Uri.UriSchemeHttps || imageUri.Scheme == Uri.UriSchemeHttp))
+        {
+            var image = new Image { Source = ImageSource.FromUri(imageUri), HeightRequest = 150, Aspect = Aspect.AspectFill };
+            stack.Children.Add(image);
+        }
         stack.Children.Add(title);
         var source = new Label { Text = recipe.IsBuiltIn ? "FAMILYOS RECIPE COLLECTION" : "YOUR FAMILY RECIPE", FontSize = 9, CharacterSpacing = 1.1 };
         source.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
@@ -228,11 +234,17 @@ public sealed class MealsPage : ContentPage
         }
         var detail = new Label
         {
-            Text = $"{recipe.Servings} servings" + (string.IsNullOrWhiteSpace(recipe.IngredientsCsv) ? "" : $" · {recipe.IngredientsCsv}"),
+            Text = $"{recipe.Servings} servings" + (recipe.PrepMinutes is int prep ? $" · {prep} min prep" : "") + (recipe.CookMinutes is int cook ? $" · {cook} min cook" : "") + (string.IsNullOrWhiteSpace(recipe.Cuisine) ? "" : $" · {recipe.Cuisine}"),
             FontSize = 13
         };
         detail.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
         stack.Children.Add(detail);
+        if (!string.IsNullOrWhiteSpace(recipe.Description))
+        {
+            var description = new Label { Text = recipe.Description, FontSize = 13, LineBreakMode = LineBreakMode.TailTruncation, MaxLines = 3 };
+            description.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
+            stack.Children.Add(description);
+        }
         if (!string.IsNullOrWhiteSpace(recipe.Instructions))
         {
             var instructions = new Label { Text = recipe.Instructions, FontSize = 13 };
