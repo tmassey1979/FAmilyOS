@@ -1,25 +1,32 @@
 # Design tokens
 
-All values live in MAUI resource dictionaries under `src/FamilyOS.Maui/Resources/`.
+All values live in MAUI resource dictionaries under `src/FamilyOS.Maui/Resources/`. Pages and shared controls must use semantic resources rather than hard-coded colors.
 
 ## Semantic colors (theme-aware)
 
 | Resource | Light | Dark |
 |----------|-------|------|
-| `BgPage` | `#F8F5F0` | `#0F172A` |
-| `BgSurface` | `#FFFFFF` | `#1E293B` |
-| `BgSurfaceAlt` | `#F1EDE6` | `#334155` |
-| `BorderSubtle` | `#E2E8F0` | `#475569` |
-| `TextPrimary` | `#0F172A` | `#F8FAFC` |
-| `TextMuted` | `#64748B` | `#94A3B8` |
-| `TextOnAccent` | `#0F172A` | `#0F172A` |
-| `AccentPrimary` | `#38BDF8` | `#38BDF8` |
-| `AccentDanger` | `#F87171` | `#F87171` |
-| `AccentSuccess` | `#4ADE80` | `#4ADE80` |
-| `AccentWarning` | `#FBBF24` | `#FBBF24` |
+| `BgPage` | `#F4F7FC` | `#080D1B` |
+| `BgSurface` | `#FFFFFF` | `#111B2E` |
+| `BgSurfaceAlt` | `#EAF0F8` | `#1B2940` |
+| `BgGlow` | `#E5F8FF` | `#102A42` |
+| `BorderSubtle` | `#D7E1EF` | `#30445F` |
+| `TextPrimary` | `#101A2B` | `#F3F7FF` |
+| `TextMuted` | `#60718A` | `#9BAFC9` |
+| `TextOnAccent` | `#081321` | `#081321` |
+| `AccentPrimary` | `#007F9F` | `#55E6FF` |
+| `AccentSecondary` | `#6D5CE7` | `#A78BFA` |
+| `AccentDanger` | `#D83D5B` | `#FF718B` |
+| `AccentSuccess` | `#087F61` | `#53E6B1` |
+| `AccentWarning` | `#956000` | `#FFC66D` |
 
-## Spacing
+## Spacing and geometry
 
-`SpaceXs` 4 · `SpaceSm` 8 · `SpaceMd` 16 · `SpaceLg` 24 · `SpaceXl` 32 · `ControlHeightMin` 48 · `RadiusMd` 12 · `RadiusLg` 16
+`SpaceXs` 4 · `SpaceSm` 8 · `SpaceMd` 16 · `SpaceLg` 24 · `SpaceXl` 32 · `ControlHeightMin` 48 · `RadiusMd` 12 · `RadiusLg` 16 · shared card radius 20.
 
-See full tables in repo history / local `docs/design-system/TOKENS.md`.
+## Rules
+
+- Use semantic resources in every page and reusable control.
+- Keep touch targets at least 48dp and body text comfortably readable.
+- Accent cyan is for primary focus; violet is a secondary highlight, never a second competing primary.
+- Status colors communicate status only. Do not use color as the only state indicator.
