@@ -8,10 +8,10 @@
        Shell.BackgroundColor="{StaticResource BgPage}"
        Shell.ForegroundColor="{StaticResource TextPrimary}"
        Shell.TitleColor="{StaticResource TextPrimary}"
-       Shell.TabBarBackgroundColor="#0F172A"
-       Shell.TabBarForegroundColor="#38BDF8"
-       Shell.TabBarUnselectedColor="#94A3B8"
-       Shell.TabBarTitleColor="#38BDF8">
+       Shell.TabBarBackgroundColor="#050914"
+       Shell.TabBarForegroundColor="#45F3FF"
+       Shell.TabBarUnselectedColor="#68809E"
+       Shell.TabBarTitleColor="#45F3FF">
 
     <!-- Keep a fixed dark tab surface so the generated white PNG tab icons
          remain visible in both light and dark app themes. Raster tab icons
