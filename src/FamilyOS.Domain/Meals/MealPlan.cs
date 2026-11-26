@@ -48,13 +48,13 @@ public class MealPlan : Entity
 
         if (existing is null)
         {
-            var entry = MealEntry.Create(Id, FamilyId, day, slot, dishName.Trim(), notes, ingredientsCsv);
+            var entry = MealEntry.Create(Id, FamilyId, day, slot, dishName.Trim(), notes, ingredientsCsv, recipeId);
             _entries.Add(entry);
             MarkUpdated();
             return entry;
         }
 
-        existing.Update(dishName.Trim(), notes, ingredientsCsv);
+        existing.Update(dishName.Trim(), notes, ingredientsCsv, recipeId);
         MarkUpdated();
         return existing;
     }
