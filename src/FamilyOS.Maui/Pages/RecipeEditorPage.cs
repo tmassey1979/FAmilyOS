@@ -293,7 +293,7 @@ public sealed class RecipeEditorPage : ContentPage
         {
             var ingredients = _ingredients.Select((x, i) => new StructuredRecipeIngredientWriteDto(
                 x.Item.Id, x.Quantity, x.Unit, x.Note, null, i)).ToList();
-            var steps = (_steps.Text ?? string.Empty).Split('\\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            var steps = (_steps.Text ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Select(x => new StructuredRecipeStepWriteDto(x)).ToList();
             var tags = (_tags.Text ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
