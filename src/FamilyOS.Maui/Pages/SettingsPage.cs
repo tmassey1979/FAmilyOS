@@ -376,8 +376,8 @@ public sealed class SettingsPage : ContentPage
     private async Task SaveAsync()
     {
         if (_busy) return;
-        var start = (int)_start.Time.TotalMinutes;
-        var end = (int)_end.Time.TotalMinutes;
+        var start = (int)(_start.Time ?? TimeSpan.Zero).TotalMinutes;
+        var end = (int)(_end.Time ?? TimeSpan.Zero).TotalMinutes;
         if (_enabled.IsToggled && start == end)
         {
             _status.Text = "Start and end times must be different.";
