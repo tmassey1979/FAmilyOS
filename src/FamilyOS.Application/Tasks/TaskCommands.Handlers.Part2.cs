@@ -265,8 +265,8 @@ public partial class TaskCommandHandlers :
         int? variance = null;
         if (t.EstimatedMinutes is int est && actualOrNull is int act)
             variance = act - est;
-        string? plannedStart = t.PlannedStartUtc?.ToString("HH:mm");
-        string? plannedEnd = t.PlannedEndUtc?.ToString("HH:mm");
+        string? plannedStart = t.PlannedStartUtc?.ToUniversalTime().ToString("O");
+        string? plannedEnd = t.PlannedEndUtc?.ToUniversalTime().ToString("O");
 
         return new TaskDto(
             t.Id, t.Title, t.Description, t.Status, t.Priority,
