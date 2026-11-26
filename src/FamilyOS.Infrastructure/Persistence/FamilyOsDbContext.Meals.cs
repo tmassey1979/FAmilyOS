@@ -44,6 +44,11 @@ public partial class FamilyOsDbContext
             e.Property(x => x.Name).HasMaxLength(300).IsRequired();
             e.Property(x => x.IngredientsCsv).HasMaxLength(2000);
             e.Property(x => x.Instructions).HasMaxLength(4000);
+            e.Property(x => x.Description).HasMaxLength(1000);
+            e.Property(x => x.ImageUrl).HasMaxLength(1000);
+            e.Property(x => x.SourceUrl).HasMaxLength(1000);
+            e.Property(x => x.Cuisine).HasMaxLength(100);
+            e.Property(x => x.Difficulty).HasMaxLength(40);
             e.HasQueryFilter(x => !x.IsDeleted);
         });
 
