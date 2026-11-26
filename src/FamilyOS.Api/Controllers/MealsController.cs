@@ -22,7 +22,7 @@ public class MealsController : ControllerBase
     [HttpPut("entries")]
     public async Task<ActionResult<MealEntryDto>> UpsertEntry([FromBody] UpsertMealBody body, CancellationToken ct)
         => Ok(await _mediator.Send(new UpsertMealEntryCommand(
-            body.DayUtc, body.Slot, body.DishName, body.Notes, body.IngredientsCsv, body.WeekStartUtc), ct));
+            body.DayUtc, body.Slot, body.DishName, body.Notes, body.IngredientsCsv, body.WeekStartUtc, body.RecipeId), ct));
 
     [HttpDelete("entries/{id:guid}")]
     public async Task<IActionResult> RemoveEntry(Guid id, CancellationToken ct)
@@ -44,5 +44,5 @@ public class MealsController : ControllerBase
         string DishName,
         string? Notes = null,
         string? IngredientsCsv = null,
-        DateTime? WeekStartUtc = null);
+        DateTime? WeekStartUtc = null,\n        Guid? RecipeId = null);
 }
