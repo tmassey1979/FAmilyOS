@@ -33,7 +33,9 @@ public record CreateTaskCommand(
     DateTime? DueDate, string? Category, bool CalendarBacked, int? EstimatedDurationMinutes,
     RecurrenceFrequency? Frequency = null,
     int Interval = 1,
-    DayOfWeek? DayOfWeek = null
+    DayOfWeek? DayOfWeek = null,
+    string? PlannedStartTime = null,
+    string? PlannedEndTime = null
 ) : IRequest<TaskDto>;
 
 public record CreateRecurrenceCommand(
