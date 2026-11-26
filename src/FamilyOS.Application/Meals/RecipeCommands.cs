@@ -144,7 +144,7 @@ public class RecipeCommandHandlers :
             foreach (var row in structuredRows)
             {
                 var unit = NormalizeShoppingUnit(row.Unit);
-                var quantity = row.Quantity is null ? null : ToBaseShoppingQuantity(row.Quantity.Value, row.Unit) * factor;
+                decimal? quantity = row.Quantity is null ? null : ToBaseShoppingQuantity(row.Quantity.Value, row.Unit) * factor;
                 var key = (row.IngredientId, unit);
                 if (aggregate.TryGetValue(key, out var current))
                     aggregate[key] = (current.Name, current.Quantity is null || quantity is null
