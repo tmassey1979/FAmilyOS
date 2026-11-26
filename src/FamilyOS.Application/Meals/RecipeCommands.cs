@@ -12,6 +12,8 @@ public record RecipeDto(
     Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions, bool IsBuiltIn = false, List<string>? Tags = null, string? Description = null, string? ImageUrl = null, string? SourceUrl = null, int? PrepMinutes = null, int? CookMinutes = null, string? Cuisine = null, string? Difficulty = null, List<string>? IngredientNames = null);
 
 public record ListRecipesQuery() : IRequest<List<RecipeDto>>;
+public record ListRecipesPageQuery(int Skip = 0, int Take = 24) : IRequest<RecipePageDto>;
+public record RecipePageDto(List<RecipeDto> Items, int TotalCount, int Skip, int Take);
 public record GetRecipeQuery(Guid Id) : IRequest<RecipeDto>;
 public record CreateRecipeCommand(
     string Name, int Servings = 4, string? IngredientsCsv = null, string? Instructions = null, string? Description = null, string? ImageUrl = null, string? SourceUrl = null, int? PrepMinutes = null, int? CookMinutes = null, string? Cuisine = null, string? Difficulty = null) : IRequest<RecipeDto>;
@@ -27,6 +29,7 @@ public record ScaledRecipeDto(Guid Id, string Name, int BaseServings, int Target
 
 public class RecipeCommandHandlers :
     IRequestHandler<ListRecipesQuery, List<RecipeDto>>,
+    IRequestHandler<ListRecipesPageQuery, RecipePageDto>,
     IRequestHandler<GetRecipeQuery, RecipeDto>,
     IRequestHandler<CreateRecipeCommand, RecipeDto>,
     IRequestHandler<UpdateRecipeCommand, RecipeDto>,
@@ -52,6 +55,20 @@ public class RecipeCommandHandlers :
             .OrderBy(r => r.Name)
             .ToListAsync(ct);
         return await AddTagsAsync(list, ct);
+    }
+
+    public async Task<RecipePageDto> Handle(ListRecipesPageQuery query, CancellationToken ct)
+    {
+        await EnsureFamilyAsync(ct);
+        var skip = Math.Max(0, query.Skip);
+        var take = Math.Clamp(query.Take, 1, 48);
+        var recipes = _db.Recipes.AsNoTracking()
+            .Where(r => r.FamilyId == _current.FamilyId || r.FamilyId == Guid.Empty);
+        var total = await recipes.CountAsync(ct);
+        var page = await recipes.OrderBy(r => r.Name)
+            .Skip(skip).Take(take).ToListAsync(ct);
+        var items = await AddTagsAsync(page, ct);
+        return new RecipePageDto(items, total, skip, take);
     }
 
     public async Task<RecipeDto> Handle(GetRecipeQuery query, CancellationToken ct)
