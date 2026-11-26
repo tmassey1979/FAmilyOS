@@ -18,6 +18,10 @@ public sealed class MealsPage : ContentPage
     private readonly Picker _recipeSort = new() { Title = "Sort recipes", WidthRequest = 170 };
     private List<RecipeDto> _allRecipes = new();
     private List<RecipeMemberPreferenceDto> _recipePreferences = new();
+    private CancellationTokenSource? _recipeSearchCts;
+    private string? _activeRecipeSearchTerm;
+    private string? _activeRecipeTag;
+    private bool _activeRecipeFavoritesOnly;
     private string _activeRecipeFilter = "All";
     private readonly Label _status = new() { FontSize = 13 };
     private readonly Button _previous = new() { Text = "‹ Previous" };
@@ -68,7 +72,7 @@ public sealed class MealsPage : ContentPage
         var newRecipe = new Button { Text = "＋ Create a recipe" };
         newRecipe.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         newRecipe.Clicked += async (_, _) => await CreateRecipeAsync();
-        _recipeSearch.TextChanged += (_, _) => RenderRecipes();
+        _recipeSearch.TextChanged += async (_, e) => await SearchRecipesAsync(e.NewTextValue);
         _recipeLoadMore.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         _recipeLoadMore.Clicked += async (_, _) => await LoadMoreRecipesAsync();
         _recipeSort.Items.Add("Recommended");
@@ -80,13 +84,13 @@ public sealed class MealsPage : ContentPage
         {
             var chip = new Button { Text = filter, FontSize = 12, Padding = new Thickness(14, 7), CornerRadius = 18 };
             chip.SetDynamicResource(VisualElement.StyleProperty, filter == "All" ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle");
-            chip.Clicked += (_, _) =>
+            chip.Clicked += async (_, _) =>
             {
                 _activeRecipeFilter = filter;
                 foreach (var child in _recipeFilters.Children.OfType<Button>())
                     child.SetDynamicResource(VisualElement.StyleProperty,
                         child.Text == filter ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle");
-                RenderRecipes();
+                await SearchRecipesAsync(_recipeSearch.Text);
             };
             _recipeFilters.Children.Add(chip);
         }
@@ -127,7 +131,8 @@ public sealed class MealsPage : ContentPage
         try
         {
             var plan = await _api.GetWeekAsync(_weekStart);
-            var recipePage = await _api.GetRecipesPageAsync(0, RecipeBatchSize);
+            var recipePage = await _api.GetRecipesPageAsync(0, RecipeBatchSize, CancellationToken.None,
+                _activeRecipeSearchTerm, _activeRecipeTag, _activeRecipeFavoritesOnly);
             var recipePreferences = await _api.GetRecipePreferencesAsync(recipePage.Items.Select(x => x.Id));
             var nominations = await _api.GetNominationsAsync(_weekStart);
             _planItems.Children.Clear();
@@ -514,21 +519,72 @@ public sealed class MealsPage : ContentPage
         _recipeLoadMore.Text = $"Load more recipes ({_recipeTotalCount - _allRecipes.Count} remaining)";
     }
 
+    private async Task SearchRecipesAsync(string? term)
+    {
+        _recipeSearchCts?.Cancel();
+        _recipeSearchCts?.Dispose();
+        _recipeSearchCts = new CancellationTokenSource();
+        var token = _recipeSearchCts.Token;
+        _activeRecipeSearchTerm = string.IsNullOrWhiteSpace(term) ? null : term.Trim();
+        _activeRecipeTag = _activeRecipeFilter is "All" or "Favorites" ? null : _activeRecipeFilter;
+        _activeRecipeFavoritesOnly = _activeRecipeFilter == "Favorites";
+        _recipeLoadMore.IsEnabled = false;
+        _recipeLoadMore.Text = "Searching recipes…";
+
+        try
+        {
+            await Task.Delay(300, token);
+            var page = await _api.GetRecipesPageAsync(0, RecipeBatchSize, token,
+                _activeRecipeSearchTerm, _activeRecipeTag, _activeRecipeFavoritesOnly);
+            var preferences = await _api.GetRecipePreferencesAsync(page.Items.Select(x => x.Id), token);
+            if (token.IsCancellationRequested) return;
+            _allRecipes = page.Items;
+            _recipePreferences = preferences;
+            _recipeTotalCount = page.TotalCount;
+            RenderRecipes();
+        }
+        catch (OperationCanceledException) { }
+        catch (FamilyApiException ex)
+        {
+            _status.Text = ex.Message;
+        }
+        catch (Exception)
+        {
+            _status.Text = "Recipe search is temporarily unavailable. Try again.";
+        }
+        finally
+        {
+            if (!token.IsCancellationRequested)
+            {
+                _recipeLoadMore.IsEnabled = true;
+                _recipeLoadMore.Text = $"Load more recipes ({Math.Max(0, _recipeTotalCount - _allRecipes.Count)} remaining)";
+            }
+        }
+    }
+
     private async Task LoadMoreRecipesAsync()
     {
         if (_allRecipes.Count >= _recipeTotalCount || _loading) return;
         _recipeLoadMore.IsEnabled = false;
+        var token = _recipeSearchCts?.Token ?? CancellationToken.None;
+        var requestedSearch = _activeRecipeSearchTerm;
+        var requestedTag = _activeRecipeTag;
+        var requestedFavorites = _activeRecipeFavoritesOnly;
         _recipeLoadMore.Text = "Loading more recipes…";
         try
         {
-            var page = await _api.GetRecipesPageAsync(_allRecipes.Count, RecipeBatchSize);
-            var preferences = await _api.GetRecipePreferencesAsync(page.Items.Select(x => x.Id));
+            var page = await _api.GetRecipesPageAsync(_allRecipes.Count, RecipeBatchSize, token,
+                requestedSearch, requestedTag, requestedFavorites);
+            if (token.IsCancellationRequested || requestedSearch != _activeRecipeSearchTerm
+                || requestedTag != _activeRecipeTag || requestedFavorites != _activeRecipeFavoritesOnly) return;
+            var preferences = await _api.GetRecipePreferencesAsync(page.Items.Select(x => x.Id), token);
             _allRecipes.AddRange(page.Items);
             _recipePreferences.RemoveAll(x => page.Items.Any(item => item.Id == x.RecipeId));
             _recipePreferences.AddRange(preferences);
             _recipeTotalCount = page.TotalCount;
             RenderRecipes();
         }
+        catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             await DisplayAlertAsync("Recipes unavailable", ex is FamilyApiException ? ex.Message : "Could not load more recipes. Please try again.", "OK");
@@ -545,10 +601,7 @@ public sealed class MealsPage : ContentPage
         {
             await _api.SetRecipePreferenceAsync(recipe.Id,
                 new RecipeMemberPreferenceWriteDto(preference, isFavorite));
-            var rows = await _api.GetRecipePreferencesAsync([recipe.Id]);
-            _recipePreferences.RemoveAll(x => x.RecipeId == recipe.Id);
-            _recipePreferences.AddRange(rows);
-            RenderRecipes();
+            await SearchRecipesAsync(_recipeSearch.Text);
         }
         catch (Exception ex)
         {
