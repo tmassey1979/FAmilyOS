@@ -29,6 +29,14 @@ public sealed class MealsApiClient
     public Task RemoveEntryAsync(Guid id, CancellationToken ct = default)
         => SendNoContentAsync(HttpMethod.Delete, $"api/meals/entries/{id:D}", ct);
 
+    public Task<MealShoppingPreviewDto> GetShoppingPreviewAsync(DateTime weekStartUtc, DateTime? dayUtc = null, CancellationToken ct = default)
+    {
+        var scope = dayUtc is null
+            ? $"weekStart={Uri.EscapeDataString(weekStartUtc.ToUniversalTime().ToString("O"))}"
+            : $"day={Uri.EscapeDataString(dayUtc.Value.ToUniversalTime().ToString("O"))}";
+        return SendAsync<MealShoppingPreviewDto>(HttpMethod.Get, $"api/meals/shopping-preview?{scope}", null, ct);
+    }
+
     public Task<MealShoppingResultDto> AddWeekToShoppingAsync(DateTime weekStartUtc, CancellationToken ct = default)
         => SendAsync<MealShoppingResultDto>(HttpMethod.Post,
             $"api/meals/week/to-shopping?weekStart={Uri.EscapeDataString(weekStartUtc.ToUniversalTime().ToString("O"))}", null, ct);
@@ -157,3 +165,5 @@ public sealed record StructuredRecipeDto(Guid Id, string Name, int Servings, boo
 public sealed record StructuredRecipeIngredientDto(Guid IngredientId, string Name, string Category, decimal? Quantity,
     string? Unit, string? PreparationNote, string? Section, int SortOrder);
 public sealed record StructuredRecipeStepDto(int StepNumber, string Text, int? DurationMinutes);
+
+public sealed record MealShoppingPreviewDto(string Scope, List<string> Items);
