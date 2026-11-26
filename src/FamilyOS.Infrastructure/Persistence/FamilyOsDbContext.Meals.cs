@@ -122,5 +122,14 @@ public partial class FamilyOsDbContext
             e.Property(x => x.Text).HasMaxLength(2000).IsRequired();
             e.HasQueryFilter(x => !x.IsDeleted);
         });
+
+        modelBuilder.Entity<RecipeMemberPreference>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.FamilyId, x.RecipeId, x.MemberId }).IsUnique();
+            e.HasIndex(x => new { x.FamilyId, x.MemberId });
+            e.Property(x => x.Preference).HasConversion<string>().HasMaxLength(20);
+            e.HasQueryFilter(x => !x.IsDeleted);
+        });
     }
 }
