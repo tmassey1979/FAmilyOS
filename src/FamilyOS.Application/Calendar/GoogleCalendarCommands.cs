@@ -31,17 +31,20 @@ public class GoogleCalendarHandlers :
     private readonly ICurrentUserService _current;
     private readonly IGoogleCalendarClient _google;
     private readonly IConfiguration _config;
+    private readonly Microsoft.AspNetCore.DataProtection.IDataProtector _stateProtector;
 
     public GoogleCalendarHandlers(
         IFamilyOsDbContext db,
         ICurrentUserService current,
         IGoogleCalendarClient google,
-        IConfiguration config)
+        IConfiguration config,
+        Microsoft.AspNetCore.DataProtection.IDataProtectionProvider dataProtectionProvider)
     {
         _db = db;
         _current = current;
         _google = google;
         _config = config;
+        _stateProtector = dataProtectionProvider.CreateProtector("FamilyOS.GoogleCalendar.OAuthState.v1");
     }
 
     public async Task<string> Handle(GetGoogleCalendarAuthUrlQuery query, CancellationToken ct)
@@ -123,9 +126,8 @@ public class GoogleCalendarHandlers :
 
     private string BuildAuthUrlFor(Guid memberId, Guid familyId)
     {
-        var state = Convert.ToBase64String(
-            System.Text.Encoding.UTF8.GetBytes($"{memberId:N}|{familyId:N}|{Guid.NewGuid():N}"));
-        return _google.BuildAuthorizationUrl(state);
+        var payload = $"{memberId:N}|{familyId:N}|{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}|{Guid.NewGuid():N}";
+        return _google.BuildAuthorizationUrl(_stateProtector.Protect(payload));
     }
 
     private bool IsConfigured() =>
