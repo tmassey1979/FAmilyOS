@@ -66,6 +66,17 @@ public sealed class MealsApiClient
         => SendAsync<RecipePageDto>(HttpMethod.Get,
             $"api/recipes/page?skip={Math.Max(0, skip)}&take={Math.Clamp(take, 1, 48)}", null, ct);
 
+    public Task<List<RecipeMemberPreferenceDto>> GetRecipePreferencesAsync(IEnumerable<Guid> recipeIds, CancellationToken ct = default)
+    {
+        var ids = string.Join(",", recipeIds.Distinct().Take(48).Select(id => id.ToString("D")));
+        return SendAsync<List<RecipeMemberPreferenceDto>>(HttpMethod.Get,
+            $"api/recipes/preferences?recipeIds={Uri.EscapeDataString(ids)}", null, ct);
+    }
+
+    public Task<RecipeMemberPreferenceDto> SetRecipePreferenceAsync(Guid recipeId, RecipeMemberPreferenceWriteDto body, CancellationToken ct = default)
+        => SendAsync<RecipeMemberPreferenceDto>(HttpMethod.Put,
+            $"api/recipes/{recipeId:D}/preference", JsonContent(body), ct);
+
     public Task<List<IngredientCatalogDto>> SearchIngredientsAsync(string query, int limit = 25, CancellationToken ct = default)
         => SendAsync<List<IngredientCatalogDto>>(HttpMethod.Get,
             $"api/ingredients/search?q={Uri.EscapeDataString(query ?? string.Empty)}&limit={Math.Clamp(limit, 1, 50)}", null, ct);
@@ -163,6 +174,8 @@ public sealed record MealEntryDto(Guid Id, DateTime DayUtc, string Slot, string 
 public sealed record MealEntryWriteDto(DateTime DayUtc, string Slot, string DishName, string? Notes = null, string? IngredientsCsv = null, DateTime? WeekStartUtc = null, Guid? RecipeId = null, Guid? EntryId = null);
 public sealed record RecipeDto(Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions, bool IsBuiltIn = false, List<string>? Tags = null, string? Description = null, string? ImageUrl = null, string? SourceUrl = null, int? PrepMinutes = null, int? CookMinutes = null, string? Cuisine = null, string? Difficulty = null, List<string>? IngredientNames = null);
 public sealed record RecipePageDto(List<RecipeDto> Items, int TotalCount, int Skip, int Take);
+public sealed record RecipeMemberPreferenceDto(Guid RecipeId, Guid MemberId, string MemberName, string? Preference, bool IsFavorite, bool IsCurrentMember);
+public sealed record RecipeMemberPreferenceWriteDto(string? Preference, bool IsFavorite);
 public sealed record RecipeWriteDto(string Name, int? Servings = 4, string? IngredientsCsv = null, string? Instructions = null);
 public sealed record ApplyRecipeDto(DateTime DayUtc, string Slot, DateTime? WeekStartUtc = null);
 public sealed record RecipeShoppingDto(int? TargetServings = null);
