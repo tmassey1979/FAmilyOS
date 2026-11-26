@@ -31,6 +31,19 @@ public sealed class RequestsApiClient
     public Task<FamilyRequestDto> GetAsync(Guid id, CancellationToken ct = default)
         => SendAsync<FamilyRequestDto>(HttpMethod.Get, $"api/requests/{id:D}", null, ct);
 
+    public Task<ExecutionPlanDto> GenerateExecutionPlanAsync(Guid requestId, CancellationToken ct = default)
+        => SendAsync<ExecutionPlanDto>(HttpMethod.Post, $"api/requests/{requestId:D}/execution-plan", null, ct);
+
+    public Task<ExecutionPlanDto> GetExecutionPlanAsync(Guid planId, CancellationToken ct = default)
+        => SendAsync<ExecutionPlanDto>(HttpMethod.Get, $"api/execution-plans/{planId:D}", null, ct);
+
+    public Task<ExecutionPlanDto> CommitExecutionPlanAsync(Guid planId, List<Guid> deselectedItemIds, CancellationToken ct = default)
+    {
+        var body = JsonSerializer.Serialize(new { deselectedItemIds }, JsonOptions);
+        return SendAsync<ExecutionPlanDto>(HttpMethod.Post, $"api/requests/execution-plans/{planId:D}/commit",
+            new StringContent(body, Encoding.UTF8, "application/json"), ct);
+    }
+
     public Task<FamilyRequestDto> CreateAsync(string type, string title, Dictionary<string, object?> answers,
         decimal? amount = null, DateTime? neededBy = null, CancellationToken ct = default)
     {
@@ -112,3 +125,6 @@ public sealed record PendingRequestQuestionDto(Guid Id, string QuestionText, boo
 
 
 public sealed record RequestTypeOptionDto(Guid Id, string Code, string Name, string? Description, List<JsonElement> Questions);
+
+public sealed record ExecutionPlanDto(Guid Id, Guid RequestId, string Status, List<ExecutionItemDto> Items);
+public sealed record ExecutionItemDto(Guid Id, string Type, string Title, Guid? AssigneeMemberId, bool IsSelected, Guid? ResultingEntityId);
