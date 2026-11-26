@@ -32,7 +32,7 @@ public class MealPlan : Entity
         };
     }
 
-    public MealEntry UpsertEntry(
+    public MealEntry AddEntry(
         DateTime dayUtc,
         MealSlot slot,
         string dishName,
@@ -43,21 +43,24 @@ public class MealPlan : Entity
         if (string.IsNullOrWhiteSpace(dishName))
             throw new ArgumentException("Dish name is required.", nameof(dishName));
 
-        var day = dayUtc.Date;
-        var existing = _entries.FirstOrDefault(e =>
-            !e.IsDeleted && e.DayUtc.Date == day && e.Slot == slot);
-
-        if (existing is null)
-        {
-            var entry = MealEntry.Create(Id, FamilyId, day, slot, dishName.Trim(), notes, ingredientsCsv, recipeId);
-            _entries.Add(entry);
-            MarkUpdated();
-            return entry;
-        }
-
-        existing.Update(dishName.Trim(), notes, ingredientsCsv, recipeId);
+        var entry = MealEntry.Create(Id, FamilyId, dayUtc.Date, slot, dishName.Trim(), notes, ingredientsCsv, recipeId);
+        _entries.Add(entry);
         MarkUpdated();
-        return existing;
+        return entry;
+    }
+
+    public MealEntry UpdateEntry(
+        Guid entryId,
+        string dishName,
+        string? notes = null,
+        string? ingredientsCsv = null,
+        Guid? recipeId = null)
+    {
+        var entry = _entries.FirstOrDefault(e => e.Id == entryId && !e.IsDeleted)
+            ?? throw new InvalidOperationException("The dish no longer exists in this meal plan.");
+        entry.Update(dishName, notes, ingredientsCsv, recipeId);
+        MarkUpdated();
+        return entry;
     }
 
     public void RemoveEntry(Guid entryId)
