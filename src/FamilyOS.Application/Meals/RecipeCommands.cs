@@ -74,6 +74,7 @@ public class RecipeCommandHandlers :
             recipes = recipes.Where(r =>
                 r.Name.ToLower().Contains(search)
                 || (r.Description != null && r.Description.ToLower().Contains(search))
+                || (r.Instructions != null && r.Instructions.ToLower().Contains(search))
                 || (r.Cuisine != null && r.Cuisine.ToLower().Contains(search))
                 || (r.IngredientsCsv != null && r.IngredientsCsv.ToLower().Contains(search))
                 || _db.RecipeIngredients.Any(row => row.RecipeId == r.Id
