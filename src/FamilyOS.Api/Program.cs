@@ -280,6 +280,7 @@ try
         await EnsureMealSchema.RunAsync(db, schemaLog);
         await EnsureRecipeSchema.RunAsync(db, schemaLog);
         await EnsureRecipeCatalogSchema.RunAsync(db, schemaLog);
+        await EnsureMealNominationSchema.RunAsync(db, schemaLog);
         await EnsureLocationSchema.RunAsync(db, schemaLog);
         await EnsureAvatarSchema.RunAsync(db, schemaLog);
         await EnsureTaskSchema.RunAsync(db, schemaLog);
