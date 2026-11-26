@@ -19,7 +19,7 @@ public sealed class SettingsPage : ContentPage
     private readonly Entry _end = new() { Placeholder = "07:00", Keyboard = Keyboard.Numeric, MaxLength = 5, WidthRequest = 100 };
     private readonly Button _save = new() { Text = "Save quiet hours" };
     private readonly Button _refresh = new() { Text = "Refresh" };
-    private readonly Button _resetFamily = new() { Text = "Reset family data", TextColor = Colors.White, BackgroundColor = Color.FromArgb("#B42318"), IsVisible = false };
+    private readonly Button _resetFamily = new() { Text = "Reset family data", TextColor = Colors.White, BackgroundColor = (Color)Application.Current!.Resources["AccentDanger"], IsVisible = false };
     private bool _busy;
 
     public SettingsPage(MeApiClient me, FamilyApiClient family)
