@@ -171,7 +171,7 @@ public sealed class RecipeEditorPage : ContentPage
 
     private static (decimal? Quantity, string? Unit, string Name) ParseImportedIngredient(string raw)
     {
-        var match = Regex.Match(raw.Trim(), @"^(?<quantity>\\d+(?:\\.\\d+)?|\\d+/\\d+)\\s+(?<unit>[A-Za-z]+)\\s+(?<name>.+)$");
+        var match = Regex.Match(raw.Trim(), @"^(?<quantity>\d+(?:\.\d+)?|\d+/\d+)\s+(?<unit>[A-Za-z]+)\s+(?<name>.+)$");
         if (!match.Success) return (null, null, raw.Trim());
         var quantityText = match.Groups["quantity"].Value;
         decimal quantity;
