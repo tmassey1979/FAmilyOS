@@ -1,6 +1,5 @@
 using FamilyOS.Application.Interfaces;
 using FamilyOS.Infrastructure.Identity;
-using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -81,4 +80,5 @@ public sealed class IngredientCatalogController : ControllerBase
 
 public sealed record IngredientCatalogDto(
     Guid Id, string Name, string Category, string? AliasesCsv, bool IsBuiltIn);
-\npublic sealed record CreateIngredientBody(string Name, string? Category = null, string? AliasesCsv = null);\n
+
+public sealed record CreateIngredientBody(string Name, string? Category = null, string? AliasesCsv = null);
