@@ -131,7 +131,7 @@ public class MealCommandHandlers :
             foreach (var item in aggregate.Values)
                 names.Add(item.Quantity is null
                     ? item.Name
-                    : $"{FormatShoppingQuantity(item.Quantity.Value)} {item.UnitForDisplay()} {item.Name}".Replace("  ", " ").Trim());
+                    : $"{FormatShoppingQuantity(item.Quantity.Value)} {item.Unit} {item.Name}".Replace("  ", " ").Trim());
         }
 
         names = names.Where(x => !string.IsNullOrWhiteSpace(x))
