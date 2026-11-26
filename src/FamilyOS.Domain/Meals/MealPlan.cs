@@ -37,7 +37,8 @@ public class MealPlan : Entity
         MealSlot slot,
         string dishName,
         string? notes = null,
-        string? ingredientsCsv = null)
+        string? ingredientsCsv = null,
+        Guid? recipeId = null)
     {
         if (string.IsNullOrWhiteSpace(dishName))
             throw new ArgumentException("Dish name is required.", nameof(dishName));
