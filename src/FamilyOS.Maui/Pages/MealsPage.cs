@@ -232,9 +232,12 @@ public sealed class MealsPage : ContentPage
             tags.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
             stack.Children.Add(tags);
         }
+        var ingredientPreview = recipe.IngredientNames is { Count: > 0 }
+            ? string.Join(", ", recipe.IngredientNames.Take(5))
+            : recipe.IngredientsCsv;
         var detail = new Label
         {
-            Text = $"{recipe.Servings} servings" + (recipe.PrepMinutes is int prep ? $" · {prep} min prep" : "") + (recipe.CookMinutes is int cook ? $" · {cook} min cook" : "") + (string.IsNullOrWhiteSpace(recipe.Cuisine) ? "" : $" · {recipe.Cuisine}"),
+            Text = $"{recipe.Servings} servings" + (recipe.PrepMinutes is int prep ? $" · {prep} min prep" : "") + (recipe.CookMinutes is int cook ? $" · {cook} min cook" : "") + (string.IsNullOrWhiteSpace(recipe.Cuisine) ? "" : $" · {recipe.Cuisine}") + (string.IsNullOrWhiteSpace(ingredientPreview) ? "" : $"\n{ingredientPreview}"),
             FontSize = 13
         };
         detail.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
