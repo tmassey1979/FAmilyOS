@@ -21,6 +21,8 @@ public static class HomeModuleCatalog
         new("calendar", "Calendar", "Events & plans", "menu_calendar.png", nameof(Pages.CalendarPage), "▦", "#E0E7FF"),
         new("requests", "Requests", "Ask & approve", "menu_requests.png", nameof(Pages.RequestsPage), "✉", "#FCE7F3"),
         new("meals", "Meals", "Plan & share", "menu_meals.png", nameof(Pages.MealsPage), "◉", "#D1FAE5"),
+        new("recipes", "Recipes", "Family favorites", "menu_meals.png", nameof(Pages.RecipesPage), "▤", "#FCE7F3"),
+        new("ingredients", "Ingredients", "Shared catalog", "menu_shopping.png", nameof(Pages.IngredientsPage), "✣", "#E0F2FE"),
         new("chat", "Chat", "Family chat", "menu_chat.png", nameof(Pages.ChatPage), "💬", "#E0F2FE"),
         new("shopping", "Shopping", "Lists & people", "menu_shopping.png", nameof(Pages.ShoppingPage), "🛒", "#FEF3C7"),
         new("map", "Map", "Family locations", "menu_map.png", "//map", "📍", "#FCE7F3"),
