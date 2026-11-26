@@ -6,6 +6,7 @@ namespace FamilyOS.Maui.Pages;
 public sealed class CalendarPage : ContentPage
 {
     private readonly CalendarApiClient _calendar;
+    private readonly TasksApiClient _tasks;
     private readonly VerticalStackLayout _events;
     private readonly Label _rangeLabel;
     private readonly Label _status;
@@ -16,9 +17,10 @@ public sealed class CalendarPage : ContentPage
     private DateTime _rangeStart = DateTime.Today;
     private bool _loading;
 
-    public CalendarPage(CalendarApiClient calendar)
+    public CalendarPage(CalendarApiClient calendar, TasksApiClient tasks)
     {
         _calendar = calendar;
+        _tasks = tasks;
         Title = "Calendar";
 
         _status = new Label { FontSize = 13 };
@@ -181,9 +183,32 @@ public sealed class CalendarPage : ContentPage
         var pickedStart = await PickEventDateTimeAsync("Event start", _rangeStart.AddHours(18));
         if (!pickedStart.HasValue) return;
         var location = await DisplayPromptAsync("Location", "Optional location", "Save", "Skip", maxLength: 160);
+        Guid? linkedTaskId = null;
+        try
+        {
+            var tasks = await _tasks.GetFamilyTasksAsync();
+            var linkable = tasks.Where(t => t.Status is not ("Completed" or "Cancelled" or "Skipped"))
+                .OrderBy(t => t.DueDate ?? DateTime.MaxValue).ThenBy(t => t.Title).ToList();
+            if (linkable.Count > 0)
+            {
+                var choices = linkable.Select(t => $"{t.Title} · {t.Status}").ToArray();
+                var selected = await DisplayActionSheetAsync("Link to a task? (Optional)", "No task", "Cancel", choices);
+                if (selected is not null && selected != "No task" && selected != "Cancel")
+                {
+                    var index = Array.IndexOf(choices, selected);
+                    if (index >= 0) linkedTaskId = linkable[index].Id;
+                }
+                if (selected == "Cancel") return;
+            }
+        }
+        catch (FamilyApiException ex)
+        {
+            await DisplayAlertAsync("Could not load tasks", ex.Message, "Continue without link");
+        }
+
         var start = pickedStart.Value.ToUniversalTime();
         var body = new CalendarEventWriteDto(title.Trim(), start, start.AddHours(1), false,
-            string.IsNullOrWhiteSpace(location) ? null : location.Trim());
+            string.IsNullOrWhiteSpace(location) ? null : location.Trim(), LinkedTaskId: linkedTaskId);
         await SaveAsync(() => _calendar.CreateAsync(body), "Event created.");
     }
 
