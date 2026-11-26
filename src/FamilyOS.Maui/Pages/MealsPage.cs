@@ -9,7 +9,10 @@ public sealed class MealsPage : ContentPage
     private readonly MealsApiClient _api;
     private readonly VerticalStackLayout _planItems = new() { Spacing = 12 };
     private readonly VerticalStackLayout _nominationItems = new() { Spacing = 9 };
-    private readonly VerticalStackLayout _recipeItems = new() { Spacing = 10 };
+    private readonly VerticalStackLayout _recipeItems = new() { Spacing = 12 };
+    private readonly Button _recipeLoadMore = new() { Text = "Load more recipes", HorizontalOptions = LayoutOptions.Fill };
+    private const int RecipeBatchSize = 8;
+    private int _visibleRecipeCount = RecipeBatchSize;
     private readonly SearchBar _recipeSearch = new() { Placeholder = "Search meals, ingredients, or cuisine…", FontSize = 14 };
     private readonly HorizontalStackLayout _recipeFilters = new() { Spacing = 8 };
     private readonly Picker _recipeSort = new() { Title = "Sort recipes", WidthRequest = 170 };
@@ -57,12 +60,16 @@ public sealed class MealsPage : ContentPage
         var nominateMeal = new Button { Text = "＋ Suggest a meal for this week" };
         nominateMeal.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         nominateMeal.Clicked += async (_, _) => await NominateMealAsync(null);
-        var recipeHeading = new Label { Text = "Discover meals", FontSize = 22, FontAttributes = FontAttributes.Bold };
+        var recipeHeading = new Label { Text = "Recipe market", FontSize = 24, FontAttributes = FontAttributes.Bold };
+        var recipeSubheading = new Label { Text = "Browse family favorites, find something new, and add ideas to this week’s vote.", FontSize = 13, LineBreakMode = LineBreakMode.WordWrap };
+        recipeSubheading.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
         recipeHeading.SetDynamicResource(VisualElement.StyleProperty, "TextTitle");
         var newRecipe = new Button { Text = "＋ Create a recipe" };
         newRecipe.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         newRecipe.Clicked += async (_, _) => await CreateRecipeAsync();
-        _recipeSearch.TextChanged += (_, _) => RenderRecipes();
+        _recipeSearch.TextChanged += (_, _) => { _visibleRecipeCount = RecipeBatchSize; RenderRecipes(); };
+        _recipeLoadMore.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+        _recipeLoadMore.Clicked += (_, _) => { _visibleRecipeCount += RecipeBatchSize; RenderRecipes(); };
         _recipeSort.Items.Add("Recommended");
         _recipeSort.Items.Add("Quickest");
         _recipeSort.Items.Add("A to Z");
@@ -75,6 +82,7 @@ public sealed class MealsPage : ContentPage
             chip.Clicked += (_, _) =>
             {
                 _activeRecipeFilter = filter;
+                _visibleRecipeCount = RecipeBatchSize;
                 foreach (var child in _recipeFilters.Children.OfType<Button>())
                     child.SetDynamicResource(VisualElement.StyleProperty,
                         child.Text == filter ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle");
@@ -93,7 +101,7 @@ public sealed class MealsPage : ContentPage
                 new BoxView { HeightRequest = 1, Opacity = 0.25 },
                 nominationHeading, new Label { Text = "Everyone can suggest and vote. Parents make the final plan.", FontSize = 12 }, nominateMeal, _nominationItems,
                 new BoxView { HeightRequest = 1, Opacity = 0.25 },
-                recipeHeading, _recipeSearch, new ScrollView { Orientation = ScrollOrientation.Horizontal, Content = _recipeFilters, HeightRequest = 48 }, _recipeSort, newRecipe, _recipeItems
+                recipeHeading, recipeSubheading, _recipeSearch, new ScrollView { Orientation = ScrollOrientation.Horizontal, Content = _recipeFilters, HeightRequest = 48 }, _recipeSort, newRecipe, _recipeItems, _recipeLoadMore
             }
         };
         Content = new RefreshView
@@ -149,7 +157,8 @@ public sealed class MealsPage : ContentPage
                     button.Clicked += async (_, _) => await EditMealAsync(day, slot, entry);
                     stack.Children.Add(button);
                 }
-                var card = new Border { Padding = 14, Content = stack };
+                var card = new Border { Padding = 0, StrokeThickness = 1, Content = stack };
+        stack.Padding = new Thickness(14);
                 card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
                 _planItems.Children.Add(card);
             }
@@ -337,7 +346,7 @@ public sealed class MealsPage : ContentPage
         if (Uri.TryCreate(recipe.ImageUrl, UriKind.Absolute, out var imageUri)
             && (imageUri.Scheme == Uri.UriSchemeHttps || imageUri.Scheme == Uri.UriSchemeHttp))
         {
-            var image = new Image { Source = ImageSource.FromUri(imageUri), HeightRequest = 150, Aspect = Aspect.AspectFill };
+            var image = new Image { Source = ImageSource.FromUri(imageUri), HeightRequest = 190, Aspect = Aspect.AspectFill };
             stack.Children.Add(image);
         }
         stack.Children.Add(title);
@@ -427,12 +436,16 @@ public sealed class MealsPage : ContentPage
 
         if (results.Count == 0)
         {
+            _recipeLoadMore.IsVisible = false;
             AddInfo(_recipeItems, "No matching meals", "Try another search or switch the category filter.");
             return;
         }
 
-        foreach (var recipe in results)
+        var visible = results.Take(_visibleRecipeCount).ToList();
+        foreach (var recipe in visible)
             AddRecipeCard(recipe);
+        _recipeLoadMore.IsVisible = results.Count > visible.Count;
+        _recipeLoadMore.Text = $"Load more recipes ({results.Count - visible.Count} remaining)";
     }
 
     private async Task ApplyRecipeAsync(RecipeDto recipe)
