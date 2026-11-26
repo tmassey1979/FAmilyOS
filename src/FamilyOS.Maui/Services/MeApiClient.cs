@@ -51,7 +51,10 @@ public sealed class MeApiClient
             throw new FamilyApiException(HttpStatusCode.Unauthorized, "Sign in to upload a photo.");
         using var content = new MultipartFormDataContent();
         var streamContent = new StreamContent(image);
-        streamContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        var normalizedType = NormalizeImageContentType(contentType, fileName);
+        streamContent.Headers.ContentType = new MediaTypeHeaderValue(normalizedType);
+        if (image.CanSeek)
+            streamContent.Headers.ContentLength = image.Length - image.Position;
         content.Add(streamContent, "file", fileName);
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(ApiBaseUri, "api/me/avatar")) { Content = content };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -59,7 +62,12 @@ public sealed class MeApiClient
         timeout.CancelAfter(TimeSpan.FromSeconds(60));
         using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
         if (!response.IsSuccessStatusCode)
-            throw new FamilyApiException(response.StatusCode, $"Could not upload photo (HTTP {(int)response.StatusCode}).");
+        {
+            var detail = await response.Content.ReadAsStringAsync(timeout.Token);
+            var message = TryGetApiErrorDetail(detail)
+                ?? $"Could not upload photo (HTTP {(int)response.StatusCode}).";
+            throw new FamilyApiException(response.StatusCode, message);
+        }
         await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
         return await JsonSerializer.DeserializeAsync<ProfileDto>(stream, JsonOptions, timeout.Token)
             ?? throw new InvalidOperationException("Empty profile response.");
@@ -67,6 +75,36 @@ public sealed class MeApiClient
 
     public Task<ProfileDto> ClearAvatarAsync(CancellationToken ct = default)
         => SendAsync<ProfileDto>(HttpMethod.Delete, "api/me/avatar", null, ct);
+
+    private static string NormalizeImageContentType(string? contentType, string? fileName)
+    {
+        var value = contentType?.Split(';', 2)[0].Trim().ToLowerInvariant();
+        if (value is "image/jpeg" or "image/jpg" or "image/png" or "image/webp" or "image/gif")
+            return value;
+        var extension = Path.GetExtension(fileName)?.ToLowerInvariant();
+        return extension switch
+        {
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            ".gif" => "image/gif",
+            _ => "image/jpeg"
+        };
+    }
+
+    private static string? TryGetApiErrorDetail(string responseBody)
+    {
+        if (string.IsNullOrWhiteSpace(responseBody)) return null;
+        try
+        {
+            using var document = JsonDocument.Parse(responseBody);
+            var root = document.RootElement;
+            foreach (var key in new[] { "detail", "message", "title", "error" })
+                if (root.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String)
+                    return value.GetString();
+        }
+        catch (JsonException) { }
+        return responseBody.Length <= 300 ? responseBody : responseBody[..300];
+    }
 
     private async Task SendNoContentAsync(HttpMethod method, string path, CancellationToken ct)
     {
