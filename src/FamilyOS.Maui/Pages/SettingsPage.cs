@@ -19,6 +19,7 @@ public sealed class SettingsPage : ContentPage
     private readonly Entry _end = new() { Placeholder = "07:00", Keyboard = Keyboard.Numeric, MaxLength = 5, WidthRequest = 100 };
     private readonly Button _save = new() { Text = "Save quiet hours" };
     private readonly Button _refresh = new() { Text = "Refresh" };
+    private readonly Button _resetFamily = new() { Text = "Reset family data", TextColor = Colors.White, BackgroundColor = Color.FromArgb("#B42318") };
     private bool _busy;
 
     public SettingsPage(MeApiClient me, FamilyApiClient family)
@@ -28,6 +29,7 @@ public sealed class SettingsPage : ContentPage
         Title = "Settings";
         _save.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
         _refresh.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+        _resetFamily.Clicked += async (_, _) => await ResetFamilyAsync();
         _status.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
         _account.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
         _household.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
@@ -101,6 +103,23 @@ public sealed class SettingsPage : ContentPage
             }
         };
         googleCard.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
+        var resetHeading = new Label { Text = "Reset family data", FontSize = 18, FontAttributes = FontAttributes.Bold };
+        resetHeading.SetDynamicResource(VisualElement.StyleProperty, "TextTitle");
+        var resetCard = new Border
+        {
+            Padding = 16,
+            Content = new VerticalStackLayout
+            {
+                Spacing = 10,
+                Children =
+                {
+                    resetHeading,
+                    new Label { Text = "Permanently erase this household, its members and family activity. Sign-in accounts are preserved. Only the household owner can do this.", FontSize = 13 },
+                    _resetFamily
+                }
+            }
+        };
+        resetCard.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
         var toolbar = new HorizontalStackLayout { Spacing = 8, Children = { _refresh } };
         Content = new RefreshView
         {
@@ -110,7 +129,7 @@ public sealed class SettingsPage : ContentPage
                 {
                     Padding = new Thickness(18, 12),
                     Spacing = 14,
-                    Children = { heading, toolbar, _status, accountCard, familyCard, quietCard, googleCard }
+                    Children = { heading, toolbar, _status, accountCard, familyCard, quietCard, googleCard, resetCard }
                 }
             },
             Command = new Command(async () => await LoadAsync())
