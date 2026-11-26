@@ -32,7 +32,7 @@ public sealed class ThemeService : IThemeService
         ["TextPrimary"] = Color.FromArgb("#101A2B"),
         ["TextMuted"] = Color.FromArgb("#60718A"),
         ["TextOnAccent"] = Color.FromArgb("#081321"),
-        ["AccentPrimary"] = Color.FromArgb("#007F9F"),
+        ["AccentPrimary"] = Color.FromArgb("#008DA8"),
         ["AccentSecondary"] = Color.FromArgb("#6D5CE7"),
         ["AccentDanger"] = Color.FromArgb("#D83D5B"),
         ["AccentSuccess"] = Color.FromArgb("#087F61"),
