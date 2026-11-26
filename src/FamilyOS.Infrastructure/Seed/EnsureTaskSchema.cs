@@ -6,7 +6,7 @@ namespace FamilyOS.Infrastructure.Seed;
 
 /// <summary>
 /// Keeps the Tasks table compatible with the current TaskItem EF model on
-/// installations whose migration history predates CompletedAtUtc.
+/// installations whose migration history predates task scheduling/completion fields.
 /// </summary>
 public static class EnsureTaskSchema
 {
@@ -15,9 +15,10 @@ public static class EnsureTaskSchema
         await db.Database.ExecuteSqlRawAsync(
             """
             ALTER TABLE familyos."Tasks"
+                ADD COLUMN IF NOT EXISTS "EstimatedMinutes" integer NULL,
                 ADD COLUMN IF NOT EXISTS "CompletedAtUtc" timestamp with time zone NULL;
             """);
 
-        logger.LogInformation("Task schema ensured (CompletedAtUtc)");
+        logger.LogInformation("Task schema ensured (EstimatedMinutes, CompletedAtUtc)");
     }
 }
