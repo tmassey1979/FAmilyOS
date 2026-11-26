@@ -31,20 +31,17 @@ public class GoogleCalendarHandlers :
     private readonly ICurrentUserService _current;
     private readonly IGoogleCalendarClient _google;
     private readonly IConfiguration _config;
-    private readonly Microsoft.AspNetCore.DataProtection.IDataProtector _stateProtector;
 
     public GoogleCalendarHandlers(
         IFamilyOsDbContext db,
         ICurrentUserService current,
         IGoogleCalendarClient google,
-        IConfiguration config,
-        Microsoft.AspNetCore.DataProtection.IDataProtectionProvider dataProtectionProvider)
+        IConfiguration config)
     {
         _db = db;
         _current = current;
         _google = google;
         _config = config;
-        _stateProtector = dataProtectionProvider.CreateProtector("FamilyOS.GoogleCalendar.OAuthState.v1");
     }
 
     public async Task<string> Handle(GetGoogleCalendarAuthUrlQuery query, CancellationToken ct)
@@ -127,7 +124,8 @@ public class GoogleCalendarHandlers :
     private string BuildAuthUrlFor(Guid memberId, Guid familyId)
     {
         var payload = $"{memberId:N}|{familyId:N}|{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}|{Guid.NewGuid():N}";
-        return _google.BuildAuthorizationUrl(_stateProtector.Protect(payload));
+        var secret = _config["Google:ClientSecret"] ?? throw new DomainException("Google Calendar client secret is not configured.");
+        return _google.BuildAuthorizationUrl(GoogleCalendarOAuthState.Protect(payload, secret));
     }
 
     private bool IsConfigured() =>
@@ -271,5 +269,52 @@ public static class GoogleCalendarSync
         {
             // Push is best-effort; local event remains the source of truth.
         }
+    }
+}
+
+/// <summary>Signs OAuth state with the configured Google client secret so callbacks can be validated without a browser session.</summary>
+public static class GoogleCalendarOAuthState
+{
+    public static string Protect(string payload, string secret)
+    {
+        var key = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(secret));
+        var bytes = System.Text.Encoding.UTF8.GetBytes(payload);
+        var signature = System.Security.Cryptography.HMACSHA256.HashData(key, bytes);
+        return $"{Base64UrlEncode(bytes)}.{Base64UrlEncode(signature)}";
+    }
+
+    public static bool TryUnprotect(string token, string secret, out string payload)
+    {
+        payload = string.Empty;
+        if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(secret)) return false;
+        var parts = token.Split('.');
+        if (parts.Length != 2) return false;
+
+        try
+        {
+            var bytes = Base64UrlDecode(parts[0]);
+            var supplied = Base64UrlDecode(parts[1]);
+            var key = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(secret));
+            var expected = System.Security.Cryptography.HMACSHA256.HashData(key, bytes);
+            if (!System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(supplied, expected))
+                return false;
+
+            payload = System.Text.Encoding.UTF8.GetString(bytes);
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    private static string Base64UrlEncode(byte[] bytes)
+        => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    private static byte[] Base64UrlDecode(string value)
+    {
+        var normalized = value.Replace('-', '+').Replace('_', '/');
+        normalized += normalized.Length % 4 switch { 2 => "==", 3 => "=", _ => "" };
+        return Convert.FromBase64String(normalized);
     }
 }
