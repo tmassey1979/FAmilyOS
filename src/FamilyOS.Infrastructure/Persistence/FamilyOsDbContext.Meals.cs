@@ -13,9 +13,30 @@ public partial class FamilyOsDbContext
     public DbSet<RecipeTag> RecipeTags => Set<RecipeTag>();
     public DbSet<RecipeTagLink> RecipeTagLinks => Set<RecipeTagLink>();
     public DbSet<RecipeInstructionStep> RecipeInstructionSteps => Set<RecipeInstructionStep>();
+    public DbSet<MealNomination> MealNominations => Set<MealNomination>();
+    public DbSet<MealNominationVote> MealNominationVotes => Set<MealNominationVote>();
 
     private static void ConfigureMeals(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<MealNomination>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.FamilyId, x.WeekStartUtc });
+            e.Property(x => x.Title).HasMaxLength(300).IsRequired();
+            e.Property(x => x.Note).HasMaxLength(1000);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.Property(x => x.PlannedSlot).HasMaxLength(20);
+            e.HasQueryFilter(x => !x.IsDeleted);
+        });
+
+        modelBuilder.Entity<MealNominationVote>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => new { x.NominationId, x.MemberId }).IsUnique();
+            e.HasIndex(x => x.FamilyId);
+            e.HasQueryFilter(x => !x.IsDeleted);
+        });
+
         modelBuilder.Entity<MealPlan>(e =>
         {
             e.HasKey(x => x.Id);
