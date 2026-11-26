@@ -8,6 +8,9 @@ public sealed class SettingsPage : ContentPage
     private readonly MeApiClient _me;
     private readonly FamilyApiClient _family;
     private readonly Label _account = new() { FontSize = 14 };
+    private readonly Label _profileName = new() { FontSize = 20, FontAttributes = FontAttributes.Bold };
+    private readonly Image _profilePhoto = new() { WidthRequest = 76, HeightRequest = 76, Aspect = Aspect.AspectFill };
+    private ProfileDto? _profile;
     private readonly Label _household = new() { FontSize = 14 };
     private readonly Label _status = new() { FontSize = 12 };
     private readonly Label _googleStatus = new() { FontSize = 13 };
@@ -41,7 +44,19 @@ public sealed class SettingsPage : ContentPage
 
         var heading = new Label { Text = "Settings", FontSize = 26, FontAttributes = FontAttributes.Bold };
         heading.SetDynamicResource(VisualElement.StyleProperty, "TextDisplay");
-        var accountCard = Card("Account", _account);
+        var photoFrame = new Border { WidthRequest = 80, HeightRequest = 80, StrokeThickness = 0, StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 40 }, Content = _profilePhoto };
+        var profileActions = new HorizontalStackLayout { Spacing = 8 };
+        var changePhoto = new Button { Text = "Change picture", FontSize = 12 };
+        changePhoto.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+        changePhoto.Clicked += async (_, _) => await ChangeProfilePhotoAsync();
+        var editProfile = new Button { Text = "Edit name", FontSize = 12 };
+        editProfile.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+        editProfile.Clicked += async (_, _) => await EditProfileNameAsync();
+        profileActions.Children.Add(changePhoto);
+        profileActions.Children.Add(editProfile);
+        var profileCard = new Border { Padding = 16, Content = new VerticalStackLayout { Spacing = 10, Children = { new Label { Text = "My profile", FontSize = 18, FontAttributes = FontAttributes.Bold }, new HorizontalStackLayout { Spacing = 14, Children = { photoFrame, new VerticalStackLayout { VerticalOptions = LayoutOptions.Center, Children = { _profileName, new Label { Text = "Your name and photo shown to your family", FontSize = 12 } } } } }, profileActions } } };
+        profileCard.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
+        var accountCard = Card("Account details", _account);
         var familyCard = Card("Household", _household);
         var quietHeading = new Label { Text = "Quiet hours", FontSize = 18, FontAttributes = FontAttributes.Bold };
         quietHeading.SetDynamicResource(VisualElement.StyleProperty, "TextTitle");
@@ -129,7 +144,7 @@ public sealed class SettingsPage : ContentPage
                 {
                     Padding = new Thickness(18, 12),
                     Spacing = 14,
-                    Children = { heading, toolbar, _status, accountCard, familyCard, quietCard, googleCard, resetCard }
+                    Children = { heading, toolbar, _status, profileCard, accountCard, familyCard, quietCard, googleCard, resetCard }
                 }
             },
             Command = new Command(async () => await LoadAsync())
@@ -160,11 +175,26 @@ public sealed class SettingsPage : ContentPage
         try
         {
             var meTask = _me.GetAsync();
+            var profileTask = _me.GetProfileAsync();
             var familyTask = _family.GetFamilyAsync();
             var quietTask = _me.GetQuietHoursAsync();
             var googleTask = _me.GetGoogleCalendarStatusAsync();
-            await Task.WhenAll(meTask, familyTask, quietTask);
+            await Task.WhenAll(meTask, profileTask, familyTask, quietTask);
             var me = await meTask;
+            _profile = await profileTask;
+            _profileName.Text = _profile.DisplayName;
+            if (!string.IsNullOrWhiteSpace(_profile.AvatarUrl))
+            {
+                var avatarUri = _profile.AvatarUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                    ? _profile.AvatarUrl
+                    : "https://api.18.226.226.118.sslip.io/" + _profile.AvatarUrl.TrimStart('/');
+                _profilePhoto.Source = ImageSource.FromUri(new Uri(avatarUri));
+            }
+            else
+            {
+                _profilePhoto.Source = null;
+                _profilePhoto.BackgroundColor = (Color)Application.Current!.Resources["BgGlow"];
+            }
             var family = await familyTask;
             var quiet = await quietTask;
 
@@ -201,6 +231,39 @@ public sealed class SettingsPage : ContentPage
         catch (HttpRequestException) { _status.Text = "FamilyOS could not be reached. Check your connection."; }
         catch (Exception) { _status.Text = "Could not load settings. Try refreshing."; }
         finally { _busy = false; _refresh.IsEnabled = true; }
+    }
+
+    private async Task EditProfileNameAsync()
+    {
+        if (_profile is null) return;
+        var name = await DisplayPromptAsync("Your name", "How should your family see you?", "Save", "Cancel", initialValue: _profile.DisplayName);
+        if (name is null) return;
+        name = name.Trim();
+        if (string.IsNullOrWhiteSpace(name)) { _status.Text = "Enter a display name."; return; }
+        try { await _me.UpdateProfileAsync(name); _status.Text = "Profile updated."; await LoadAsync(); }
+        catch (Exception ex) { _status.Text = ex is FamilyApiException ? ex.Message : "Could not update your profile."; }
+    }
+
+    private async Task ChangeProfilePhotoAsync()
+    {
+        try
+        {
+            var choice = await DisplayActionSheetAsync("Profile picture", "Cancel", null, "Take photo", "Choose from library", "Remove photo");
+            if (choice is null or "Cancel") return;
+            if (choice == "Remove photo") await _me.ClearAvatarAsync();
+            else
+            {
+                var file = choice == "Take photo" ? await MediaPicker.Default.CapturePhotoAsync() : await MediaPicker.Default.PickPhotoAsync();
+                if (file is null) return;
+                await using var stream = await file.OpenReadAsync();
+                var contentType = string.IsNullOrWhiteSpace(file.ContentType) ? "image/jpeg" : file.ContentType;
+                await _me.UploadAvatarAsync(stream, file.FileName ?? "profile.jpg", contentType);
+            }
+            _status.Text = "Profile picture updated.";
+            await LoadAsync();
+        }
+        catch (PermissionException) { _status.Text = "Allow camera or photo-library access to change your picture."; }
+        catch (Exception ex) { _status.Text = ex is FamilyApiException ? ex.Message : "Could not update your profile picture."; }
     }
 
     private async Task ConnectGoogleCalendarAsync()
