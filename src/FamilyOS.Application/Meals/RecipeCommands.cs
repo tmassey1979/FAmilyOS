@@ -130,9 +130,37 @@ public class RecipeCommandHandlers :
             .FirstOrDefaultAsync(x => x.Id == cmd.RecipeId && (x.FamilyId == _current.FamilyId || x.FamilyId == Guid.Empty), ct)
             ?? throw new NotFoundException("Recipe", cmd.RecipeId);
 
-        var names = cmd.TargetServings is int target && target != recipe.Servings
-            ? recipe.ScaleIngredientsForServings(target)
-            : recipe.IngredientList();
+        var targetServings = cmd.TargetServings is int requested ? Math.Clamp(requested, 1, 100) : recipe.Servings;
+        var factor = (decimal)targetServings / recipe.Servings;
+        var structuredRows = await (from row in _db.RecipeIngredients.AsNoTracking()
+                                    join ingredient in _db.IngredientCatalog.AsNoTracking() on row.IngredientId equals ingredient.Id
+                                    where row.RecipeId == recipe.Id
+                                    orderby row.SortOrder
+                                    select new { row.IngredientId, ingredient.Name, row.Quantity, row.Unit }).ToListAsync(ct);
+        var names = new List<string>();
+        if (structuredRows.Count > 0)
+        {
+            var aggregate = new Dictionary<(Guid IngredientId, string Unit), (string Name, decimal? Quantity, string Unit)>();
+            foreach (var row in structuredRows)
+            {
+                var unit = NormalizeShoppingUnit(row.Unit);
+                var quantity = row.Quantity is null ? null : ToBaseShoppingQuantity(row.Quantity.Value, row.Unit) * factor;
+                var key = (row.IngredientId, unit);
+                if (aggregate.TryGetValue(key, out var current))
+                    aggregate[key] = (current.Name, current.Quantity is null || quantity is null
+                        ? null : current.Quantity.Value + quantity.Value, current.Unit);
+                else aggregate[key] = (row.Name, quantity, unit);
+            }
+            names.AddRange(aggregate.Values.Select(x => x.Quantity is null
+                ? x.Name : FormatShoppingLine(x.Quantity.Value, x.Unit, x.Name)));
+        }
+        else
+        {
+            names.AddRange(targetServings == recipe.Servings
+                ? recipe.IngredientList()
+                : recipe.ScaleIngredientsForServings(targetServings));
+        }
+        names = names.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (names.Count == 0) return 0;
 
         var existing = await _db.ProcurementItems
@@ -171,6 +199,53 @@ public class RecipeCommandHandlers :
         return new ScaledRecipeDto(recipe.Id, recipe.Name, recipe.Servings, query.TargetServings, ingredients);
     }
 
+
+    private static string NormalizeShoppingUnit(string? unit)
+    {
+        if (string.IsNullOrWhiteSpace(unit)) return "";
+        return unit.Trim().ToLowerInvariant() switch
+        {
+            "tsp" or "teaspoon" or "teaspoons" or "tbsp" or "tablespoon" or "tablespoons" or "cup" or "cups" or "fl oz" or "fluid ounce" or "fluid ounces" or "ml" or "milliliter" or "milliliters" or "l" or "liter" or "liters" => "tsp",
+            "oz" or "ounce" or "ounces" or "lb" or "lbs" or "pound" or "pounds" or "g" or "gram" or "grams" or "kg" or "kilogram" or "kilograms" => "g",
+            "each" or "ea" or "item" or "items" => "each",
+            var other => other
+        };
+    }
+
+    private static decimal ToBaseShoppingQuantity(decimal quantity, string? rawUnit)
+        => rawUnit?.Trim().ToLowerInvariant() switch
+        {
+            "tbsp" or "tablespoon" or "tablespoons" => quantity * 3m,
+            "cup" or "cups" => quantity * 48m,
+            "fl oz" or "fluid ounce" or "fluid ounces" => quantity * 6m,
+            "ml" or "milliliter" or "milliliters" => quantity * 0.202884m,
+            "l" or "liter" or "liters" => quantity * 202.884m,
+            "oz" or "ounce" or "ounces" => quantity * 28.3495m,
+            "lb" or "lbs" or "pound" or "pounds" => quantity * 453.592m,
+            "kg" or "kilogram" or "kilograms" => quantity * 1000m,
+            _ => quantity
+        };
+
+    private static string FormatShoppingLine(decimal quantity, string unit, string name)
+    {
+        string displayUnit;
+        decimal displayQuantity;
+        if (unit == "tsp")
+        {
+            if (quantity >= 48m) { displayUnit = "cup"; displayQuantity = quantity / 48m; }
+            else if (quantity >= 3m) { displayUnit = "tbsp"; displayQuantity = quantity / 3m; }
+            else { displayUnit = "tsp"; displayQuantity = quantity; }
+        }
+        else if (unit == "g")
+        {
+            if (quantity >= 453.592m) { displayUnit = "lb"; displayQuantity = quantity / 453.592m; }
+            else if (quantity >= 28.3495m) { displayUnit = "oz"; displayQuantity = quantity / 28.3495m; }
+            else { displayUnit = "g"; displayQuantity = quantity; }
+        }
+        else { displayUnit = unit; displayQuantity = quantity; }
+        return string.Join(" ", new[] { displayQuantity.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture), displayUnit, name }
+            .Where(x => !string.IsNullOrWhiteSpace(x)));
+    }
 
     private async Task<List<RecipeDto>> AddTagsAsync(List<Recipe> recipes, CancellationToken ct)
     {
