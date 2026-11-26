@@ -13,7 +13,7 @@ public record RecipeDto(
     Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions, bool IsBuiltIn = false, List<string>? Tags = null, string? Description = null, string? ImageUrl = null, string? SourceUrl = null, int? PrepMinutes = null, int? CookMinutes = null, string? Cuisine = null, string? Difficulty = null, List<string>? IngredientNames = null);
 
 public record ListRecipesQuery() : IRequest<List<RecipeDto>>;
-public record ListRecipesPageQuery(int Skip = 0, int Take = 24) : IRequest<RecipePageDto>;
+public record ListRecipesPageQuery(int Skip = 0, int Take = 24, string? Search = null, string? Tag = null, bool FavoritesOnly = false) : IRequest<RecipePageDto>;
 public record RecipePageDto(List<RecipeDto> Items, int TotalCount, int Skip, int Take);
 public record GetRecipeQuery(Guid Id) : IRequest<RecipeDto>;
 public record CreateRecipeCommand(
@@ -67,6 +67,36 @@ public class RecipeCommandHandlers :
         var take = Math.Clamp(query.Take, 1, 48);
         var recipes = _db.Recipes.AsNoTracking()
             .Where(r => r.FamilyId == _current.FamilyId || r.FamilyId == Guid.Empty);
+
+        var search = query.Search?.Trim().ToLowerInvariant();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            recipes = recipes.Where(r =>
+                r.Name.ToLower().Contains(search)
+                || (r.Description != null && r.Description.ToLower().Contains(search))
+                || (r.Cuisine != null && r.Cuisine.ToLower().Contains(search))
+                || (r.IngredientsCsv != null && r.IngredientsCsv.ToLower().Contains(search))
+                || _db.RecipeIngredients.Any(row => row.RecipeId == r.Id
+                    && _db.IngredientCatalog.Any(ingredient => ingredient.Id == row.IngredientId
+                        && ingredient.Name.ToLower().Contains(search)))
+                || _db.RecipeTagLinks.Any(link => link.RecipeId == r.Id
+                    && _db.RecipeTags.Any(tag => tag.Id == link.TagId && tag.Name.ToLower().Contains(search))));
+        }
+
+        var tag = query.Tag?.Trim().ToLowerInvariant();
+        if (!string.IsNullOrWhiteSpace(tag))
+        {
+            recipes = recipes.Where(r => _db.RecipeTagLinks.Any(link => link.RecipeId == r.Id
+                && _db.RecipeTags.Any(recipeTag => recipeTag.Id == link.TagId
+                    && recipeTag.Name.ToLower() == tag)));
+        }
+
+        if (query.FavoritesOnly)
+        {
+            recipes = recipes.Where(r => _db.RecipeMemberPreferences.Any(preference =>
+                preference.FamilyId == _current.FamilyId && preference.RecipeId == r.Id && preference.IsFavorite));
+        }
+
         var total = await recipes.CountAsync(ct);
         var page = await recipes.OrderBy(r => r.Name)
             .Skip(skip).Take(take).ToListAsync(ct);
