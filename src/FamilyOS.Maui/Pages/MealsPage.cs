@@ -507,7 +507,7 @@ public sealed class MealsPage : ContentPage
 
         if (results.Count == 0)
         {
-            AddInfo(_recipeItems, "No matching meals in the recipes loaded so far", "Try another search or load more recipes to continue browsing.");
+            AddInfo(_recipeItems, "No recipes found", "Try another search or choose a different category. Your search covers the full recipe collection.");
             _recipeLoadMore.IsVisible = _allRecipes.Count < _recipeTotalCount;
             _recipeLoadMore.Text = $"Load more recipes ({_recipeTotalCount - _allRecipes.Count} remaining)";
             return;
