@@ -50,6 +50,10 @@ public sealed class MealsApiClient
     public Task<StructuredRecipeDto> SaveStructuredRecipeAsync(StructuredRecipeWriteDto body, CancellationToken ct = default)
         => SendAsync<StructuredRecipeDto>(HttpMethod.Post, "api/recipes/structured", JsonContent(body), ct);
 
+    public Task<RecipeImportPreviewDto> ImportRecipePreviewAsync(string url, CancellationToken ct = default)
+        => SendAsync<RecipeImportPreviewDto>(HttpMethod.Post, "api/recipes/import-preview",
+            JsonContent(new RecipeImportRequestDto(url)), ct);
+
     public Task<StructuredRecipeDto> GetRecipeDetailsAsync(Guid id, CancellationToken ct = default)
         => SendAsync<StructuredRecipeDto>(HttpMethod.Get, $"api/recipes/{id:D}/details", null, ct);
 
@@ -131,20 +135,25 @@ public sealed class MealsApiClient
 public sealed record MealPlanDto(Guid Id, DateTime WeekStartUtc, string? Notes, List<MealEntryDto> Entries);
 public sealed record MealEntryDto(Guid Id, DateTime DayUtc, string Slot, string DishName, string? Notes, string? IngredientsCsv, Guid? RecipeId = null);
 public sealed record MealEntryWriteDto(DateTime DayUtc, string Slot, string DishName, string? Notes = null, string? IngredientsCsv = null, DateTime? WeekStartUtc = null);
-public sealed record RecipeDto(Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions, bool IsBuiltIn = false, List<string>? Tags = null);
+public sealed record RecipeDto(Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions, bool IsBuiltIn = false, List<string>? Tags = null, string? Description = null, string? ImageUrl = null, string? SourceUrl = null, int? PrepMinutes = null, int? CookMinutes = null, string? Cuisine = null, string? Difficulty = null);
 public sealed record RecipeWriteDto(string Name, int? Servings = 4, string? IngredientsCsv = null, string? Instructions = null);
 public sealed record ApplyRecipeDto(DateTime DayUtc, string Slot, DateTime? WeekStartUtc = null);
 public sealed record RecipeShoppingDto(int? TargetServings = null);
-public sealed record MealShoppingResultDto(int Added, int? TargetServings = null);\npublic sealed record IngredientCatalogDto(Guid Id, string Name, string Category, string? AliasesCsv, bool IsBuiltIn);
+public sealed record MealShoppingResultDto(int Added, int? TargetServings = null);
+public sealed record IngredientCatalogDto(Guid Id, string Name, string Category, string? AliasesCsv, bool IsBuiltIn);
 
 public sealed record CreateIngredientDto(string Name, string? Category = null, string? AliasesCsv = null);
+public sealed record RecipeImportRequestDto(string Url);
+public sealed record RecipeImportPreviewDto(string Name, string? Description, int Servings, List<string> Ingredients, List<string> Steps, List<string> Tags, int? PrepMinutes, int? CookMinutes, string? ImageUrl, string SourceUrl);
 public sealed record StructuredRecipeIngredientWriteDto(Guid IngredientId, decimal? Quantity, string? Unit,
     string? PreparationNote, string? Section, int SortOrder);
 public sealed record StructuredRecipeStepWriteDto(string Text, int? DurationMinutes = null);
 public sealed record StructuredRecipeWriteDto(Guid? Id, string Name, int Servings,
-    List<StructuredRecipeIngredientWriteDto> Ingredients, List<StructuredRecipeStepWriteDto> Steps, List<string> Tags);
+    List<StructuredRecipeIngredientWriteDto> Ingredients, List<StructuredRecipeStepWriteDto> Steps, List<string> Tags,
+    string? Description = null, string? ImageUrl = null, string? SourceUrl = null, int? PrepMinutes = null, int? CookMinutes = null, string? Cuisine = null, string? Difficulty = null);
 public sealed record StructuredRecipeDto(Guid Id, string Name, int Servings, bool IsBuiltIn, string? LegacyIngredientsCsv,
-    List<StructuredRecipeIngredientDto> Ingredients, List<StructuredRecipeStepDto> Steps, List<string> Tags);
+    List<StructuredRecipeIngredientDto> Ingredients, List<StructuredRecipeStepDto> Steps, List<string> Tags,
+    string? Description, string? ImageUrl, string? SourceUrl, int? PrepMinutes, int? CookMinutes, string? Cuisine, string? Difficulty);
 public sealed record StructuredRecipeIngredientDto(Guid IngredientId, string Name, string Category, decimal? Quantity,
     string? Unit, string? PreparationNote, string? Section, int SortOrder);
 public sealed record StructuredRecipeStepDto(int StepNumber, string Text, int? DurationMinutes);
