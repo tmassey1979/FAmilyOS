@@ -22,7 +22,7 @@ public static class HomeModuleCatalog
         new("requests", "Requests", "Ask & approve", "menu_requests.png", nameof(Pages.RequestsPage), "✉", "#FCE7F3"),
         new("meals", "Meals", "Plan & share", "menu_meals.png", nameof(Pages.MealsPage), "◉", "#D1FAE5"),
         new("chat", "Chat", "Family chat", "menu_chat.png", nameof(Pages.ChatPage), "💬", "#E0F2FE"),
-        new("shopping", "Shopping", "Lists & people", "menu_shopping.png", "//family", "🛒", "#FEF3C7"),
+        new("shopping", "Shopping", "Lists & people", "menu_shopping.png", nameof(Pages.ShoppingPage), "🛒", "#FEF3C7"),
         new("map", "Map", "Family locations", "menu_map.png", "//map", "📍", "#FCE7F3"),
         new("notifications", "Alerts", "Stay informed", "menu_notifications.png", nameof(Pages.NotificationsPage), "🔔", "#FEE2E2"),
         new("settings", "Settings", "Preferences", "menu_settings.png", nameof(Pages.SettingsPage), "⚙", "#E2E8F0"),
