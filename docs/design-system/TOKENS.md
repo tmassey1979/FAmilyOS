@@ -22,7 +22,7 @@ All values live in MAUI resource dictionaries under `src/FamilyOS.Maui/Resources
 
 ## Spacing and geometry
 
-`SpaceXs` 4 · `SpaceSm` 8 · `SpaceMd` 16 · `SpaceLg` 24 · `SpaceXl` 32 · `ControlHeightMin` 48 · `RadiusMd` 12 · `RadiusLg` 16 · shared card radius 20.
+`SpaceXs` 4 · `SpaceSm` 8 · `SpaceMd` 16 · `SpaceLg` 24 · `SpaceXl` 32 · `ControlHeightMin` 48 · `RadiusMd` 12 · `RadiusLg` 16 · shared card radius 22.
 
 ## Rules
 
@@ -30,3 +30,11 @@ All values live in MAUI resource dictionaries under `src/FamilyOS.Maui/Resources
 - Keep touch targets at least 48dp and body text comfortably readable.
 - Accent cyan is for primary focus; violet is a secondary highlight, never a second competing primary.
 - Status colors communicate status only. Do not use color as the only state indicator.
+
+
+## Component treatment
+
+- Primary buttons are high-contrast ion-cyan with dark text; secondary actions sit on a quieter raised surface.
+- Cards use a 22dp radius, fine semantic border, and restrained surface contrast rather than heavy shadows.
+- Inputs use the surface color, readable 16sp text, muted placeholder text, and at least 48dp height.
+- Status color is reserved for actual success, warning, danger, and information—not decoration.
