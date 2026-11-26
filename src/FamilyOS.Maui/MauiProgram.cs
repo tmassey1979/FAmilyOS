@@ -42,6 +42,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<CalendarApiClient>();
         builder.Services.AddTransient<CalendarPage>();
         builder.Services.AddSingleton<OnboardingApiClient>();
+        // Demo-only provider behind a purchase abstraction; replace with Google Play Billing later.
+        builder.Services.AddSingleton<ISubscriptionPurchaseService, DemoSubscriptionPurchaseService>();
         builder.Services.AddTransient<OnboardingPage>();
         builder.Services.AddSingleton<OfflineStore>();
         builder.Services.AddSingleton<OfflineFlushService>();
