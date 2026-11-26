@@ -35,7 +35,7 @@ public class ConditionalApprovalTests
         r.Approve(Approver, conditional: true);
         r.PromoteFromConditions(Other);
         r.Status.Should().Be(RequestStatus.Approved);
-        r.History.Should().Contain(h => h.Detail.Contains("All conditions satisfied"));
+        r.History.Should().Contain(h => h.Detail.Contains("Approval conditions satisfied"));
     }
 
     [Fact]
@@ -44,6 +44,24 @@ public class ConditionalApprovalTests
         var r = SubmittedPurchase();
         r.Approve(Approver, conditional: false);
         var act = () => r.PromoteFromConditions(Other);
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Cannot_prepare_execution_while_conditionally_approved()
+    {
+        var r = SubmittedPurchase();
+        r.Approve(Approver, conditional: true);
+        var act = () => r.MarkExecutable();
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("All approval conditions must be satisfied before execution.");
+    }
+
+    [Fact]
+    public void Cannot_approve_a_draft_request()
+    {
+        var r = Request.Create(FamilyId, Requester, RequestTypeCode.Purchase, "Bike");
+        var act = () => r.Approve(Approver);
         act.Should().Throw<InvalidOperationException>();
     }
 
