@@ -36,35 +36,41 @@ public class MealPlanTests
     }
 
     [Fact]
-    public void UpsertEntry_adds_and_updates()
+    public void AddEntry_allows_multiple_dishes_for_the_same_meal()
     {
         var plan = MealPlan.Create(FamilyId, DateTime.UtcNow);
         var day = new DateTime(2026, 10, 13, 0, 0, 0, DateTimeKind.Utc);
-        var e1 = plan.UpsertEntry(day, MealSlot.Dinner, "Pasta", notes: "garlic");
-        plan.Entries.Should().ContainSingle();
-        e1.DishName.Should().Be("Pasta");
-        e1.Slot.Should().Be(MealSlot.Dinner);
+        var main = plan.AddEntry(day, MealSlot.Dinner, "Beef stroganoff", notes: "Main dish");
+        var side = plan.AddEntry(day, MealSlot.Dinner, "Roasted broccoli");
+        var bread = plan.AddEntry(day, MealSlot.Dinner, "Garlic bread");
 
-        var e2 = plan.UpsertEntry(day, MealSlot.Dinner, "Tacos");
-        plan.Entries.Should().ContainSingle();
-        e2.Id.Should().Be(e1.Id);
-        e2.DishName.Should().Be("Tacos");
+        plan.Entries.Should().HaveCount(3);
+        plan.Entries.Select(x => x.Id).Should().OnlyHaveUniqueItems();
+        plan.Entries.Select(x => x.DishName).Should().Contain(new[] { "Beef stroganoff", "Roasted broccoli", "Garlic bread" });
+        main.Slot.Should().Be(MealSlot.Dinner);
+        side.DayUtc.Date.Should().Be(day.Date);
+
+        var updated = plan.UpdateEntry(side.Id, "Roasted asparagus");
+        plan.Entries.Should().HaveCount(3);
+        updated.Id.Should().Be(side.Id);
+        updated.DishName.Should().Be("Roasted asparagus");
+        bread.DishName.Should().Be("Garlic bread");
     }
 
     [Fact]
     public void RemoveEntry_soft_deletes()
     {
         var plan = MealPlan.Create(FamilyId, DateTime.UtcNow);
-        var e = plan.UpsertEntry(DateTime.UtcNow.Date, MealSlot.Breakfast, "Eggs");
+        var e = plan.AddEntry(DateTime.UtcNow.Date, MealSlot.Breakfast, "Eggs");
         plan.RemoveEntry(e.Id);
         e.IsDeleted.Should().BeTrue();
     }
 
     [Fact]
-    public void UpsertEntry_rejects_empty_dish()
+    public void AddEntry_rejects_empty_dish()
     {
         var plan = MealPlan.Create(FamilyId, DateTime.UtcNow);
-        var act = () => plan.UpsertEntry(DateTime.UtcNow.Date, MealSlot.Lunch, "  ");
+        var act = () => plan.AddEntry(DateTime.UtcNow.Date, MealSlot.Lunch, "  ");
         act.Should().Throw<ArgumentException>();
     }
 
@@ -73,8 +79,8 @@ public class MealPlanTests
     {
         var plan = MealPlan.Create(FamilyId, DateTime.UtcNow);
         var day = DateTime.UtcNow.Date;
-        var e = plan.UpsertEntry(day, MealSlot.Dinner, "Pasta", ingredientsCsv: "pasta, garlic");
-        plan.UpsertEntry(day, MealSlot.Lunch, "Salad", ingredientsCsv: "lettuce");
+        var e = plan.AddEntry(day, MealSlot.Dinner, "Pasta", ingredientsCsv: "pasta, garlic");
+        plan.AddEntry(day, MealSlot.Lunch, "Salad", ingredientsCsv: "lettuce");
         plan.RemoveEntry(e.Id);
         plan.AllIngredients().Should().Equal("lettuce");
     }
