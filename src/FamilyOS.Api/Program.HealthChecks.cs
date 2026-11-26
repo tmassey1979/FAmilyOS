@@ -3,10 +3,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 
-file record UpdateQuietHoursBody(bool Enabled, int? StartMinutes, int? EndMinutes);
-file record RegisterDeviceBody(string Token, string Platform, string? DeviceName);
+internal record UpdateQuietHoursBody(bool Enabled, int? StartMinutes, int? EndMinutes);
+internal record RegisterDeviceBody(string Token, string Platform, string? DeviceName);
 
-file sealed class KeycloakSigningKeysHealthCheck : IHealthCheck
+internal sealed class KeycloakSigningKeysHealthCheck : IHealthCheck
 {
     private readonly IOptionsMonitor<JwtBearerOptions> _jwtOptions;
     private readonly string _expectedIssuer;
@@ -86,7 +86,7 @@ file sealed class KeycloakSigningKeysHealthCheck : IHealthCheck
     }
 }
 
-file sealed class PostgresHealthCheck : IHealthCheck
+internal sealed class PostgresHealthCheck : IHealthCheck
 {
     private readonly IServiceScopeFactory _scopeFactory;
 
