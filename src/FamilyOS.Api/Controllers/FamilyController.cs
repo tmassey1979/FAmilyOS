@@ -41,6 +41,66 @@ public class FamilyController : ControllerBase
         return Ok(dto);
     }
 
+    /// <summary>Owner-confirmed permanent removal of all household data; sign-in identities are retained.</summary>
+    [HttpPost("reset")]
+    [Authorize(Policy = FamilyAuthPolicies.OwnerOnly)]
+    public async Task<IActionResult> Reset([FromBody] ResetFamilyBody body, CancellationToken ct)
+    {
+        if (!string.Equals(body.Confirmation, "RESET FAMILY", StringComparison.Ordinal))
+            return BadRequest(new { detail = "Type RESET FAMILY exactly to confirm." });
+
+        await _current.EnsureLoadedAsync(ct);
+        if (!_current.FamilyId.HasValue || !_current.UserId.HasValue || _current.Role != FamilyRole.Owner)
+            return Forbid();
+
+        var familyId = _current.FamilyId.Value;
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+        var users = await _db.Users.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ToListAsync(ct);
+        foreach (var user in users) user.ClearFamilyAssociation();
+
+        await _db.ChatMessages.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.TaskHistory.IgnoreQueryFilters().Where(x => _db.Tasks.IgnoreQueryFilters().Any(t => t.Id == x.TaskId && t.FamilyId == familyId)).ExecuteDeleteAsync(ct);
+        await _db.TaskTimeSegments.IgnoreQueryFilters().Where(x => _db.Tasks.IgnoreQueryFilters().Any(t => t.Id == x.TaskId && t.FamilyId == familyId)).ExecuteDeleteAsync(ct);
+        await _db.RequestHistory.IgnoreQueryFilters().Where(x => _db.Requests.IgnoreQueryFilters().Any(r => r.Id == x.RequestId && r.FamilyId == familyId)).ExecuteDeleteAsync(ct);
+        await _db.RequestQuestions.IgnoreQueryFilters().Where(x => _db.Requests.IgnoreQueryFilters().Any(r => r.Id == x.RequestId && r.FamilyId == familyId)).ExecuteDeleteAsync(ct);
+        await _db.ExecutionItems.IgnoreQueryFilters().Where(x => _db.ExecutionPlans.IgnoreQueryFilters().Any(p => p.Id == x.ExecutionPlanId && _db.Requests.IgnoreQueryFilters().Any(r => r.Id == p.RequestId && r.FamilyId == familyId))).ExecuteDeleteAsync(ct);
+
+        await _db.MemberLocationViewerGrants.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.MemberPlacePresences.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.MemberLocationHistory.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.MemberLocations.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.CheckInRequests.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.SavedPlaces.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.FamilyInvites.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.DeclineReasons.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.TaskTimingRecords.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.RecurrenceDefinitions.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.CalendarEvents.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.GoogleCalendarConnections.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.ChatChannels.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.RequestTypeDefinitions.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.PolicyOverrides.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.ExecutionPlans.IgnoreQueryFilters().Where(x => _db.Requests.IgnoreQueryFilters().Any(r => r.Id == x.RequestId && r.FamilyId == familyId)).ExecuteDeleteAsync(ct);
+        await _db.Conditions.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.ApprovalPolicies.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.ProcurementItems.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.Products.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.Carts.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.Notifications.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.DeviceRegistrations.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.MealEntries.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.MealPlans.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.Recipes.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.Tasks.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.Requests.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.FamilyMembers.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
+        await _db.Families.IgnoreQueryFilters().Where(x => x.Id == familyId).ExecuteDeleteAsync(ct);
+
+        await _db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return NoContent();
+    }
+
     [HttpGet]
     [Authorize(Policy = FamilyAuthPolicies.FamilyMember)]
     public async Task<ActionResult<FamilyDto>> Get(CancellationToken ct)
@@ -91,7 +151,9 @@ public class FamilyController : ControllerBase
     public async Task<ActionResult<List<DeclineReasonDto>>> DeclineReasons(CancellationToken ct)
         => Ok(await _mediator.Send(new GetDeclineReasonsQuery(), ct));
 
-    public record ResetFamilyBody(string Confirmation);\n\n    public record CreateFamilyBody(
+    public record ResetFamilyBody(string Confirmation);
+
+    public record CreateFamilyBody(
         string Name,
         string? TimeZone,
         string? Currency,
