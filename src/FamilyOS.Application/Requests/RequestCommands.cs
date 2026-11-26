@@ -414,7 +414,7 @@ public class RequestCommandHandlers :
                 .FirstOrDefaultAsync(p => p.Id == existingPlanId && p.FamilyId == _current.FamilyId, ct);
             if (existingPlan is not null) return ToPlanDto(existingPlan);
         }
-        if (request.Status is not (RequestStatus.Approved or RequestStatus.ConditionallyApproved or RequestStatus.Executable))
+        if (request.Status is not (RequestStatus.Approved or RequestStatus.Executable))
             throw new BusinessRuleException("Request must be approved before generating a plan.");
 
         var plan = ExecutionPlan.Create(_current.FamilyId!.Value, request.Id, _current.MemberId!.Value);
