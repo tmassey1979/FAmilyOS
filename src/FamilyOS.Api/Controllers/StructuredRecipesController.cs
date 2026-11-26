@@ -32,17 +32,19 @@ public sealed class StructuredRecipesController : ControllerBase
         if (body.Ingredients.Count > 100 || body.Steps.Count > 50 || body.Tags.Count > 20)
             return BadRequest("This recipe has too many ingredients, steps, or tags.");
 
+        if (body.Ingredients is null || body.Steps is null || body.Tags is null)
+            return BadRequest("Ingredients, steps, and tags must be supplied.");
         Recipe recipe;
         if (body.Id is Guid id)
         {
             recipe = await _db.Recipes.FirstOrDefaultAsync(
                 x => x.Id == id && x.FamilyId == _current.FamilyId, ct)
-                ?? throw new KeyNotFoundException("Recipe not found.");
+                ?? throw new InvalidOperationException("Recipe not found.");
             recipe.Update(body.Name, body.Servings, null,
                 string.Join(Environment.NewLine, body.Steps.Select(x => x.Text)));
-            foreach (var old in await _db.RecipeIngredients.Where(x => x.RecipeId == id).ToListAsync(ct)) old.SoftDelete();
-            foreach (var old in await _db.RecipeInstructionSteps.Where(x => x.RecipeId == id).ToListAsync(ct)) old.SoftDelete();
-            foreach (var old in await _db.RecipeTagLinks.Where(x => x.RecipeId == id).ToListAsync(ct)) old.SoftDelete();
+            _db.RecipeIngredients.RemoveRange(await _db.RecipeIngredients.Where(x => x.RecipeId == id).ToListAsync(ct));
+            _db.RecipeInstructionSteps.RemoveRange(await _db.RecipeInstructionSteps.Where(x => x.RecipeId == id).ToListAsync(ct));
+            _db.RecipeTagLinks.RemoveRange(await _db.RecipeTagLinks.Where(x => x.RecipeId == id).ToListAsync(ct));
         }
         else
         {
