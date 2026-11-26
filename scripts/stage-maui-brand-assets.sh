@@ -156,4 +156,4 @@ PY
 python3 "$ROOT/scripts/generate-maui-menu-icons.py"
 
 echo "Staged MAUI brand + menu assets:"
-ls -la "$APPICON_DIR" "$SPLASH_DIR" "$ROOT/src/FamilyOS.Maui/Resources/Images/Menu" 2>/dev/null || true
+ls -la "$APPICON_DIR" "$SPLASH_DIR" "$ROOT/src/FamilyOS.Maui/Resources/Images" 2>/dev/null || true
