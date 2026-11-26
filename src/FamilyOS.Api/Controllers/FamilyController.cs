@@ -1,6 +1,9 @@
 using FamilyOS.Application.Family;
 using FamilyOS.Domain.Common;
 using FamilyOS.Infrastructure.Identity;
+using FamilyOS.Infrastructure.Persistence;
+using FamilyOS.Application.Interfaces;
+using Microsoft.EntityFrameworkCore;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,8 +15,15 @@ namespace FamilyOS.Api.Controllers;
 public class FamilyController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly FamilyOsDbContext _db;
+    private readonly ICurrentUserService _current;
 
-    public FamilyController(IMediator mediator) => _mediator = mediator;
+    public FamilyController(IMediator mediator, FamilyOsDbContext db, ICurrentUserService current)
+    {
+        _mediator = mediator;
+        _db = db;
+        _current = current;
+    }
 
     /// <summary>Onboarding: create a new household. Requires auth but not existing family membership.</summary>
     [HttpPost]
@@ -81,7 +91,7 @@ public class FamilyController : ControllerBase
     public async Task<ActionResult<List<DeclineReasonDto>>> DeclineReasons(CancellationToken ct)
         => Ok(await _mediator.Send(new GetDeclineReasonsQuery(), ct));
 
-    public record CreateFamilyBody(
+    public record ResetFamilyBody(string Confirmation);\n\n    public record CreateFamilyBody(
         string Name,
         string? TimeZone,
         string? Currency,
