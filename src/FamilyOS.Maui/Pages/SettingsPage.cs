@@ -19,7 +19,7 @@ public sealed class SettingsPage : ContentPage
     private readonly Entry _end = new() { Placeholder = "07:00", Keyboard = Keyboard.Numeric, MaxLength = 5, WidthRequest = 100 };
     private readonly Button _save = new() { Text = "Save quiet hours" };
     private readonly Button _refresh = new() { Text = "Refresh" };
-    private readonly Button _resetFamily = new() { Text = "Reset family data", TextColor = Colors.White, BackgroundColor = Color.FromArgb("#B42318") };
+    private readonly Button _resetFamily = new() { Text = "Reset family data", TextColor = Colors.White, BackgroundColor = Color.FromArgb("#B42318"), IsVisible = false };
     private bool _busy;
 
     public SettingsPage(MeApiClient me, FamilyApiClient family)
@@ -190,6 +190,7 @@ public sealed class SettingsPage : ContentPage
             _googleDisconnect.IsVisible = google?.Configured == true && google.Connected;
             _account.Text = $"Role: {me.Role ?? "Member"}\nMember ID: {me.MemberId?.ToString("D") ?? "Unavailable"}";
             _household.Text = $"{family.Name}\n{family.Members.Count(x => x.IsActive)} active members";
+            _resetFamily.IsVisible = string.Equals(me.Role, "Owner", StringComparison.OrdinalIgnoreCase);
             _resetFamily.IsVisible = string.Equals(me.Role, "Owner", StringComparison.OrdinalIgnoreCase);
             _enabled.IsToggled = quiet.Enabled;
             _start.Text = quiet.StartLabel ?? FormatTime(quiet.StartMinutes);
