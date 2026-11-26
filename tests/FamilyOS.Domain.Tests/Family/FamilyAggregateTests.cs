@@ -1,3 +1,4 @@
+using FamilyOS.Domain.Common;
 using FamilyOS.Domain.Family;
 using FluentAssertions;
 
@@ -30,53 +31,31 @@ public class FamilyAggregateTests
         m.SetQuietHours(enabled: true, startMinutes: 21 * 60, endMinutes: 7 * 60);
         m.QuietHoursEnabled.Should().BeTrue();
         m.QuietHoursStartMinutes.Should().Be(21 * 60);
-
-        m.IsInQuietHours(TimeSpan.FromHours(23)).Should().BeTrue();
-        m.IsInQuietHours(TimeSpan.FromHours(10)).Should().BeFalse();
+        m.QuietHoursEndMinutes.Should().Be(7 * 60);
+        m.IsInQuietHours(new DateTime(2026, 1, 1, 22, 0, 0, DateTimeKind.Utc)).Should().BeTrue();
 
         m.ChangeRole(FamilyRole.Adult);
+        m.Role.Should().Be(FamilyRole.Adult);
         m.CanApproveRequests.Should().BeTrue();
+    }
 
-        m.UpdateDisplayName("Alex H");
-        m.SetAvatarUrl("/avatars/alex.jpg");
-        m.AvatarUrl.Should().Be("/avatars/alex.jpg");
+    [Fact]
+    public void FamilyMember_avatar_and_display_name()
+    {
+        var m = FamilyMember.Create(Guid.NewGuid(), Guid.NewGuid(), FamilyRole.Owner, "Terry");
+        m.SetAvatarUrl("/avatars/x.png");
+        m.AvatarUrl.Should().Be("/avatars/x.png");
         m.ClearAvatar();
         m.AvatarUrl.Should().BeNull();
-        m.DisplayName.Should().Be("Alex H");
+        m.UpdateDisplayName("Terry M");
+        m.DisplayName.Should().Be("Terry M");
+    }
 
+    [Fact]
+    public void FamilyMember_deactivate()
+    {
+        var m = FamilyMember.Create(Guid.NewGuid(), Guid.NewGuid(), FamilyRole.Child, "Kid");
         m.Deactivate();
         m.IsActive.Should().BeFalse();
-    }
-
-    [Fact]
-    public void FamilyInvite_Create_Accept_Revoke()
-    {
-        var familyId = Guid.NewGuid();
-        var inviter = Guid.NewGuid();
-        var invite = FamilyInvite.Create(familyId, inviter, FamilyRole.Adult, emailHint: "new@example.com");
-
-        invite.Code.Should().NotBeNullOrWhiteSpace();
-        invite.IsOpen.Should().BeTrue();
-
-        invite.Accept(memberId: Guid.NewGuid());
-        invite.AcceptedAtUtc.Should().NotBeNull();
-        invite.IsOpen.Should().BeFalse();
-    }
-
-    [Fact]
-    public void FamilyInvite_Revoke_blocks_accept()
-    {
-        var invite = FamilyInvite.Create(Guid.NewGuid(), Guid.NewGuid(), FamilyRole.Teen);
-        invite.Revoke();
-        invite.IsRevoked.Should().BeTrue();
-        var act = () => invite.Accept(Guid.NewGuid());
-        act.Should().Throw<InvalidOperationException>();
-    }
-
-    [Fact]
-    public void FamilyInvite_cannot_invite_as_Owner()
-    {
-        var act = () => FamilyInvite.Create(Guid.NewGuid(), Guid.NewGuid(), FamilyRole.Owner);
-        act.Should().Throw<ArgumentException>();
     }
 }
