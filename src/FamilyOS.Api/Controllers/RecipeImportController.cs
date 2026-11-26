@@ -64,10 +64,32 @@ public sealed class RecipeImportController : ControllerBase
 
     private static async Task<string> DownloadPublicPageAsync(Uri initial, CancellationToken ct)
     {
-        using var handler = new HttpClientHandler
+        using var handler = new SocketsHttpHandler
         {
             AllowAutoRedirect = false,
             AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli
+        };
+        handler.ConnectCallback = async (context, token) =>
+        {
+            var addresses = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, token);
+            if (addresses.Length == 0 || addresses.Any(IsPrivateAddress))
+                throw new HttpRequestException("Only public recipe websites can be imported.");
+            Exception? lastError = null;
+            foreach (var address in addresses)
+            {
+                var socket = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+                try
+                {
+                    await socket.ConnectAsync(new IPEndPoint(address, context.DnsEndPoint.Port), token);
+                    return new NetworkStream(socket, ownsSocket: true);
+                }
+                catch (Exception ex)
+                {
+                    socket.Dispose();
+                    lastError = ex;
+                }
+            }
+            throw new HttpRequestException("Could not connect to the public recipe website.", lastError);
         };
         using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) };
         var current = initial;
@@ -128,10 +150,14 @@ public sealed class RecipeImportController : ControllerBase
             return bytes[0] == 10 || bytes[0] == 127 || bytes[0] == 0
                 || (bytes[0] == 169 && bytes[1] == 254)
                 || (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
-                || (bytes[0] == 192 && bytes[1] == 168)
+                || (bytes[0] == 192 && (bytes[1] == 168 || bytes[1] == 0 || bytes[1] == 2))
+                || (bytes[0] == 100 && bytes[1] >= 64 && bytes[1] <= 127)
+                || (bytes[0] == 198 && (bytes[1] == 18 || bytes[1] == 19 || bytes[1] == 51))
+                || (bytes[0] == 203 && bytes[1] == 0 && bytes[2] == 113)
                 || bytes[0] >= 224;
-        return address.AddressFamily == AddressFamily.InterNetworkV6
-            && (bytes[0] & 0xfe) == 0xfc;
+        if (address.AddressFamily != AddressFamily.InterNetworkV6) return true;
+        return (bytes[0] & 0xe0) != 0x20
+            || (bytes[0] == 0x20 && bytes[1] == 0x01 && bytes[2] == 0x0d && bytes[3] == 0xb8);
     }
 
     private static JsonElement? FindRecipe(JsonElement element)
@@ -161,11 +187,16 @@ public sealed class RecipeImportController : ControllerBase
     {
         if (!element.TryGetProperty("@type", out var type)) return false;
         if (type.ValueKind == JsonValueKind.String)
-            return string.Equals(type.GetString(), "Recipe", StringComparison.OrdinalIgnoreCase);
+            return IsRecipeTypeName(type.GetString());
         return type.ValueKind == JsonValueKind.Array
             && type.EnumerateArray().Any(x => x.ValueKind == JsonValueKind.String
-                && string.Equals(x.GetString(), "Recipe", StringComparison.OrdinalIgnoreCase));
+                && IsRecipeTypeName(x.GetString()));
     }
+
+    private static bool IsRecipeTypeName(string? value)
+        => string.Equals(value, "Recipe", StringComparison.OrdinalIgnoreCase)
+            || (value?.EndsWith("/Recipe", StringComparison.OrdinalIgnoreCase) ?? false)
+            || (value?.EndsWith("#Recipe", StringComparison.OrdinalIgnoreCase) ?? false);
 
     private static RecipeImportPreviewDto ParseRecipe(JsonElement recipe, Uri source)
     {
