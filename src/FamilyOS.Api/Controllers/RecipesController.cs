@@ -35,7 +35,7 @@ public class RecipesController : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<ActionResult<RecipeDto>> Update(Guid id, [FromBody] RecipeBody body, CancellationToken ct)
         => Ok(await _mediator.Send(new UpdateRecipeCommand(
-            id, body.Name, body.Servings ?? 4, body.IngredientsCsv, body.Instructions), ct));
+            id, body.Name, body.Servings ?? 4, body.IngredientsCsv, body.Instructions, body.Description, body.ImageUrl, body.SourceUrl, body.PrepMinutes, body.CookMinutes, body.Cuisine, body.Difficulty), ct));
 
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
