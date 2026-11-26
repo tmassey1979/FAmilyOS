@@ -17,6 +17,7 @@ public sealed class MealsPage : ContentPage
     private readonly HorizontalStackLayout _recipeFilters = new() { Spacing = 8 };
     private readonly Picker _recipeSort = new() { Title = "Sort recipes", WidthRequest = 170 };
     private List<RecipeDto> _allRecipes = new();
+    private List<RecipeMemberPreferenceDto> _recipePreferences = new();
     private string _activeRecipeFilter = "All";
     private readonly Label _status = new() { FontSize = 13 };
     private readonly Button _previous = new() { Text = "‹ Previous" };
@@ -75,7 +76,7 @@ public sealed class MealsPage : ContentPage
         _recipeSort.Items.Add("A to Z");
         _recipeSort.SelectedIndex = 0;
         _recipeSort.SelectedIndexChanged += (_, _) => RenderRecipes();
-        foreach (var filter in new[] { "All", "Dinner", "Breakfast", "Lunch", "Quick", "Vegetarian", "Kid-Friendly", "Budget-Friendly", "Family-Favorite", "High-Protein", "Slow-Cooker" })
+        foreach (var filter in new[] { "All", "Favorites", "Dinner", "Breakfast", "Lunch", "Quick", "Vegetarian", "Kid-Friendly", "Budget-Friendly", "Family-Favorite", "High-Protein", "Slow-Cooker" })
         {
             var chip = new Button { Text = filter, FontSize = 12, Padding = new Thickness(14, 7), CornerRadius = 18 };
             chip.SetDynamicResource(VisualElement.StyleProperty, filter == "All" ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle");
@@ -127,6 +128,7 @@ public sealed class MealsPage : ContentPage
         {
             var plan = await _api.GetWeekAsync(_weekStart);
             var recipePage = await _api.GetRecipesPageAsync(0, RecipeBatchSize);
+            var recipePreferences = await _api.GetRecipePreferencesAsync(recipePage.Items.Select(x => x.Id));
             var nominations = await _api.GetNominationsAsync(_weekStart);
             _planItems.Children.Clear();
             _nominationItems.Children.Clear();
@@ -189,6 +191,7 @@ public sealed class MealsPage : ContentPage
             }
 
             _allRecipes = recipePage.Items;
+            _recipePreferences = recipePreferences;
             _recipeTotalCount = recipePage.TotalCount;
             RenderRecipes();
 
@@ -401,12 +404,43 @@ public sealed class MealsPage : ContentPage
             description.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
             stack.Children.Add(description);
         }
+        var familyPreferences = _recipePreferences.Where(x => x.RecipeId == recipe.Id).ToList();
+        var favoriteNames = familyPreferences.Where(x => x.IsFavorite).Select(x => x.MemberName).ToArray();
+        var likedNames = familyPreferences.Where(x => x.Preference == "Like").Select(x => x.MemberName).ToArray();
+        var dislikedNames = familyPreferences.Where(x => x.Preference == "Dislike").Select(x => x.MemberName).ToArray();
+        var feedback = new List<string>();
+        if (favoriteNames.Length > 0) feedback.Add($"♥ Favorites: {string.Join(", ", favoriteNames)}");
+        if (likedNames.Length > 0) feedback.Add($"👍 Likes: {string.Join(", ", likedNames)}");
+        if (dislikedNames.Length > 0) feedback.Add($"Not for: {string.Join(", ", dislikedNames)}");
+        if (feedback.Count > 0)
+        {
+            var familySummary = new Label { Text = string.Join("   ·   ", feedback), FontSize = 11, LineBreakMode = LineBreakMode.WordWrap };
+            familySummary.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+            stack.Children.Add(familySummary);
+        }
+
         if (!string.IsNullOrWhiteSpace(recipe.Instructions))
         {
             var instructions = new Label { Text = recipe.Instructions, FontSize = 13 };
             instructions.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
             stack.Children.Add(instructions);
         }
+
+        var myPreference = familyPreferences.FirstOrDefault(x => x.IsCurrentMember);
+        var feedbackActions = new HorizontalStackLayout { Spacing = 6 };
+        var favorite = new Button { Text = myPreference?.IsFavorite == true ? "♥ Saved" : "♡ Favorite", FontSize = 11 };
+        favorite.SetDynamicResource(VisualElement.StyleProperty, myPreference?.IsFavorite == true ? "FoPrimaryButtonStyle" : "FoGhostButtonStyle");
+        favorite.Clicked += async (_, _) => await SaveRecipePreferenceAsync(recipe, myPreference?.Preference, !(myPreference?.IsFavorite ?? false));
+        var like = new Button { Text = myPreference?.Preference == "Like" ? "✓ Liked" : "👍 Like", FontSize = 11 };
+        like.SetDynamicResource(VisualElement.StyleProperty, myPreference?.Preference == "Like" ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle");
+        like.Clicked += async (_, _) => await SaveRecipePreferenceAsync(recipe, myPreference?.Preference == "Like" ? null : "Like", myPreference?.IsFavorite ?? false);
+        var dislike = new Button { Text = myPreference?.Preference == "Dislike" ? "✓ Not for me" : "👎 Not for me", FontSize = 11 };
+        dislike.SetDynamicResource(VisualElement.StyleProperty, myPreference?.Preference == "Dislike" ? "FoPrimaryButtonStyle" : "FoGhostButtonStyle");
+        dislike.Clicked += async (_, _) => await SaveRecipePreferenceAsync(recipe, myPreference?.Preference == "Dislike" ? null : "Dislike", myPreference?.IsFavorite ?? false);
+        feedbackActions.Children.Add(favorite);
+        feedbackActions.Children.Add(like);
+        feedbackActions.Children.Add(dislike);
+        stack.Children.Add(feedbackActions);
 
         var actions = new HorizontalStackLayout { Spacing = 8 };
         var nominate = new Button { Text = "Nominate" , FontSize = 12 };
@@ -447,8 +481,12 @@ public sealed class MealsPage : ContentPage
                 || (recipe.Cuisine?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
                 || (recipe.Description?.Contains(term, StringComparison.OrdinalIgnoreCase) ?? false)
                 || (recipe.Tags?.Any(tag => tag.Contains(term, StringComparison.OrdinalIgnoreCase)) ?? false);
-            var tagMatch = _activeRecipeFilter == "All"
-                || (recipe.Tags?.Any(tag => string.Equals(tag, _activeRecipeFilter, StringComparison.OrdinalIgnoreCase)) ?? false);
+            var tagMatch = _activeRecipeFilter switch
+            {
+                "All" => true,
+                "Favorites" => _recipePreferences.Any(x => x.RecipeId == recipe.Id && x.IsFavorite),
+                _ => recipe.Tags?.Any(tag => string.Equals(tag, _activeRecipeFilter, StringComparison.OrdinalIgnoreCase)) ?? false
+            };
             return textMatch && tagMatch;
         }).ToList();
 
@@ -456,7 +494,9 @@ public sealed class MealsPage : ContentPage
         {
             1 => results.OrderBy(x => (x.PrepMinutes ?? 999) + (x.CookMinutes ?? 999)).ThenBy(x => x.Name),
             2 => results.OrderBy(x => x.Name),
-            _ => results.OrderByDescending(x => x.Tags?.Contains("Family-Favorite") == true)
+            _ => results.OrderByDescending(x => _recipePreferences.Count(p => p.RecipeId == x.Id && p.IsFavorite))
+                .ThenByDescending(x => _recipePreferences.Count(p => p.RecipeId == x.Id && p.Preference == "Like"))
+                .ThenByDescending(x => x.Tags?.Contains("Family-Favorite") == true)
                 .ThenBy(x => x.Name)
         }).ToList();
 
@@ -482,7 +522,10 @@ public sealed class MealsPage : ContentPage
         try
         {
             var page = await _api.GetRecipesPageAsync(_allRecipes.Count, RecipeBatchSize);
+            var preferences = await _api.GetRecipePreferencesAsync(page.Items.Select(x => x.Id));
             _allRecipes.AddRange(page.Items);
+            _recipePreferences.RemoveAll(x => page.Items.Any(item => item.Id == x.RecipeId));
+            _recipePreferences.AddRange(preferences);
             _recipeTotalCount = page.TotalCount;
             RenderRecipes();
         }
@@ -493,6 +536,24 @@ public sealed class MealsPage : ContentPage
         finally
         {
             _recipeLoadMore.IsEnabled = true;
+        }
+    }
+
+    private async Task SaveRecipePreferenceAsync(RecipeDto recipe, string? preference, bool isFavorite)
+    {
+        try
+        {
+            var updated = await _api.SetRecipePreferenceAsync(recipe.Id,
+                new RecipeMemberPreferenceWriteDto(preference, isFavorite));
+            var rows = await _api.GetRecipePreferencesAsync([recipe.Id]);
+            _recipePreferences.RemoveAll(x => x.RecipeId == recipe.Id);
+            _recipePreferences.AddRange(rows);
+            RenderRecipes();
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlertAsync("Preference not saved",
+                ex is FamilyApiException ? ex.Message : "Could not update this recipe. Please try again.", "OK");
         }
     }
 
