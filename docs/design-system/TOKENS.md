@@ -14,7 +14,7 @@ All values live in MAUI resource dictionaries under `src/FamilyOS.Maui/Resources
 | `TextPrimary` | `#101A2B` | `#F3F7FF` |
 | `TextMuted` | `#60718A` | `#9BAFC9` |
 | `TextOnAccent` | `#081321` | `#081321` |
-| `AccentPrimary` | `#007F9F` | `#55E6FF` |
+| `AccentPrimary` | `#008DA8` | `#55E6FF` |
 | `AccentSecondary` | `#6D5CE7` | `#A78BFA` |
 | `AccentDanger` | `#D83D5B` | `#FF718B` |
 | `AccentSuccess` | `#087F61` | `#53E6B1` |
