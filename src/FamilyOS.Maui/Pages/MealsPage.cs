@@ -354,12 +354,22 @@ public sealed class MealsPage : ContentPage
     {
         try
         {
+            var preview = await _api.GetShoppingPreviewAsync(_weekStart, day);
+            if (preview.Items.Count == 0)
+            {
+                await DisplayAlertAsync("Daily shopping list", "There are no ingredients planned for this day.", "OK");
+                return;
+            }
+            var message = string.Join(Environment.NewLine, preview.Items.Take(18));
+            if (preview.Items.Count > 18) message += $"{Environment.NewLine}…and {preview.Items.Count - 18} more item(s)";
+            if (!await DisplayAlertAsync($"Review {day:dddd} shopping list", message, "Add to shopping", "Cancel"))
+                return;
             var result = await _api.AddDayToShoppingAsync(day);
-            await DisplayAlertAsync("Daily shopping list", $"Added {result.Added} new ingredient item(s) for {day:dddd}.", "OK");
+            await DisplayAlertAsync("Shopping list updated", $"Added {result.Added} new ingredient item(s).", "OK");
         }
         catch (Exception ex)
         {
-            await DisplayAlertAsync("Shopping list not updated", ex is FamilyApiException ? ex.Message : "Could not add this day's ingredients.", "OK");
+            await DisplayAlertAsync("Shopping list not updated", ex is FamilyApiException ? ex.Message : "Could not create this day's list.", "OK");
         }
     }
 
@@ -367,12 +377,22 @@ public sealed class MealsPage : ContentPage
     {
         try
         {
+            var preview = await _api.GetShoppingPreviewAsync(_weekStart);
+            if (preview.Items.Count == 0)
+            {
+                await DisplayAlertAsync("Weekly shopping list", "There are no ingredients planned for this week.", "OK");
+                return;
+            }
+            var message = string.Join(Environment.NewLine, preview.Items.Take(18));
+            if (preview.Items.Count > 18) message += $"{Environment.NewLine}…and {preview.Items.Count - 18} more item(s)";
+            if (!await DisplayAlertAsync("Review weekly shopping list", message, "Add to shopping", "Cancel"))
+                return;
             var result = await _api.AddWeekToShoppingAsync(_weekStart);
-            await DisplayAlertAsync("Shopping list", $"Added {result.Added} new ingredient item(s).", "OK");
+            await DisplayAlertAsync("Shopping list updated", $"Added {result.Added} new ingredient item(s).", "OK");
         }
         catch (Exception ex)
         {
-            await DisplayAlertAsync("Shopping list not updated", ex is FamilyApiException ? ex.Message : "Could not add meal ingredients.", "OK");
+            await DisplayAlertAsync("Shopping list not updated", ex is FamilyApiException ? ex.Message : "Could not create this week's list.", "OK");
         }
     }
 
