@@ -31,6 +31,13 @@ public class MealsController : ControllerBase
         return NoContent();
     }
 
+    [HttpPost("day/to-shopping")]
+    public async Task<ActionResult<object>> DayToShopping([FromQuery] DateTime day, CancellationToken ct)
+    {
+        var added = await _mediator.Send(new PushMealIngredientsToQueueCommand(day, day), ct);
+        return Ok(new { added, dayUtc = day.Date });
+    }
+
     [HttpPost("week/to-shopping")]
     public async Task<ActionResult<object>> ToShopping([FromQuery] DateTime? weekStart, CancellationToken ct)
     {
