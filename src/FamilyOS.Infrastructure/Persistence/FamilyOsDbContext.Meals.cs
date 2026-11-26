@@ -127,7 +127,7 @@ public partial class FamilyOsDbContext
         {
             e.HasKey(x => x.Id);
             e.HasIndex(x => new { x.FamilyId, x.RecipeId, x.MemberId }).IsUnique().HasFilter("\"IsDeleted\" = false");
-            e.HasIndex(x => new { x.FamilyId, x.MemberId });
+            e.HasIndex(x => new { x.FamilyId, x.MemberId }).HasFilter("\"IsDeleted\" = false");
             e.Property(x => x.Preference).HasConversion<string>().HasMaxLength(20);
             e.HasQueryFilter(x => !x.IsDeleted);
         });
