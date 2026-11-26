@@ -203,23 +203,8 @@ public sealed class MealsPage : ContentPage
 
     private async Task CreateRecipeAsync()
     {
-        var name = await DisplayPromptAsync("New recipe", "Recipe name", maxLength: 160);
-        if (string.IsNullOrWhiteSpace(name)) return;
-        var servingsText = await DisplayPromptAsync("Servings", "How many servings?", initialValue: "4", maxLength: 3, keyboard: Keyboard.Numeric);
-        var servings = int.TryParse(servingsText, out var parsed) && parsed > 0 ? parsed : 4;
-        var ingredients = await DisplayPromptAsync("Ingredients", "Comma-separated ingredients", maxLength: 2000);
-        var instructions = await DisplayPromptAsync("Instructions", "Optional preparation instructions", maxLength: 2000);
-        try
-        {
-            await _api.CreateRecipeAsync(new RecipeWriteDto(name.Trim(), servings,
-                string.IsNullOrWhiteSpace(ingredients) ? null : ingredients.Trim(),
-                string.IsNullOrWhiteSpace(instructions) ? null : instructions.Trim()));
-            await LoadAsync();
-        }
-        catch (Exception ex)
-        {
-            await DisplayAlertAsync("Recipe not saved", ex is FamilyApiException ? ex.Message : "Could not save this recipe.", "OK");
-        }
+        await Navigation.PushModalAsync(new NavigationPage(new RecipeEditorPage(_api)));
+        await LoadAsync();
     }
 
     private void AddRecipeCard(RecipeDto recipe)
