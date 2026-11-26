@@ -162,47 +162,59 @@ public sealed class GoogleCalendarClient : IGoogleCalendarClient
         string? syncToken = null,
         CancellationToken ct = default)
     {
-        var url = new StringBuilder(
-            $"https://www.googleapis.com/calendar/v3/calendars/{Uri.EscapeDataString(calendarId)}/events?singleEvents=true&showDeleted=true&maxResults=250");
-        if (!string.IsNullOrWhiteSpace(syncToken))
-        {
-            url.Append("&syncToken=").Append(Uri.EscapeDataString(syncToken));
-        }
-        else
-        {
-            if (timeMinUtc.HasValue)
-                url.Append("&timeMin=").Append(Uri.EscapeDataString(timeMinUtc.Value.ToUniversalTime().ToString("o")));
-            if (timeMaxUtc.HasValue)
-                url.Append("&timeMax=").Append(Uri.EscapeDataString(timeMaxUtc.Value.ToUniversalTime().ToString("o")));
-        }
-
-        using var req = new HttpRequestMessage(HttpMethod.Get, url.ToString());
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        using var res = await _http.SendAsync(req, ct);
-        var body = await res.Content.ReadAsStringAsync(ct);
-
-        if ((int)res.StatusCode == 410)
-            throw new InvalidOperationException("Google sync token expired.");
-
-        if (!res.IsSuccessStatusCode)
-        {
-            _logger.LogWarning("Google list events failed: {Status} {Body}", (int)res.StatusCode, body);
-            throw new InvalidOperationException("Google list events failed.");
-        }
-
-        using var doc = JsonDocument.Parse(body);
         var events = new List<GoogleEventResult>();
-        if (doc.RootElement.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
+        string? pageToken = null;
+        string? nextSyncToken = null;
+
+        do
         {
-            foreach (var item in items.EnumerateArray())
-                events.Add(ParseEventElement(item));
+            var url = new StringBuilder(
+                $"https://www.googleapis.com/calendar/v3/calendars/{Uri.EscapeDataString(calendarId)}/events?singleEvents=true&showDeleted=true&maxResults=250");
+            if (!string.IsNullOrWhiteSpace(syncToken))
+            {
+                url.Append("&syncToken=").Append(Uri.EscapeDataString(syncToken));
+            }
+            else
+            {
+                if (timeMinUtc.HasValue)
+                    url.Append("&timeMin=").Append(Uri.EscapeDataString(timeMinUtc.Value.ToUniversalTime().ToString("o")));
+                if (timeMaxUtc.HasValue)
+                    url.Append("&timeMax=").Append(Uri.EscapeDataString(timeMaxUtc.Value.ToUniversalTime().ToString("o")));
+            }
+            if (!string.IsNullOrWhiteSpace(pageToken))
+                url.Append("&pageToken=").Append(Uri.EscapeDataString(pageToken));
+
+            using var req = new HttpRequestMessage(HttpMethod.Get, url.ToString());
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+            using var res = await _http.SendAsync(req, ct);
+            var body = await res.Content.ReadAsStringAsync(ct);
+
+            if ((int)res.StatusCode == 410)
+                throw new InvalidOperationException("Google sync token expired.");
+
+            if (!res.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Google list events failed: {Status} {Body}", (int)res.StatusCode, body);
+                throw new InvalidOperationException("Google list events failed.");
+            }
+
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("items", out var items) && items.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in items.EnumerateArray())
+                    events.Add(ParseEventElement(item));
+            }
+
+            pageToken = doc.RootElement.TryGetProperty("nextPageToken", out var nextPage)
+                ? nextPage.GetString()
+                : null;
+            nextSyncToken = doc.RootElement.TryGetProperty("nextSyncToken", out var nextSync)
+                ? nextSync.GetString()
+                : nextSyncToken;
         }
+        while (!string.IsNullOrWhiteSpace(pageToken));
 
-        string? nextSync = null;
-        if (doc.RootElement.TryGetProperty("nextSyncToken", out var st))
-            nextSync = st.GetString();
-
-        return new GoogleEventListResult(events, nextSync);
+        return new GoogleEventListResult(events, nextSyncToken);
     }
 
     private static object ToGoogleEventBody(GoogleEventInput input)
