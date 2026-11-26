@@ -18,11 +18,10 @@ public sealed class HomePage : ContentPage
         ColumnDefinitions =
         {
             new ColumnDefinition(GridLength.Star),
-            new ColumnDefinition(GridLength.Star),
             new ColumnDefinition(GridLength.Star)
         },
-        ColumnSpacing = 10,
-        RowSpacing = 10
+        ColumnSpacing = 12,
+        RowSpacing = 12
     };
     private readonly Button _editToggle = new() { Text = "Edit" };
     private List<HomeModule> _modules = [];
@@ -130,10 +129,10 @@ public sealed class HomePage : ContentPage
 
         var avatar = new Border
         {
-            WidthRequest = 52,
-            HeightRequest = 52,
+            WidthRequest = 56,
+            HeightRequest = 56,
             StrokeThickness = _selectedMemberId == member.Id ? 3 : 0,
-            BackgroundColor = Color.FromArgb("#E0F2FE"),
+            
             StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 26 },
             Content = new Label
             {
@@ -142,10 +141,13 @@ public sealed class HomePage : ContentPage
                 FontSize = 16,
                 HorizontalTextAlignment = TextAlignment.Center,
                 VerticalTextAlignment = TextAlignment.Center,
-                TextColor = Color.FromArgb("#0F172A")
+                
             }
         };
         avatar.SetDynamicResource(Border.StrokeProperty, "AccentPrimary");
+        if (avatar.Content is Label avatarLabel)
+            avatarLabel.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
+        avatar.SetDynamicResource(VisualElement.BackgroundColorProperty, "BgGlow");
 
         var name = new Label
         {
@@ -240,7 +242,7 @@ public sealed class HomePage : ContentPage
     {
         _moduleGrid.Children.Clear();
         _moduleGrid.RowDefinitions.Clear();
-        const int cols = 3;
+        const int cols = 2;
         var rows = (_modules.Count + cols - 1) / cols;
         for (var r = 0; r < rows; r++)
             _moduleGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
@@ -257,19 +259,23 @@ public sealed class HomePage : ContentPage
             FontSize = 26,
             HorizontalTextAlignment = TextAlignment.Center,
             VerticalTextAlignment = TextAlignment.Center,
-            TextColor = Color.FromArgb("#0F172A")
+            
         };
 
         var iconWell = new Border
         {
             WidthRequest = 56,
             HeightRequest = 56,
-            BackgroundColor = Color.FromArgb(module.TintHex),
+            
             StrokeThickness = 0,
             HorizontalOptions = LayoutOptions.Center,
-            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 16 },
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 18 },
             Content = glyph
         };
+        iconWell.SetDynamicResource(VisualElement.BackgroundColorProperty, "BgGlow");
+        iconWell.SetDynamicResource(Border.StrokeProperty, "BorderSubtle");
+        iconWell.StrokeThickness = 1;
+        glyph.SetDynamicResource(Label.TextColorProperty, "AccentPrimary");
 
         var title = new Label
         {
@@ -284,7 +290,7 @@ public sealed class HomePage : ContentPage
         var body = new VerticalStackLayout
         {
             Spacing = 8,
-            Padding = new Thickness(8, 12),
+            Padding = new Thickness(10, 14),
             Children = { iconWell, title }
         };
 
@@ -304,7 +310,7 @@ public sealed class HomePage : ContentPage
             });
         }
 
-        var border = new Border { Padding = 0, Content = body };
+        var border = new Border { Padding = 0, MinimumHeightRequest = 124, Content = body };
         border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
 
         if (!_editMode)

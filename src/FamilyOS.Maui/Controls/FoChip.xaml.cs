@@ -76,18 +76,9 @@ public partial class FoChip : ContentView
         var surface = GetColor(resources, "BgSurface");
         var muted = GetColor(resources, "TextMuted");
 
-        if (IsSelected)
-        {
-            Root.BackgroundColor = accent;
-            Root.Stroke = accent;
-            Label.TextColor = GetColor(resources, "TextOnAccent");
-        }
-        else
-        {
-            Root.BackgroundColor = surface;
-            Root.Stroke = accent;
-            Label.TextColor = Tone == FoChipTone.Neutral ? muted : accent;
-        }
+        Root.BackgroundColor = IsSelected ? accent.WithAlpha(0.16f) : surface;
+        Root.Stroke = IsSelected ? accent : accent.WithAlpha(0.55f);
+        Label.TextColor = Tone == FoChipTone.Neutral ? muted : accent;
 
         SemanticProperties.SetHint(Root, IsSelected ? "Selected" : "Not selected");
     }

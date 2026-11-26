@@ -30,7 +30,22 @@ public partial class FoBadge : ContentView
             FoBadgeTone.Info => "AccentPrimary",
             _ => "BgSurfaceAlt"
         };
-        BadgeBorder.BackgroundColor = (Color)Application.Current!.Resources[key];
+        var resources = Application.Current!.Resources;
+        BadgeBorder.StrokeThickness = 0;
+        BadgeBorder.Stroke = Colors.Transparent;
+        if (Tone == FoBadgeTone.Neutral)
+        {
+            BadgeBorder.BackgroundColor = (Color)resources["BgSurfaceAlt"];
+            BadgeLabel.TextColor = (Color)resources["TextMuted"];
+        }
+        else
+        {
+            var accent = (Color)resources[key];
+            BadgeBorder.BackgroundColor = accent.WithAlpha(0.14f);
+            BadgeBorder.Stroke = accent.WithAlpha(0.45f);
+            BadgeBorder.StrokeThickness = 1;
+            BadgeLabel.TextColor = accent;
+        }
         SemanticProperties.SetDescription(this, $"{Tone}: {Text}");
     }
 }

@@ -78,7 +78,7 @@ public sealed class OnboardingPage : ContentPage
             financeRow,
             _planSummary,
             new Label { Text = "30-day free trial applies to Core only. Optional modules are billed when selected. Trial eligibility and final terms will be confirmed by the store in the production billing flow.", FontSize = 12 },
-            new Label { Text = "TEST MODE · No payment is collected. This local simulator does not create a real subscription or server entitlement.", FontSize = 12, TextColor = Color.FromArgb("#B54708") },
+            new Label { Text = "TEST MODE · No payment is collected. This local simulator does not create a real subscription or server entitlement.", FontSize = 12, TextColor = (Color)Application.Current!.Resources["AccentWarning"] },
             _activateTestPlan
         });
         _createCard = Card("Create a household", new View[] { _familyName, _displayName, _email, _create });
