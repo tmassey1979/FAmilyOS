@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace FamilyOS.Application.Meals;
 
 public record RecipeDto(
-    Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions, bool IsBuiltIn = false);
+    Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions, bool IsBuiltIn = false, List<string>? Tags = null);
 
 public record ListRecipesQuery() : IRequest<List<RecipeDto>>;
 public record GetRecipeQuery(Guid Id) : IRequest<RecipeDto>;
@@ -51,7 +51,7 @@ public class RecipeCommandHandlers :
             .Where(r => r.FamilyId == _current.FamilyId || r.FamilyId == Guid.Empty)
             .OrderBy(r => r.Name)
             .ToListAsync(ct);
-        return list.Select(ToDto).ToList();
+        return await AddTagsAsync(list, ct);
     }
 
     public async Task<RecipeDto> Handle(GetRecipeQuery query, CancellationToken ct)
@@ -60,10 +60,7 @@ public class RecipeCommandHandlers :
         var r = await _db.Recipes.AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == query.Id && (x.FamilyId == _current.FamilyId || x.FamilyId == Guid.Empty), ct)
             ?? throw new NotFoundException("Recipe", query.Id);
-        return ToDto(r);
-    }
-
-    public async Task<RecipeDto> Handle(CreateRecipeCommand cmd, CancellationToken ct)
+        var tagged = await AddTagsAsync(new List<Recipe> { r }, ct);\n        return tagged[0];\n    }\n\n    public async Task<RecipeDto> Handle(CreateRecipeCommand cmd, CancellationToken ct)
     {
         await EnsureFamilyAsync(ct);
         var recipe = Recipe.Create(
@@ -168,6 +165,23 @@ public class RecipeCommandHandlers :
             ?? throw new NotFoundException("Recipe", query.Id);
         var ingredients = recipe.ScaleIngredientsForServings(query.TargetServings);
         return new ScaledRecipeDto(recipe.Id, recipe.Name, recipe.Servings, query.TargetServings, ingredients);
+    }
+
+
+    private async Task<List<RecipeDto>> AddTagsAsync(List<Recipe> recipes, CancellationToken ct)
+    {
+        if (recipes.Count == 0) return new List<RecipeDto>();
+        var ids = recipes.Select(x => x.Id).ToArray();
+        var tagRows = await (from link in _db.RecipeTagLinks.AsNoTracking()
+                             join tag in _db.RecipeTags.AsNoTracking() on link.TagId equals tag.Id
+                             where ids.Contains(link.RecipeId)
+                             select new { link.RecipeId, tag.Name }).ToListAsync(ct);
+        var tagsByRecipe = tagRows.GroupBy(x => x.RecipeId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Name).OrderBy(x => x).ToList());
+        return recipes.Select(r => ToDto(r) with
+        {
+            Tags = tagsByRecipe.TryGetValue(r.Id, out var tags) ? tags : new List<string>()
+        }).ToList();
     }
 
     private async Task EnsureFamilyAsync(CancellationToken ct)
