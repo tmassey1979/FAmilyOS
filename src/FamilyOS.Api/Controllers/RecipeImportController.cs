@@ -210,6 +210,8 @@ public sealed class RecipeImportController : ControllerBase
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Distinct(StringComparer.OrdinalIgnoreCase).Take(20).ToList();
         var image = ReadImage(recipe);
+        if (Uri.TryCreate(image, UriKind.RelativeOrAbsolute, out var imageUri))
+            image = imageUri.IsAbsoluteUri ? imageUri.ToString() : new Uri(source, imageUri).ToString();
         var servings = ReadServings(recipe);
         var prep = ReadDuration(recipe, "prepTime");
         var cook = ReadDuration(recipe, "cookTime");
