@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MAUI_RES = ROOT / "src" / "FamilyOS.Maui" / "Resources"
 DATA_DIR = ROOT / "scripts" / "maui-graphics"
-NAVY = (15, 23, 42, 255)
+NAVY = (69, 243, 255, 255)  # High-contrast cyan for dark Shell tab bar
 SIZE = 128
 
 
@@ -44,7 +44,7 @@ def blank():
 
 
 def generate_menu_icons() -> int:
-    """Always write high-contrast navy menu icons so tab/module chrome is visible."""
+    """Always write high-contrast cyan menu icons so Shell tab chrome is visible on the dark navigation surface."""
     ensure_pillow()
     from PIL import Image, ImageDraw
 
