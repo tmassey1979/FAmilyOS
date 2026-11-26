@@ -190,6 +190,7 @@ public sealed class SettingsPage : ContentPage
             _googleDisconnect.IsVisible = google?.Configured == true && google.Connected;
             _account.Text = $"Role: {me.Role ?? "Member"}\nMember ID: {me.MemberId?.ToString("D") ?? "Unavailable"}";
             _household.Text = $"{family.Name}\n{family.Members.Count(x => x.IsActive)} active members";
+            _resetFamily.IsVisible = string.Equals(me.Role, "Owner", StringComparison.OrdinalIgnoreCase);
             _enabled.IsToggled = quiet.Enabled;
             _start.Text = quiet.StartLabel ?? FormatTime(quiet.StartMinutes);
             _end.Text = quiet.EndLabel ?? FormatTime(quiet.EndMinutes);
@@ -244,6 +245,45 @@ public sealed class SettingsPage : ContentPage
         }
         catch (Exception ex) { _status.Text = ex is FamilyApiException ? ex.Message : "Could not disconnect Google Calendar."; }
         finally { _busy = false; _googleDisconnect.IsEnabled = true; }
+    }
+
+    private async Task ResetFamilyAsync()
+    {
+        if (_busy) return;
+        var typed = await DisplayPromptAsync(
+            "Reset family data",
+            "This permanently deletes household locations, history, tasks, messages, calendar data, invitations and other family records. All sign-in accounts are preserved.\n\nType RESET FAMILY exactly to continue.",
+            "Continue", "Cancel", "RESET FAMILY");
+        if (!string.Equals(typed, "RESET FAMILY", StringComparison.Ordinal)) return;
+
+        var confirmed = await DisplayAlertAsync(
+            "Permanently erase household?",
+            "There is no undo. Your account will return to household setup after the reset.",
+            "Erase family data", "Keep my family");
+        if (!confirmed) return;
+
+        _busy = true;
+        _resetFamily.IsEnabled = false;
+        _status.Text = "Resetting family data…";
+        try
+        {
+            await _family.ResetFamilyAsync("RESET FAMILY");
+            await DisplayAlertAsync("Family data reset", "Your sign-in is preserved. You can now create a new household or join one.", "Continue");
+            await Shell.Current.GoToAsync(nameof(OnboardingPage));
+        }
+        catch (FamilyApiException ex)
+        {
+            _status.Text = ex.Message;
+        }
+        catch (Exception)
+        {
+            _status.Text = "Family data could not be reset. Check your connection and try again.";
+        }
+        finally
+        {
+            _busy = false;
+            _resetFamily.IsEnabled = true;
+        }
     }
 
     private async Task SaveAsync()
