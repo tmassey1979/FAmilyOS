@@ -113,10 +113,10 @@ public class RecipeCommandHandlers :
         }
 
         var entry = plan.UpsertEntry(
-            cmd.DayUtc, slot, recipe.Name, notes: $"{recipe.Servings} servings", recipe.IngredientsCsv);
+            cmd.DayUtc, slot, recipe.Name, notes: $"{recipe.Servings} servings", recipe.IngredientsCsv, recipe.Id);
         await _db.SaveChangesAsync(ct);
         return new MealEntryDto(
-            entry.Id, entry.DayUtc, entry.Slot.ToString(), entry.DishName, entry.Notes, entry.IngredientsCsv);
+            entry.Id, entry.DayUtc, entry.Slot.ToString(), entry.DishName, entry.Notes, entry.IngredientsCsv, entry.RecipeId);
     }
 
     public async Task<int> Handle(PushRecipeIngredientsToQueueCommand cmd, CancellationToken ct)
