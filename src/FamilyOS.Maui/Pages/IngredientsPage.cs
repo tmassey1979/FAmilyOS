@@ -10,6 +10,9 @@ public sealed class IngredientsPage : ContentPage
     private readonly VerticalStackLayout _items = new() { Spacing = 8 };
     private readonly Label _status = new() { FontSize = 12 };
     private readonly Picker _category = new() { Title = "All categories" };
+    private readonly Button _loadMore = new() { Text = "Load more ingredients", HorizontalOptions = LayoutOptions.Fill };
+    private const int PageSize = 50;
+    private int _skip;
     private CancellationTokenSource? _searchCts;
 
     public IngredientsPage(MealsApiClient api)
@@ -28,6 +31,9 @@ public sealed class IngredientsPage : ContentPage
         add.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
         add.Clicked += async (_, _) => await AddAsync();
         _status.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
+        _loadMore.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+        _loadMore.IsVisible = false;
+        _loadMore.Clicked += async (_, _) => await SearchAsync(_search.Text, false, false);
         Content = new RefreshView
         {
             Command = new Command(async () => await SearchAsync(_search.Text, false)),
@@ -36,7 +42,7 @@ public sealed class IngredientsPage : ContentPage
                 Content = new VerticalStackLayout
                 {
                     Padding = new Thickness(18, 14, 18, 28), Spacing = 12,
-                    Children = { title, subtitle, _search, _category, add, _status, _items }
+                    Children = { title, subtitle, _search, _category, add, _status, _items, _loadMore }
                 }
             }
         };
@@ -44,18 +50,20 @@ public sealed class IngredientsPage : ContentPage
 
     protected override async void OnAppearing() { base.OnAppearing(); if (_items.Children.Count == 0) await SearchAsync(null, false); }
 
-    private async Task SearchAsync(string? term, bool debounce = true)
+    private async Task SearchAsync(string? term, bool debounce = true, bool reset = true)
     {
         _searchCts?.Cancel(); _searchCts?.Dispose(); _searchCts = new CancellationTokenSource();
         var token = _searchCts.Token;
+        if (reset) _skip = 0;
+        _loadMore.IsEnabled = false;
         _status.Text = "Searching ingredient catalog…";
         try
         {
             if (debounce) await Task.Delay(220, token);
             var category = _category.SelectedIndex <= 0 ? null : _category.SelectedItem?.ToString();
-            var found = await _api.SearchIngredientsAsync(term ?? "", 50, token, category);
+            var found = await _api.SearchIngredientsAsync(term ?? "", PageSize, token, category, _skip);
             if (token.IsCancellationRequested) return;
-            _items.Children.Clear();
+            if (reset) _items.Children.Clear();
             foreach (var ingredient in found)
             {
                 var row = new Grid { ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }, ColumnSpacing = 8 };
@@ -71,11 +79,14 @@ public sealed class IngredientsPage : ContentPage
                     aliases.SetDynamicResource(VisualElement.StyleProperty, "TextCaption"); _items.Children.Add(aliases);
                 }
             }
-            if (found.Count == 0) _items.Children.Add(new Label { Text = "No ingredients found. Add it to your family catalog.", FontSize = 13 });
-            _status.Text = $"{found.Count} ingredient{(found.Count == 1 ? "" : "s")} shown · up to 50 results";
+            if (reset && found.Count == 0) _items.Children.Add(new Label { Text = "No ingredients found. Add it to your family catalog.", FontSize = 13 });
+            _skip += found.Count;
+            _loadMore.IsVisible = found.Count == PageSize;
+            _status.Text = $"{_skip} ingredient{(_skip == 1 ? "" : "s")} shown";
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { _status.Text = ex is FamilyApiException ? ex.Message : "Ingredient catalog unavailable. Try again."; }
+        finally { _loadMore.IsEnabled = true; }
     }
 
     private async Task AddAsync()
