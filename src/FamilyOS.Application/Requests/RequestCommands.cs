@@ -61,9 +61,10 @@ public record OverridePolicyCommand(
 ) : IRequest<RequestDto>;
 
 public record GenerateExecutionPlanCommand(Guid RequestId) : IRequest<ExecutionPlanDto>;
+public record GetExecutionPlanQuery(Guid PlanId) : IRequest<ExecutionPlanDto>;
 public record CommitExecutionPlanCommand(Guid PlanId, List<Guid>? DeselectedItemIds) : IRequest<ExecutionPlanDto>;
-public record ExecutionPlanDto(Guid Id, Guid RequestId, ExecutionPlanStatus Status, List<ExecutionItemDto> Items);
-public record ExecutionItemDto(Guid Id, ExecutionItemType Type, string Title, Guid? AssigneeMemberId, bool IsSelected, Guid? ResultingEntityId);
+public record ExecutionPlanDto(Guid Id, Guid RequestId, string Status, List<ExecutionItemDto> Items);
+public record ExecutionItemDto(Guid Id, string Type, string Title, Guid? AssigneeMemberId, bool IsSelected, Guid? ResultingEntityId);
 
 public class RequestCommandHandlers :
     IRequestHandler<CreateRequestCommand, RequestDto>,
@@ -82,6 +83,7 @@ public class RequestCommandHandlers :
     IRequestHandler<EvaluatePolicyQuery, PolicyEvaluationResult>,
     IRequestHandler<OverridePolicyCommand, RequestDto>,
     IRequestHandler<GenerateExecutionPlanCommand, ExecutionPlanDto>,
+    IRequestHandler<GetExecutionPlanQuery, ExecutionPlanDto>,
     IRequestHandler<CommitExecutionPlanCommand, ExecutionPlanDto>
 {
     private readonly IFamilyOsDbContext _db;
@@ -396,6 +398,12 @@ public class RequestCommandHandlers :
         await _current.EnsureLoadedAsync(ct);
         EnsureAdult();
         var request = await GetRequest(cmd.RequestId, ct);
+        if (request.ExecutionPlanId is Guid existingPlanId)
+        {
+            var existingPlan = await _db.ExecutionPlans.Include(p => p.Items)
+                .FirstOrDefaultAsync(p => p.Id == existingPlanId && p.FamilyId == _current.FamilyId, ct);
+            if (existingPlan is not null) return ToPlanDto(existingPlan);
+        }
         if (request.Status is not (RequestStatus.Approved or RequestStatus.ConditionallyApproved or RequestStatus.Executable))
             throw new BusinessRuleException("Request must be approved before generating a plan.");
 
@@ -407,6 +415,16 @@ public class RequestCommandHandlers :
         _db.ExecutionPlans.Add(plan);
         request.LinkExecutionPlan(plan.Id);
         await _db.SaveChangesAsync(ct);
+        return ToPlanDto(plan);
+    }
+
+    public async Task<ExecutionPlanDto> Handle(GetExecutionPlanQuery query, CancellationToken ct)
+    {
+        await _current.EnsureLoadedAsync(ct);
+        EnsureAdult();
+        var plan = await _db.ExecutionPlans.AsNoTracking().Include(p => p.Items)
+            .FirstOrDefaultAsync(p => p.Id == query.PlanId && p.FamilyId == _current.FamilyId, ct)
+            ?? throw new NotFoundException("ExecutionPlan", query.PlanId);
         return ToPlanDto(plan);
     }
 
@@ -639,6 +657,6 @@ public class RequestCommandHandlers :
     }
 
     private static ExecutionPlanDto ToPlanDto(ExecutionPlan plan) =>
-        new(plan.Id, plan.RequestId, plan.Status,
-            plan.Items.Select(i => new ExecutionItemDto(i.Id, i.Type, i.Title, i.AssigneeMemberId, i.IsSelected, i.ResultingEntityId)).ToList());
+        new(plan.Id, plan.RequestId, plan.Status.ToString(),
+            plan.Items.Select(i => new ExecutionItemDto(i.Id, i.Type.ToString(), i.Title, i.AssigneeMemberId, i.IsSelected, i.ResultingEntityId)).ToList());
 }
