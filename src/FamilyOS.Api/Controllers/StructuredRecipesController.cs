@@ -29,7 +29,8 @@ public sealed class StructuredRecipesController : ControllerBase
         if (!_current.IsAuthenticated || _current.FamilyId is null) return Unauthorized();
         if (string.IsNullOrWhiteSpace(body.Name)) return BadRequest("Recipe name is required.");
         if (body.Servings is < 1 or > 100) return BadRequest("Servings must be between 1 and 100.");
-        if (body.Ingredients.Count > 100 || body.Steps.Count > 50 || body.Tags.Count > 20)
+        if (body.Ingredients.Count > 100 || body.Steps.Count > 50 || body.Tags.Count > 20
+            || body.Tags.Any(x => x?.Length > 60))
             return BadRequest("This recipe has too many ingredients, steps, or tags.");
 
         if (body.Ingredients is null || body.Steps is null || body.Tags is null)
@@ -42,9 +43,9 @@ public sealed class StructuredRecipesController : ControllerBase
                 ?? throw new InvalidOperationException("Recipe not found.");
             recipe.Update(body.Name, body.Servings, null,
                 string.Join(Environment.NewLine, body.Steps.Select(x => x.Text)), body.Description, body.ImageUrl, body.SourceUrl, body.PrepMinutes, body.CookMinutes, body.Cuisine, body.Difficulty);
-            _db.RecipeIngredients.RemoveRange(await _db.RecipeIngredients.Where(x => x.RecipeId == id).ToListAsync(ct));
-            _db.RecipeInstructionSteps.RemoveRange(await _db.RecipeInstructionSteps.Where(x => x.RecipeId == id).ToListAsync(ct));
-            _db.RecipeTagLinks.RemoveRange(await _db.RecipeTagLinks.Where(x => x.RecipeId == id).ToListAsync(ct));
+            _db.RecipeIngredients.RemoveRange(await _db.RecipeIngredients.IgnoreQueryFilters().Where(x => x.RecipeId == id).ToListAsync(ct));
+            _db.RecipeInstructionSteps.RemoveRange(await _db.RecipeInstructionSteps.IgnoreQueryFilters().Where(x => x.RecipeId == id).ToListAsync(ct));
+            _db.RecipeTagLinks.RemoveRange(await _db.RecipeTagLinks.IgnoreQueryFilters().Where(x => x.RecipeId == id).ToListAsync(ct));
         }
         else
         {
