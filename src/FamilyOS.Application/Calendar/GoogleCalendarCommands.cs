@@ -314,7 +314,7 @@ public static class GoogleCalendarOAuthState
     private static byte[] Base64UrlDecode(string value)
     {
         var normalized = value.Replace('-', '+').Replace('_', '/');
-        normalized += normalized.Length % 4 switch { 2 => "==", 3 => "=", _ => "" };
+        normalized += (normalized.Length % 4) switch { 2 => "==", 3 => "=", _ => "" };
         return Convert.FromBase64String(normalized);
     }
 }
