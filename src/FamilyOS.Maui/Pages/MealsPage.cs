@@ -11,8 +11,8 @@ public sealed class MealsPage : ContentPage
     private readonly VerticalStackLayout _nominationItems = new() { Spacing = 9 };
     private readonly VerticalStackLayout _recipeItems = new() { Spacing = 12 };
     private readonly Button _recipeLoadMore = new() { Text = "Load more recipes", HorizontalOptions = LayoutOptions.Fill };
-    private const int RecipeBatchSize = 8;
-    private int _visibleRecipeCount = RecipeBatchSize;
+    private const int RecipeBatchSize = 24;
+    private int _recipeTotalCount;
     private readonly SearchBar _recipeSearch = new() { Placeholder = "Search meals, ingredients, or cuisine…", FontSize = 14 };
     private readonly HorizontalStackLayout _recipeFilters = new() { Spacing = 8 };
     private readonly Picker _recipeSort = new() { Title = "Sort recipes", WidthRequest = 170 };
@@ -67,9 +67,9 @@ public sealed class MealsPage : ContentPage
         var newRecipe = new Button { Text = "＋ Create a recipe" };
         newRecipe.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         newRecipe.Clicked += async (_, _) => await CreateRecipeAsync();
-        _recipeSearch.TextChanged += (_, _) => { _visibleRecipeCount = RecipeBatchSize; RenderRecipes(); };
+        _recipeSearch.TextChanged += (_, _) => RenderRecipes();
         _recipeLoadMore.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
-        _recipeLoadMore.Clicked += (_, _) => { _visibleRecipeCount += RecipeBatchSize; RenderRecipes(); };
+        _recipeLoadMore.Clicked += async (_, _) => await LoadMoreRecipesAsync();
         _recipeSort.Items.Add("Recommended");
         _recipeSort.Items.Add("Quickest");
         _recipeSort.Items.Add("A to Z");
@@ -82,7 +82,6 @@ public sealed class MealsPage : ContentPage
             chip.Clicked += (_, _) =>
             {
                 _activeRecipeFilter = filter;
-                _visibleRecipeCount = RecipeBatchSize;
                 foreach (var child in _recipeFilters.Children.OfType<Button>())
                     child.SetDynamicResource(VisualElement.StyleProperty,
                         child.Text == filter ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle");
@@ -127,7 +126,7 @@ public sealed class MealsPage : ContentPage
         try
         {
             var plan = await _api.GetWeekAsync(_weekStart);
-            var recipes = await _api.GetRecipesAsync();
+            var recipePage = await _api.GetRecipesPageAsync(0, RecipeBatchSize);
             var nominations = await _api.GetNominationsAsync(_weekStart);
             _planItems.Children.Clear();
             _nominationItems.Children.Clear();
@@ -163,10 +162,11 @@ public sealed class MealsPage : ContentPage
                 _planItems.Children.Add(card);
             }
 
-            _allRecipes = recipes;
+            _allRecipes = recipePage.Items;
+            _recipeTotalCount = recipePage.TotalCount;
             RenderRecipes();
 
-            _status.Text = $"{plan.Entries.Count} planned meal{(plan.Entries.Count == 1 ? "" : "s")} · {recipes.Count} recipes to discover";
+            _status.Text = $"{plan.Entries.Count} planned meal{(plan.Entries.Count == 1 ? "" : "s")} · {_recipeTotalCount} recipes in the market";
         }
         catch (OperationCanceledException)
         {
@@ -441,11 +441,32 @@ public sealed class MealsPage : ContentPage
             return;
         }
 
-        var visible = results.Take(_visibleRecipeCount).ToList();
-        foreach (var recipe in visible)
+        foreach (var recipe in results)
             AddRecipeCard(recipe);
-        _recipeLoadMore.IsVisible = results.Count > visible.Count;
-        _recipeLoadMore.Text = $"Load more recipes ({results.Count - visible.Count} remaining)";
+        _recipeLoadMore.IsVisible = _allRecipes.Count < _recipeTotalCount;
+        _recipeLoadMore.Text = $"Load more recipes ({_recipeTotalCount - _allRecipes.Count} remaining)";
+    }
+
+    private async Task LoadMoreRecipesAsync()
+    {
+        if (_allRecipes.Count >= _recipeTotalCount || _loading) return;
+        _recipeLoadMore.IsEnabled = false;
+        _recipeLoadMore.Text = "Loading more recipes…";
+        try
+        {
+            var page = await _api.GetRecipesPageAsync(_allRecipes.Count, RecipeBatchSize);
+            _allRecipes.AddRange(page.Items);
+            _recipeTotalCount = page.TotalCount;
+            RenderRecipes();
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlertAsync("Recipes unavailable", ex is FamilyApiException ? ex.Message : "Could not load more recipes. Please try again.", "OK");
+        }
+        finally
+        {
+            _recipeLoadMore.IsEnabled = true;
+        }
     }
 
     private async Task ApplyRecipeAsync(RecipeDto recipe)
