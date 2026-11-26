@@ -22,7 +22,8 @@ public record UpsertMealEntryCommand(
     string DishName,
     string? Notes = null,
     string? IngredientsCsv = null,
-    DateTime? WeekStartUtc = null
+    DateTime? WeekStartUtc = null,
+    Guid? RecipeId = null
 ) : IRequest<MealEntryDto>;
 
 public record RemoveMealEntryCommand(Guid EntryId) : IRequest;
