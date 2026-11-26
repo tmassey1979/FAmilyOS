@@ -32,6 +32,9 @@ public sealed class FamilyApiClient
     public Task RevokeInviteAsync(Guid inviteId, CancellationToken ct = default)
         => SendNoContentAsync(HttpMethod.Delete, $"api/invites/{inviteId:D}", null, ct);
 
+    public Task ResetFamilyAsync(string confirmation, CancellationToken ct = default)
+        => SendNoContentAsync(HttpMethod.Post, "api/family/reset", JsonContent.Create(new { confirmation }, options: JsonOptions), ct);
+
     public Task UpdateHouseholdAsync(string? name, string? timeZone, string? currency, CancellationToken ct = default)
         => SendNoContentAsync(HttpMethod.Put, "api/family", JsonContent.Create(new { name, timeZone, currency }, options: JsonOptions), ct);
 
