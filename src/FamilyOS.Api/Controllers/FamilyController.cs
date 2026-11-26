@@ -99,6 +99,7 @@ public class FamilyController : ControllerBase
         var mealPlanCount = await _db.MealPlans.IgnoreQueryFilters().CountAsync(x => x.FamilyId == familyId, ct);
         var deletedMealPlans = await _db.MealPlans.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
         _logger.LogWarning("Family reset {ResetOperationId}: physically deleted {DeletedMealPlanCount}/{MealPlanCount} MealPlan rows", resetOperationId, deletedMealPlans, mealPlanCount);
+        await _db.RecipeMemberPreferences.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
         await _db.Recipes.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
         await _db.Tasks.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
         await _db.Requests.IgnoreQueryFilters().Where(x => x.FamilyId == familyId).ExecuteDeleteAsync(ct);
