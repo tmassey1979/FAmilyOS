@@ -63,10 +63,10 @@ public sealed class RequestsApiClient
     public Task<List<RequestConditionDto>> GetConditionsAsync(Guid id, CancellationToken ct = default)
         => SendAsync<List<RequestConditionDto>>(HttpMethod.Get, $"api/conditions/by-request/{id:D}", null, ct);
 
-    public Task<RequestConditionDto> CreateConditionAsync(Guid requestId, string name, string description, CancellationToken ct = default)
+    public Task<RequestConditionDto> CreateConditionAsync(Guid requestId, string name, string description, string logicGroup = "All", CancellationToken ct = default)
     {
         var body = JsonSerializer.Serialize(new { name, type = "Manual", requestId, taskId = (Guid?)null,
-            description, deadlineUtc = (DateTime?)null, logicGroup = "All", groupOrder = 0 }, JsonOptions);
+            description, deadlineUtc = (DateTime?)null, logicGroup, groupOrder = 0 }, JsonOptions);
         return SendAsync<RequestConditionDto>(HttpMethod.Post, "api/conditions",
             new StringContent(body, Encoding.UTF8, "application/json"), ct);
     }
