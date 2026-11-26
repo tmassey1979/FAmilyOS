@@ -24,7 +24,7 @@ public sealed class RecipeImportController : ControllerBase
     {
         if (!Uri.TryCreate(body.Url, UriKind.Absolute, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp)
-            || string.IsNullOrWhiteSpace(uri.Host))
+            || string.IsNullOrWhiteSpace(uri.Host) || !string.IsNullOrEmpty(uri.UserInfo) || (uri.Port != 80 && uri.Port != 443))
             return BadRequest("Enter a valid public http or https recipe URL.");
 
         try
@@ -67,6 +67,7 @@ public sealed class RecipeImportController : ControllerBase
         using var handler = new SocketsHttpHandler
         {
             AllowAutoRedirect = false,
+            UseProxy = false,
             AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli
         };
         handler.ConnectCallback = async (context, token) =>
@@ -107,7 +108,8 @@ public sealed class RecipeImportController : ControllerBase
                 current = response.Headers.Location.IsAbsoluteUri
                     ? response.Headers.Location
                     : new Uri(current, response.Headers.Location);
-                if (current.Scheme != Uri.UriSchemeHttps && current.Scheme != Uri.UriSchemeHttp)
+                if ((current.Scheme != Uri.UriSchemeHttps && current.Scheme != Uri.UriSchemeHttp)
+                    || !string.IsNullOrEmpty(current.UserInfo) || (current.Port != 80 && current.Port != 443))
                     throw new InvalidOperationException("The recipe page redirected to an unsupported address.");
                 continue;
             }
