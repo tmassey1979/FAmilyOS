@@ -104,8 +104,6 @@ public sealed class MealsPage : ContentPage
                 heading, range, _today, _shopping, _status, _planItems,
                 new BoxView { HeightRequest = 1, Opacity = 0.25 },
                 nominationHeading, new Label { Text = "Everyone can suggest and vote. Parents make the final plan.", FontSize = 12 }, nominateMeal, _nominationItems,
-                new BoxView { HeightRequest = 1, Opacity = 0.25 },
-                recipeHeading, recipeSubheading, _recipeSearch, new ScrollView { Orientation = ScrollOrientation.Horizontal, Content = _recipeFilters, HeightRequest = 48 }, _recipeSort, newRecipe, _recipeItems, _recipeLoadMore
             }
         };
         Content = new RefreshView
@@ -131,13 +129,9 @@ public sealed class MealsPage : ContentPage
         try
         {
             var plan = await _api.GetWeekAsync(_weekStart);
-            var recipePage = await _api.GetRecipesPageAsync(0, RecipeBatchSize, CancellationToken.None,
-                _activeRecipeSearchTerm, _activeRecipeTag, _activeRecipeFavoritesOnly);
-            var recipePreferences = await _api.GetRecipePreferencesAsync(recipePage.Items.Select(x => x.Id));
             var nominations = await _api.GetNominationsAsync(_weekStart);
             _planItems.Children.Clear();
             _nominationItems.Children.Clear();
-            _recipeItems.Children.Clear();
             RenderNominations(nominations);
             foreach (var dayOffset in Enumerable.Range(0, 7))
             {
@@ -195,12 +189,7 @@ public sealed class MealsPage : ContentPage
                 _planItems.Children.Add(card);
             }
 
-            _allRecipes = recipePage.Items;
-            _recipePreferences = recipePreferences;
-            _recipeTotalCount = recipePage.TotalCount;
-            RenderRecipes();
-
-            _status.Text = $"{plan.Entries.Count} planned dish{(plan.Entries.Count == 1 ? "" : "es")} · {_recipeTotalCount} recipes in the market";
+            _status.Text = $"{plan.Entries.Count} planned dish{(plan.Entries.Count == 1 ? "" : "es")} this week";
         }
         catch (OperationCanceledException)
         {
