@@ -593,13 +593,13 @@ public sealed class TasksPage : ContentPage
             }
 
             var lines = history
-                .OrderByDescending(h => h.OccurredAtUtc)
+                .OrderByDescending(h => h.TimestampUtc)
                 .Take(20)
                 .Select(h =>
                 {
                     var who = string.IsNullOrWhiteSpace(h.ActorName) ? "" : $" · {h.ActorName}";
                     var detail = string.IsNullOrWhiteSpace(h.Detail) ? "" : $" — {h.Detail}";
-                    return $"{h.OccurredAtUtc.ToLocalTime():g} · {h.Action}{who}{detail}";
+                    return $"{h.TimestampUtc.ToLocalTime():g} · {h.Status}{who}{detail}";
                 });
             await DisplayAlertAsync($"History · {title}", string.Join("\n", lines), "OK");
         }
