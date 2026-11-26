@@ -4,11 +4,11 @@ namespace FamilyOS.Maui.Tests;
 
 /// <summary>
 /// Validates design-token contract without requiring a MAUI device host.
-/// Keeps the Expo → MAUI mapping honest as resources evolve.
+/// Keeps the FamilyOS visual token contract consistent as resources evolve.
 /// </summary>
 public class ThemeTokenTests
 {
-    public static readonly IReadOnlyDictionary<string, string> ExpoDarkColors =
+    public static readonly IReadOnlyDictionary<string, string> FamilyOsDarkColors =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["bg"] = "#080D1B",
@@ -53,7 +53,7 @@ public class ThemeTokenTests
     ];
 
     [Fact]
-    public void Expo_dark_palette_maps_1_to_1_onto_maui_dark_semantics()
+    public void FamilyOS_dark_palette_matches_MAUI_semantic_tokens()
     {
         Assert.Equal(ExpoDarkColors["bg"], MauiDarkSemantic["BgPage"]);
         Assert.Equal(ExpoDarkColors["surface"], MauiDarkSemantic["BgSurface"]);
