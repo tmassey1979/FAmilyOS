@@ -11,7 +11,7 @@ public class MealEntry : Entity
     public string DishName { get; private set; } = string.Empty;
     public string? Notes { get; private set; }
     /// <summary>Comma-separated ingredient hints for shopping list generation.</summary>
-    public string? IngredientsCsv { get; private set; }
+    public string? IngredientsCsv { get; private set; }\n    public Guid? RecipeId { get; private set; }
 
     private MealEntry() { }
 
@@ -22,7 +22,7 @@ public class MealEntry : Entity
         MealSlot slot,
         string dishName,
         string? notes = null,
-        string? ingredientsCsv = null)
+        string? ingredientsCsv = null,\n        Guid? recipeId = null)
     {
         return new MealEntry
         {
@@ -32,11 +32,11 @@ public class MealEntry : Entity
             Slot = slot,
             DishName = dishName.Trim(),
             Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
-            IngredientsCsv = NormalizeIngredients(ingredientsCsv)
+            IngredientsCsv = NormalizeIngredients(ingredientsCsv),\n            RecipeId = recipeId
         };
     }
 
-    public void Update(string dishName, string? notes, string? ingredientsCsv)
+    public void Update(string dishName, string? notes, string? ingredientsCsv, Guid? recipeId = null)
     {
         if (string.IsNullOrWhiteSpace(dishName))
             throw new ArgumentException("Dish name required.");
