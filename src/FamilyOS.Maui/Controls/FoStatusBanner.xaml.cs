@@ -23,9 +23,22 @@ public partial class FoStatusBanner : ContentView
             FoStatusKind.Offline => "BgSurfaceAlt",
             _ => "AccentPrimary"
         };
-        BannerBorder.BackgroundColor = (Color)Application.Current!.Resources[key];
+        var resources = Application.Current!.Resources;
+        var accent = (Color)resources[key];
         if (Kind == FoStatusKind.Offline)
-            MessageLabel.TextColor = (Color)Application.Current.Resources["TextPrimary"];
+        {
+            BannerBorder.BackgroundColor = (Color)resources["BgSurfaceAlt"];
+            BannerBorder.Stroke = (Color)resources["BorderSubtle"];
+            MessageLabel.TextColor = (Color)resources["TextPrimary"];
+        }
+        else
+        {
+            // Soft tint keeps semantic text readable in both themes.
+            BannerBorder.BackgroundColor = accent.WithAlpha(0.14f);
+            BannerBorder.Stroke = accent.WithAlpha(0.45f);
+            BannerBorder.StrokeThickness = 1;
+            MessageLabel.TextColor = accent;
+        }
         SemanticProperties.SetDescription(this, $"{Kind}: {Message}");
     }
 }
