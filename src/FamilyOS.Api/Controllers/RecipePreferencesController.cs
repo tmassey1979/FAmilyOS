@@ -37,12 +37,18 @@ public sealed class RecipePreferencesController : ControllerBase
                           where preference.FamilyId == familyId && ids.Contains(preference.RecipeId)
                               && member.FamilyId == familyId && member.IsActive
                           orderby member.DisplayName
-                          select new RecipeMemberPreferenceDto(
-                              preference.RecipeId, preference.MemberId, member.DisplayName,
-                              preference.Preference == null ? null : preference.Preference.ToString(),
-                              preference.IsFavorite, preference.MemberId == memberId))
+                          select new
+                          {
+                              preference.RecipeId,
+                              preference.MemberId,
+                              member.DisplayName,
+                              preference.Preference,
+                              preference.IsFavorite
+                          })
             .ToListAsync(ct);
-        return Ok(rows);
+        return Ok(rows.Select(row => new RecipeMemberPreferenceDto(
+            row.RecipeId, row.MemberId, row.DisplayName,
+            row.Preference?.ToString(), row.IsFavorite, row.MemberId == memberId)).ToList());
     }
 
     [HttpPut("{recipeId:guid}/preference")]
@@ -51,7 +57,8 @@ public sealed class RecipePreferencesController : ControllerBase
     {
         var (familyId, memberId, _) = await _current.RequireFamilyAsync(ct);
         if (body.Preference is not null
-            && !Enum.TryParse<RecipePreferenceKind>(body.Preference, true, out _))
+            && (!Enum.TryParse<RecipePreferenceKind>(body.Preference, true, out var parsedPreference)
+                || !Enum.IsDefined(typeof(RecipePreferenceKind), parsedPreference)))
             return BadRequest("Preference must be Like, Dislike, or null.");
 
         var recipeExists = await _db.Recipes.AnyAsync(
