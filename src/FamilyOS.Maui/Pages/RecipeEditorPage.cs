@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using FamilyOS.Maui.Services;
 
 namespace FamilyOS.Maui.Pages;
@@ -9,6 +10,12 @@ public sealed class RecipeEditorPage : ContentPage
     private readonly MealsApiClient _api;
     private readonly Entry _name = new() { Placeholder = "Recipe name" };
     private readonly Entry _servings = new() { Text = "4", Keyboard = Keyboard.Numeric, WidthRequest = 90 };
+    private readonly Editor _description = new() { Placeholder = "A short description (optional)", AutoSize = EditorAutoSizeOption.TextChanges, MinimumHeightRequest = 70 };
+    private string? _imageUrl;
+    private string? _sourceUrl;
+    private string? _cuisine;
+    private int? _prepMinutes;
+    private int? _cookMinutes;
     private readonly SearchBar _search = new() { Placeholder = "Find an ingredient…" };
     private readonly VerticalStackLayout _results = new() { Spacing = 6 };
     private readonly VerticalStackLayout _selected = new() { Spacing = 6 };
@@ -31,6 +38,10 @@ public sealed class RecipeEditorPage : ContentPage
 
         var heading = new Label { Text = "Build a recipe", FontSize = 26, FontAttributes = FontAttributes.Bold };
         heading.SetDynamicResource(VisualElement.StyleProperty, "TextDisplay");
+        var import = new Button { Text = "Import recipe from website", FontSize = 12 };
+        import.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+        import.Clicked += async (_, _) => await ImportFromWebsiteAsync();
+
         var servingsRow = new HorizontalStackLayout
         {
             Spacing = 10,
@@ -52,7 +63,9 @@ public sealed class RecipeEditorPage : ContentPage
             Children =
             {
                 heading,
+                import,
                 _name,
+                _description,
                 servingsRow,
                 new Label { Text = "INGREDIENTS", FontAttributes = FontAttributes.Bold, FontSize = 12 },
                 _search,
@@ -111,6 +124,64 @@ public sealed class RecipeEditorPage : ContentPage
         {
             _status.Text = ex is FamilyApiException ? ex.Message : "Ingredient search is temporarily unavailable.";
         }
+    }
+
+    private async Task ImportFromWebsiteAsync()
+    {
+        var url = await DisplayPromptAsync("Import recipe", "Paste the recipe webpage URL", maxLength: 1000);
+        if (string.IsNullOrWhiteSpace(url)) return;
+        _status.Text = "Reading recipe page…";
+        try
+        {
+            var preview = await _api.ImportRecipePreviewAsync(url.Trim());
+            _name.Text = preview.Name;
+            _servings.Text = preview.Servings.ToString(CultureInfo.InvariantCulture);
+            _description.Text = preview.Description ?? string.Empty;
+            _steps.Text = string.Join(Environment.NewLine, preview.Steps);
+            _tags.Text = string.Join(", ", preview.Tags);
+            _imageUrl = preview.ImageUrl;
+            _sourceUrl = preview.SourceUrl;
+            _prepMinutes = preview.PrepMinutes;
+            _cookMinutes = preview.CookMinutes;
+            _cuisine = preview.Tags.FirstOrDefault(x =>
+                new[] { "Italian", "Mexican", "American", "Asian", "Mediterranean" }
+                    .Any(cuisine => x.Contains(cuisine, StringComparison.OrdinalIgnoreCase)));
+
+            var added = 0;
+            foreach (var rawLine in preview.Ingredients)
+            {
+                var (quantity, unit, ingredientName) = ParseImportedIngredient(rawLine);
+                var matches = await _api.SearchIngredientsAsync(ingredientName, 8);
+                var item = matches.FirstOrDefault(x => string.Equals(x.Name, ingredientName, StringComparison.OrdinalIgnoreCase))
+                    ?? matches.FirstOrDefault();
+                if (item is null)
+                    item = await _api.CreateIngredientAsync(new CreateIngredientDto(ingredientName, "Other"));
+                if (_ingredients.Any(x => x.Item.Id == item.Id)) continue;
+                _ingredients.Add(new SelectedIngredient(item, quantity, unit, null));
+                added++;
+            }
+            RenderSelected();
+            _status.Text = $"Imported draft · {added} ingredients matched to your catalog. Review everything before saving.";
+        }
+        catch (Exception ex)
+        {
+            _status.Text = ex is FamilyApiException ? ex.Message : "Could not import this page. You can still enter the recipe manually.";
+        }
+    }
+
+    private static (decimal? Quantity, string? Unit, string Name) ParseImportedIngredient(string raw)
+    {
+        var match = Regex.Match(raw.Trim(), @"^(?<quantity>\\d+(?:\\.\\d+)?|\\d+/\\d+)\\s+(?<unit>[A-Za-z]+)\\s+(?<name>.+)$");
+        if (!match.Success) return (null, null, raw.Trim());
+        var quantityText = match.Groups["quantity"].Value;
+        decimal quantity;
+        if (quantityText.Contains('/'))
+        {
+            var parts = quantityText.Split('/');
+            quantity = decimal.Parse(parts[0], CultureInfo.InvariantCulture) / decimal.Parse(parts[1], CultureInfo.InvariantCulture);
+        }
+        else quantity = decimal.Parse(quantityText, CultureInfo.InvariantCulture);
+        return (quantity, match.Groups["unit"].Value.ToLowerInvariant(), match.Groups["name"].Value.Trim());
     }
 
     private async Task SelectIngredientAsync(IngredientCatalogDto item)
@@ -179,7 +250,8 @@ public sealed class RecipeEditorPage : ContentPage
             var item = _ingredients[i];
             var amount = item.Quantity is null ? "" : item.Quantity.Value.ToString(CultureInfo.InvariantCulture) + " ";
             var detail = amount + (item.Unit ?? "") + (string.IsNullOrWhiteSpace(item.Note) ? "" : " · " + item.Note);
-            var label = new Label { Text = $"{i + 1}. {item.Item.Name}\n{detail}", FontSize = 13, VerticalTextAlignment = TextAlignment.Center };
+            var label = new Label { Text = $"{i + 1}. {item.Item.Name}
+{detail}", FontSize = 13, VerticalTextAlignment = TextAlignment.Center };
             label.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
             var remove = new Button { Text = "Remove", FontSize = 11, Padding = new Thickness(10, 5) };
             remove.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
@@ -222,11 +294,12 @@ public sealed class RecipeEditorPage : ContentPage
         {
             var ingredients = _ingredients.Select((x, i) => new StructuredRecipeIngredientWriteDto(
                 x.Item.Id, x.Quantity, x.Unit, x.Note, null, i)).ToList();
-            var steps = (_steps.Text ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            var steps = (_steps.Text ?? string.Empty).Split('
+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Select(x => new StructuredRecipeStepWriteDto(x)).ToList();
             var tags = (_tags.Text ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            await _api.SaveStructuredRecipeAsync(new StructuredRecipeWriteDto(null, _name.Text.Trim(), servings, ingredients, steps, tags));
+            await _api.SaveStructuredRecipeAsync(new StructuredRecipeWriteDto(null, _name.Text.Trim(), servings, ingredients, steps, tags, _description.Text, _imageUrl, _sourceUrl, _prepMinutes, _cookMinutes, _cuisine));
             await DisplayAlertAsync("Recipe saved", "Your recipe is now in the family recipe library.", "Done");
             await Navigation.PopModalAsync();
         }
