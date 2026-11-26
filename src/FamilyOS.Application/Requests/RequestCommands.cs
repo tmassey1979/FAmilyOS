@@ -298,6 +298,7 @@ public class RequestCommandHandlers :
 
     public async Task<List<RequestHistoryDto>> Handle(GetRequestHistoryQuery query, CancellationToken ct)
     {
+        await _current.EnsureLoadedAsync(ct);
         var request = await GetRequest(query.RequestId, ct);
         return request.History
             .OrderBy(h => h.TimestampUtc)
