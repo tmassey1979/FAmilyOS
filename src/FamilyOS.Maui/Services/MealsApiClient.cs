@@ -23,6 +23,20 @@ public sealed class MealsApiClient
         => SendAsync<MealPlanDto>(HttpMethod.Get,
             $"api/meals/week?weekStart={Uri.EscapeDataString(weekStartUtc.ToUniversalTime().ToString("O"))}", null, ct);
 
+    public Task<List<MealNominationDto>> GetNominationsAsync(DateTime weekStartUtc, CancellationToken ct = default)
+        => SendAsync<List<MealNominationDto>>(HttpMethod.Get,
+            $"api/meals/nominations?weekStart={Uri.EscapeDataString(weekStartUtc.ToUniversalTime().ToString("O"))}", null, ct);
+
+    public Task<MealNominationDto> NominateMealAsync(NominateMealDto body, CancellationToken ct = default)
+        => SendAsync<MealNominationDto>(HttpMethod.Post, "api/meals/nominations", JsonContent(body), ct);
+
+    public Task VoteForMealAsync(Guid id, bool voted, CancellationToken ct = default)
+        => SendNoContentAsync(voted ? HttpMethod.Delete : HttpMethod.Put,
+            $"api/meals/nominations/{id:D}/vote", ct);
+
+    public Task<MealNominationDto> DecideNominationAsync(Guid id, DecideMealNominationDto body, CancellationToken ct = default)
+        => SendAsync<MealNominationDto>(HttpMethod.Post, $"api/meals/nominations/{id:D}/decision", JsonContent(body), ct);
+
     public Task<MealEntryDto> UpsertEntryAsync(MealEntryWriteDto body, CancellationToken ct = default)
         => SendAsync<MealEntryDto>(HttpMethod.Put, "api/meals/entries", JsonContent(body), ct);
 
@@ -167,3 +181,7 @@ public sealed record StructuredRecipeIngredientDto(Guid IngredientId, string Nam
 public sealed record StructuredRecipeStepDto(int StepNumber, string Text, int? DurationMinutes);
 
 public sealed record MealShoppingPreviewDto(string Scope, List<string> Items);
+
+public sealed record MealNominationDto(Guid Id, string Title, Guid? RecipeId, string? Note, Guid ProposedByMemberId, string Status, int VoteCount, bool HasVoted, DateTime? PlannedDayUtc, string? PlannedSlot);
+public sealed record NominateMealDto(string Title, DateTime? WeekStartUtc = null, Guid? RecipeId = null, string? Note = null);
+public sealed record DecideMealNominationDto(bool Selected, DateTime? DayUtc = null, string? Slot = null);
