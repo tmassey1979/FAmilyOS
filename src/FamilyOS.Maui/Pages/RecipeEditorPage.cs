@@ -250,8 +250,7 @@ public sealed class RecipeEditorPage : ContentPage
             var item = _ingredients[i];
             var amount = item.Quantity is null ? "" : item.Quantity.Value.ToString(CultureInfo.InvariantCulture) + " ";
             var detail = amount + (item.Unit ?? "") + (string.IsNullOrWhiteSpace(item.Note) ? "" : " · " + item.Note);
-            var label = new Label { Text = $"{i + 1}. {item.Item.Name}
-{detail}", FontSize = 13, VerticalTextAlignment = TextAlignment.Center };
+            var label = new Label { Text = $"{i + 1}. {item.Item.Name}\n{detail}", FontSize = 13, VerticalTextAlignment = TextAlignment.Center };
             label.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
             var remove = new Button { Text = "Remove", FontSize = 11, Padding = new Thickness(10, 5) };
             remove.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
@@ -294,8 +293,7 @@ public sealed class RecipeEditorPage : ContentPage
         {
             var ingredients = _ingredients.Select((x, i) => new StructuredRecipeIngredientWriteDto(
                 x.Item.Id, x.Quantity, x.Unit, x.Note, null, i)).ToList();
-            var steps = (_steps.Text ?? string.Empty).Split('
-', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            var steps = (_steps.Text ?? string.Empty).Split('\\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Select(x => new StructuredRecipeStepWriteDto(x)).ToList();
             var tags = (_tags.Text ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
