@@ -118,7 +118,7 @@ public sealed class MealsApiClient
 public sealed record MealPlanDto(Guid Id, DateTime WeekStartUtc, string? Notes, List<MealEntryDto> Entries);
 public sealed record MealEntryDto(Guid Id, DateTime DayUtc, string Slot, string DishName, string? Notes, string? IngredientsCsv);
 public sealed record MealEntryWriteDto(DateTime DayUtc, string Slot, string DishName, string? Notes = null, string? IngredientsCsv = null, DateTime? WeekStartUtc = null);
-public sealed record RecipeDto(Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions, bool IsBuiltIn = false);
+public sealed record RecipeDto(Guid Id, string Name, int Servings, string? IngredientsCsv, string? Instructions, bool IsBuiltIn = false, List<string>? Tags = null);
 public sealed record RecipeWriteDto(string Name, int? Servings = 4, string? IngredientsCsv = null, string? Instructions = null);
 public sealed record ApplyRecipeDto(DateTime DayUtc, string Slot, DateTime? WeekStartUtc = null);
 public sealed record RecipeShoppingDto(int? TargetServings = null);
