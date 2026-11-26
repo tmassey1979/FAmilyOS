@@ -419,7 +419,7 @@ public sealed class RequestsPage : ContentPage
             {
                 var detail = new Label { Text = entry.Detail, FontSize = 14 };
                 detail.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
-                var meta = new Label { Text = $"{entry.Status}  ·  {entry.TimestampUtc.ToLocalTime():MMM d, yyyy h:mm tt}", FontSize = 12 };
+                var meta = new Label { Text = $"{entry.Status}  ·  {entry.ActorName}  ·  {entry.TimestampUtc.ToLocalTime():MMM d, yyyy h:mm tt}", FontSize = 12 };
                 meta.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
                 var row = new VerticalStackLayout { Spacing = 4, Children = { detail, meta } };
                 var card = new Border { Padding = 12, Content = row };
