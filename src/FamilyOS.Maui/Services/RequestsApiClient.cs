@@ -60,6 +60,16 @@ public sealed class RequestsApiClient
             new StringContent(body, Encoding.UTF8, "application/json"), ct);
     }
 
+    public Task<List<RequestHistoryEntryDto>> GetHistoryAsync(Guid id, CancellationToken ct = default)
+        => SendAsync<List<RequestHistoryEntryDto>>(HttpMethod.Get, $"api/requests/{id:D}/history", null, ct);
+
+    public Task<FamilyRequestDto> AskQuestionAsync(Guid id, string questionText, CancellationToken ct = default)
+    {
+        var body = JsonSerializer.Serialize(new { questionText }, JsonOptions);
+        return SendAsync<FamilyRequestDto>(HttpMethod.Post, $"api/requests/{id:D}/ask-question",
+            new StringContent(body, Encoding.UTF8, "application/json"), ct);
+    }
+
     public Task<FamilyRequestDto> AnswerQuestionAsync(Guid id, Guid questionId, string answer, CancellationToken ct = default)
     {
         var body = JsonSerializer.Serialize(new { questionId, answer }, JsonOptions);
@@ -128,3 +138,5 @@ public sealed record RequestTypeOptionDto(Guid Id, string Code, string Name, str
 
 public sealed record ExecutionPlanDto(Guid Id, Guid RequestId, string Status, List<ExecutionItemDto> Items);
 public sealed record ExecutionItemDto(Guid Id, string Type, string Title, Guid? AssigneeMemberId, bool IsSelected, Guid? ResultingEntityId);
+
+public sealed record RequestHistoryEntryDto(Guid Id, string Status, Guid ActorMemberId, string Detail, DateTime TimestampUtc);
