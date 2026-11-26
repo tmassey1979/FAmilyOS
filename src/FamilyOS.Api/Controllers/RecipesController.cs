@@ -19,6 +19,11 @@ public class RecipesController : ControllerBase
     public async Task<ActionResult<List<RecipeDto>>> List(CancellationToken ct)
         => Ok(await _mediator.Send(new ListRecipesQuery(), ct));
 
+    [HttpGet("page")]
+    public async Task<ActionResult<RecipePageDto>> ListPage(
+        [FromQuery] int skip = 0, [FromQuery] int take = 24, CancellationToken ct = default)
+        => Ok(await _mediator.Send(new ListRecipesPageQuery(skip, take), ct));
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<RecipeDto>> Get(Guid id, CancellationToken ct)
         => Ok(await _mediator.Send(new GetRecipeQuery(id), ct));
