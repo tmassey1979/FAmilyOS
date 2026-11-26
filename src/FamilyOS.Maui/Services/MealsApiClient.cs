@@ -83,9 +83,12 @@ public sealed class MealsApiClient
         => SendAsync<RecipeMemberPreferenceDto>(HttpMethod.Put,
             $"api/recipes/{recipeId:D}/preference", JsonContent(body), ct);
 
-    public Task<List<IngredientCatalogDto>> SearchIngredientsAsync(string query, int limit = 25, CancellationToken ct = default)
-        => SendAsync<List<IngredientCatalogDto>>(HttpMethod.Get,
-            $"api/ingredients/search?q={Uri.EscapeDataString(query ?? string.Empty)}&limit={Math.Clamp(limit, 1, 50)}", null, ct);
+    public Task<List<IngredientCatalogDto>> SearchIngredientsAsync(string query, int limit = 25, CancellationToken ct = default, string? category = null)
+    {
+        var path = $"api/ingredients/search?q={Uri.EscapeDataString(query ?? string.Empty)}&limit={Math.Clamp(limit, 1, 50)}";
+        if (!string.IsNullOrWhiteSpace(category)) path += $"&category={Uri.EscapeDataString(category.Trim())}";
+        return SendAsync<List<IngredientCatalogDto>>(HttpMethod.Get, path, null, ct);
+    }
 
     public Task<IngredientCatalogDto> CreateIngredientAsync(CreateIngredientDto body, CancellationToken ct = default)
         => SendAsync<IngredientCatalogDto>(HttpMethod.Post, "api/ingredients", JsonContent(body), ct);
