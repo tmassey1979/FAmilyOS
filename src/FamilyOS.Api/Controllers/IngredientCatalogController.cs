@@ -21,6 +21,26 @@ public sealed class IngredientCatalogController : ControllerBase
         _current = current;
     }
 
+    [HttpPost]
+    public async Task<ActionResult<IngredientCatalogDto>> Create(
+        [FromBody] CreateIngredientBody body, CancellationToken ct)
+    {
+        await _current.EnsureLoadedAsync(ct);
+        if (!_current.IsAuthenticated || _current.FamilyId is null) return Unauthorized();
+        if (string.IsNullOrWhiteSpace(body.Name) || body.Name.Length > 160)
+            return BadRequest("Ingredient name must be between 1 and 160 characters.");
+        var key = string.Join(' ', body.Name.Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries));
+        var existing = await _db.IngredientCatalog.FirstOrDefaultAsync(
+            x => x.FamilyId == _current.FamilyId && x.SearchKey == key, ct);
+        if (existing is not null)
+            return Ok(new IngredientCatalogDto(existing.Id, existing.Name, existing.Category, existing.AliasesCsv, false));
+        var item = IngredientCatalogItem.CreateFamily(_current.FamilyId.Value,
+            body.Name, string.IsNullOrWhiteSpace(body.Category) ? "Other" : body.Category, body.AliasesCsv);
+        _db.IngredientCatalog.Add(item);
+        await _db.SaveChangesAsync(ct);
+        return Ok(new IngredientCatalogDto(item.Id, item.Name, item.Category, item.AliasesCsv, false));
+    }
+
     [HttpGet("search")]
     public async Task<ActionResult<IReadOnlyList<IngredientCatalogDto>>> Search(
         [FromQuery] string? q,
@@ -61,3 +81,4 @@ public sealed class IngredientCatalogController : ControllerBase
 
 public sealed record IngredientCatalogDto(
     Guid Id, string Name, string Category, string? AliasesCsv, bool IsBuiltIn);
+\npublic sealed record CreateIngredientBody(string Name, string? Category = null, string? AliasesCsv = null);\n
