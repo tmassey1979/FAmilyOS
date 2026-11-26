@@ -60,7 +60,7 @@ public sealed class MealShoppingPreviewController : ControllerBase
             foreach (var row in rows)
             {
                 var unit = NormalizeUnit(row.Unit);
-                var quantity = row.Quantity is null ? null : ToBaseQuantity(row.Quantity.Value, row.Unit) * uses[row.RecipeId];
+                decimal? quantity = row.Quantity is null ? null : ToBaseQuantity(row.Quantity.Value, row.Unit) * uses[row.RecipeId];
                 var key = (row.IngredientId, unit);
                 if (aggregate.TryGetValue(key, out var current))
                     aggregate[key] = (current.Name, current.Quantity is null || quantity is null
