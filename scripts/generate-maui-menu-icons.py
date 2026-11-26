@@ -83,6 +83,19 @@ def icon_family() -> None:
     save("family", im)
 
 
+
+def icon_map() -> None:
+    im, d = canvas()
+    # Folded map with a centered location marker, matching the other tab icons.
+    d.line([(10, 20), (25, 14), (39, 20), (54, 14)], fill=STROKE, width=WIDTH)
+    d.line([(10, 20), (10, 50), (25, 44), (39, 50), (54, 44), (54, 14)], fill=STROKE, width=WIDTH)
+    d.line([(25, 14), (25, 44)], fill=STROKE, width=max(1, WIDTH - 1))
+    d.line([(39, 20), (39, 50)], fill=STROKE, width=max(1, WIDTH - 1))
+    d.ellipse([26, 22, 38, 34], outline=STROKE, width=max(1, WIDTH - 1))
+    d.polygon([(27, 32), (37, 32), (32, 43)], fill=STROKE)
+    save("map", im)
+
+
 def icon_more() -> None:
     im, d = canvas()
     for x in (20, 32, 44):
@@ -162,6 +175,7 @@ def main() -> None:
         icon_tasks,
         icon_calendar,
         icon_family,
+        icon_map,
         icon_more,
         icon_requests,
         icon_meals,
