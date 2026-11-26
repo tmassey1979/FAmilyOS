@@ -13,6 +13,7 @@ public partial class FamilyOsDbContext
     public DbSet<RecipeTag> RecipeTags => Set<RecipeTag>();
     public DbSet<RecipeTagLink> RecipeTagLinks => Set<RecipeTagLink>();
     public DbSet<RecipeInstructionStep> RecipeInstructionSteps => Set<RecipeInstructionStep>();
+    public DbSet<RecipeMemberPreference> RecipeMemberPreferences => Set<RecipeMemberPreference>();
     public DbSet<MealNomination> MealNominations => Set<MealNomination>();
     public DbSet<MealNominationVote> MealNominationVotes => Set<MealNominationVote>();
 
