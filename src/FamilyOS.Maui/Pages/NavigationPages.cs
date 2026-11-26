@@ -104,6 +104,7 @@ public sealed class MorePage() : FeaturePlaceholderPage(
         var list = new VerticalStackLayout { Spacing = 10 };
         AddDestination(list, "Requests", nameof(RequestsPage), "menu_requests.png");
         AddDestination(list, "Meals", nameof(MealsPage), "menu_meals.png");
+        AddDestination(list, "Shopping", nameof(ShoppingPage), "menu_shopping.png");
         AddDestination(list, "Chat", nameof(ChatPage), "menu_chat.png");
         AddDestination(list, "Outcomes", nameof(OutcomesPage), "menu_outcomes.png");
         AddDestination(list, "Notifications", nameof(NotificationsPage), "menu_notifications.png");
