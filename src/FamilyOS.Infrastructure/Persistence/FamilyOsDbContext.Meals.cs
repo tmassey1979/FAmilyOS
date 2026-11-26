@@ -126,7 +126,7 @@ public partial class FamilyOsDbContext
         modelBuilder.Entity<RecipeMemberPreference>(e =>
         {
             e.HasKey(x => x.Id);
-            e.HasIndex(x => new { x.FamilyId, x.RecipeId, x.MemberId }).IsUnique();
+            e.HasIndex(x => new { x.FamilyId, x.RecipeId, x.MemberId }).IsUnique().HasFilter("\"IsDeleted\" = false");
             e.HasIndex(x => new { x.FamilyId, x.MemberId });
             e.Property(x => x.Preference).HasConversion<string>().HasMaxLength(20);
             e.HasQueryFilter(x => !x.IsDeleted);
