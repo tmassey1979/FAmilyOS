@@ -706,7 +706,7 @@ public sealed class TasksPage : ContentPage
                         Description: string.IsNullOrWhiteSpace(description.Text) ? null : description.Text.Trim(),
                         Priority: priority.SelectedItem?.ToString() ?? "Normal",
                         Category: string.IsNullOrWhiteSpace(category.Text) ? null : category.Text.Trim(),
-                        DueDate: dueEnabled.IsToggled ? (dueDate.Date + dueTime.Time).ToUniversalTime() : null,
+                        DueDate: dueEnabled.IsToggled ? ((dueDate.Date ?? DateTime.Today) + (dueTime.Time ?? TimeSpan.Zero)).ToUniversalTime() : null,
                         EstimatedDurationMinutes: string.IsNullOrWhiteSpace(estimate.Text) ? null : minutes,
                         AssignToMemberId: assigneeId,
                         PlannedStartTime: startAt?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
