@@ -259,7 +259,7 @@ try
         string? state,
         string? error,
         IMediator mediator,
-        Microsoft.AspNetCore.DataProtection.IDataProtectionProvider dataProtectionProvider,
+        IConfiguration configuration,
         CancellationToken ct) =>
     {
         if (!string.IsNullOrWhiteSpace(error))
@@ -271,8 +271,10 @@ try
         Guid familyId;
         try
         {
-            var protector = dataProtectionProvider.CreateProtector("FamilyOS.GoogleCalendar.OAuthState.v1");
-            var parts = protector.Unprotect(state).Split('|');
+            var secret = configuration["Google:ClientSecret"] ?? string.Empty;
+            if (!GoogleCalendarOAuthState.TryUnprotect(state, secret, out var payload))
+                return Results.BadRequest(new { error = "invalid OAuth state" });
+            var parts = payload.Split('|');
             if (parts.Length != 4
                 || !Guid.TryParseExact(parts[0], "N", out memberId)
                 || !Guid.TryParseExact(parts[1], "N", out familyId)
@@ -282,10 +284,6 @@ try
             var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             if (issuedAt > now + 60 || now - issuedAt > 600)
                 return Results.BadRequest(new { error = "OAuth state expired" });
-        }
-        catch (System.Security.Cryptography.CryptographicException)
-        {
-            return Results.BadRequest(new { error = "invalid OAuth state" });
         }
 
         var status = await mediator.Send(new CompleteGoogleCalendarOAuthCommand(code, memberId, familyId), ct);
