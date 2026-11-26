@@ -46,6 +46,7 @@ public sealed class IngredientCatalogController : ControllerBase
         [FromQuery] string? q,
         [FromQuery] string? category,
         [FromQuery] int limit = 25,
+        [FromQuery] int skip = 0,
         CancellationToken ct = default)
     {
         await _current.EnsureLoadedAsync(ct);
@@ -53,6 +54,7 @@ public sealed class IngredientCatalogController : ControllerBase
             return Unauthorized();
 
         limit = Math.Clamp(limit, 1, 50);
+        skip = Math.Max(0, skip);
         var query = _db.IngredientCatalog.AsNoTracking()
             .Where(x => x.FamilyId == null || x.FamilyId == _current.FamilyId);
 
@@ -70,6 +72,7 @@ public sealed class IngredientCatalogController : ControllerBase
         var results = await query
             .OrderByDescending(x => x.IsBuiltIn)
             .ThenBy(x => x.Name)
+            .Skip(skip)
             .Take(limit)
             .Select(x => new IngredientCatalogDto(
                 x.Id, x.Name, x.Category, x.AliasesCsv, x.IsBuiltIn))
