@@ -269,22 +269,20 @@ try
 
         Guid memberId;
         Guid familyId;
-        try
-        {
             var secret = configuration["Google:ClientSecret"] ?? string.Empty;
             if (!GoogleCalendarOAuthState.TryUnprotect(state, secret, out var payload))
                 return Results.BadRequest(new { error = "invalid OAuth state" });
             var parts = payload.Split('|');
-            if (parts.Length != 4
-                || !Guid.TryParseExact(parts[0], "N", out memberId)
-                || !Guid.TryParseExact(parts[1], "N", out familyId)
-                || !long.TryParse(parts[2], out var issuedAt))
+        if (parts.Length != 4
+            || !Guid.TryParseExact(parts[0], "N", out memberId)
+            || !Guid.TryParseExact(parts[1], "N", out familyId)
+            || !long.TryParse(parts[2], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var issuedAt)
+            || !Guid.TryParseExact(parts[3], "N", out _))
                 return Results.BadRequest(new { error = "invalid OAuth state" });
 
-            var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            if (issuedAt > now + 60 || now - issuedAt > 600)
-                return Results.BadRequest(new { error = "OAuth state expired" });
-        }
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        if (issuedAt > now + 60 || now - issuedAt > 600)
+            return Results.BadRequest(new { error = "OAuth state expired" });
 
         var status = await mediator.Send(new CompleteGoogleCalendarOAuthCommand(code, memberId, familyId), ct);
         return Results.Ok(new { ok = true, status });
