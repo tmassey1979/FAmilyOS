@@ -1,3 +1,8 @@
+using FamilyOS.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
+
 file record UpdateQuietHoursBody(bool Enabled, int? StartMinutes, int? EndMinutes);
 file record RegisterDeviceBody(string Token, string Platform, string? DeviceName);
 
