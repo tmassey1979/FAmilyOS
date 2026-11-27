@@ -109,7 +109,8 @@ public class PulseQueryHandler : IRequestHandler<GetPulseQuery, PulseDto>
             // In-progress work above remains the highest priority.
             var now = DateTime.UtcNow;
             var dueTask = await _db.Tasks.AsNoTracking()
-                .Where(t => t.FamilyId == familyId && t.AssigneeMemberId == memberId &&
+                .Where(t => t.FamilyId == familyId &&
+                            ((role == FamilyRole.Owner || role == FamilyRole.Adult) || t.AssigneeMemberId == memberId) &&
                             t.DueDate != null &&
                             (t.Status == FamilyTaskStatus.Accepted ||
                              t.Status == FamilyTaskStatus.Assigned ||
@@ -121,7 +122,9 @@ public class PulseQueryHandler : IRequestHandler<GetPulseQuery, PulseDto>
 
             if (dueTask != null)
             {
-                var action = dueTask.Status == FamilyTaskStatus.Assigned ? "Accept" :
+                var isAssignedToCurrentMember = dueTask.AssigneeMemberId == memberId;
+                var action = !isAssignedToCurrentMember ? "View" :
+                    dueTask.Status == FamilyTaskStatus.Assigned ? "Accept" :
                     dueTask.Status == FamilyTaskStatus.Paused || dueTask.Status == FamilyTaskStatus.Deferred ? "Resume" : "Start";
                 var dueAt = dueTask.DueDate!.Value;
                 var dueLabel = dueAt < now ? "Overdue" :
