@@ -415,7 +415,7 @@ public sealed class TasksPage : ContentPage, IQueryAttributable
                 case "schedule": await SetPlannedTimesAsync(task); break;
                 case "assign": await ReassignTaskAsync(task); break;
                 case "history": await ShowHistoryAsync(task.Id, task.Title); break;
-                default: await ExecuteAsync(task.Id, choice.action); break;
+                default: await ExecuteAsync(task, choice.action); break;
             }
         };
         return button;
