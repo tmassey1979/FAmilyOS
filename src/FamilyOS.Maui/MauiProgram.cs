@@ -24,6 +24,7 @@ public static class MauiProgram
             });
 
         builder.Services.AddSingleton<IThemeService, ThemeService>();
+        builder.Services.AddSingleton<PulseRefreshSignal>();
 
         // Shared HTTP + auth session used by all API clients.
         builder.Services.AddSingleton<HttpClient>();

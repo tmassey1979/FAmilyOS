@@ -1,6 +1,7 @@
 using FamilyOS.Application.Common;
 using FamilyOS.Application.Interfaces;
 using FamilyOS.Domain.Common;
+using FamilyOS.Domain.Calendar;
 using FamilyOS.Domain.Conditions;
 using FamilyOS.Domain.Notifications;
 using FamilyOS.Domain.Tasks;
@@ -235,8 +236,42 @@ public partial class TaskCommandHandlers :
         await _current.EnsureLoadedAsync(ct);
         var task = await GetTaskForFamily(cmd.TaskId, ct);
         task.Accept(_current.MemberId!.Value);
+        await EnsureTaskCalendarEventAsync(task, ct);
         await _db.SaveChangesAsync(ct);
         return await ToDto(task, ct);
+    }
+
+
+    /// <summary>
+    /// Every accepted task has a native calendar entry linked back to the task.
+    /// A planned time is preferred; otherwise use the due date as an all-day placeholder.
+    /// </summary>
+    private async Task EnsureTaskCalendarEventAsync(TaskItem task, CancellationToken ct)
+    {
+        var start = task.PlannedStartUtc ?? task.DueDate?.Date ?? DateTime.UtcNow.Date;
+        var allDay = !task.PlannedStartUtc.HasValue;
+        var end = task.PlannedEndUtc ??
+            (task.PlannedStartUtc.HasValue
+                ? task.PlannedStartUtc.Value.AddMinutes(task.EstimatedMinutes ?? 60)
+                : (DateTime?)null);
+
+        var ev = task.CalendarEventId is Guid eventId
+            ? await _db.CalendarEvents.FirstOrDefaultAsync(e => e.Id == eventId && e.FamilyId == task.FamilyId, ct)
+            : await _db.CalendarEvents.FirstOrDefaultAsync(e => e.LinkedTaskId == task.Id && e.FamilyId == task.FamilyId && !e.IsCancelled, ct);
+
+        if (ev is null)
+        {
+            ev = CalendarEvent.Create(
+                task.FamilyId, task.Title, start, _current.MemberId!.Value,
+                end, allDay, linkedTaskId: task.Id, description: task.Description);
+            _db.CalendarEvents.Add(ev);
+        }
+        else
+        {
+            ev.Update(task.Title, start, end, allDay, null, task.Description);
+        }
+
+        task.EnableCalendarBacking(ev.Id);
     }
 
     public async Task<TaskDto> Handle(DeclineTaskCommand cmd, CancellationToken ct)
