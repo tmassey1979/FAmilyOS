@@ -190,6 +190,8 @@ public sealed class TasksPage : ContentPage
             tags.Children.Add(CreateTaskChip(task.Category, "BgSurfaceAlt", "TextPrimary"));
         if (task.IsOverdue)
             tags.Children.Add(CreateTaskChip("OVERDUE", "BgGlow", "AccentDanger"));
+        if (task.DueDate is null && task.Status is not ("Completed" or "Cancelled" or "Declined" or "Skipped"))
+            tags.Children.Add(CreateTaskChip("DUE DATE NEEDED", "BgGlow", "AccentDanger"));
         if (task.IsRecurring)
             tags.Children.Add(CreateTaskChip(
                 task.RecurrenceFrequency is { Length: > 0 } frequency ? $"↻ {frequency}" : "↻ RECURRING",
@@ -231,6 +233,8 @@ public sealed class TasksPage : ContentPage
             AddTaskInfo(info, infoIndex++, "ASSIGNED TO", task.AssignedToName);
         if (task.DueDate is { } due)
             AddTaskInfo(info, infoIndex++, "DUE", due.ToLocalTime().ToString("ddd, MMM d · h:mm tt", CultureInfo.CurrentCulture));
+        else if (task.Status is not ("Completed" or "Cancelled" or "Declined" or "Skipped"))
+            AddTaskInfo(info, infoIndex++, "DUE", "Needs a due date");
         if (!string.IsNullOrWhiteSpace(task.PlannedStartTime) || !string.IsNullOrWhiteSpace(task.PlannedEndTime))
             AddTaskInfo(info, infoIndex++, "SCHEDULED", $"{FormatPlannedTime(task.PlannedStartTime)} – {FormatPlannedTime(task.PlannedEndTime)}");
         else if (task.EstimatedDurationMinutes is { } estimate)
@@ -261,7 +265,7 @@ public sealed class TasksPage : ContentPage
         var canEdit = _showFamilyTasks && !isTerminal;
         var canPlan = task.Status is "Accepted" or "InProgress" or "Paused" or "Deferred";
         var canAssign = _showFamilyTasks &&
-            task.Status is "Created" or "Assigned" or "Reassigned" or "Declined";
+            task.Status is ("Created" or "Assigned" or "Reassigned" or "Declined");
         var moreOptions = allActions
             .Where(x => !visibleActions.Any(v => v.action == x.action))
             .Select(x => (x.label, x.action))
