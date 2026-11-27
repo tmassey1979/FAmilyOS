@@ -9,6 +9,7 @@ public sealed class HomePage : ContentPage
 {
     private readonly PulseApiClient _pulse;
     private readonly FamilyApiClient _family;
+    private readonly PulseRefreshSignal _pulseRefresh;
     private readonly HorizontalStackLayout _members = new() { Spacing = 14 };
     private readonly Label _greeting = new() { FontSize = 28, FontAttributes = FontAttributes.Bold };
     private readonly Label _status = new() { FontSize = 14 };
@@ -29,10 +30,12 @@ public sealed class HomePage : ContentPage
     private bool _loading;
     private Guid? _selectedMemberId;
 
-    public HomePage(PulseApiClient pulse, FamilyApiClient family)
+    public HomePage(PulseApiClient pulse, FamilyApiClient family, PulseRefreshSignal pulseRefresh)
     {
         _pulse = pulse;
         _family = family;
+        _pulseRefresh = pulseRefresh;
+        _pulseRefresh.RefreshRequested += OnPulseRefreshRequested;
         Title = "Home";
 
         _greeting.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
@@ -84,6 +87,11 @@ public sealed class HomePage : ContentPage
 
         _modules = HomeModuleCatalog.GetOrdered();
         RebuildModuleGrid();
+    }
+
+    private void OnPulseRefreshRequested(object? sender, EventArgs e)
+    {
+        MainThread.BeginInvokeOnMainThread(async () => await LoadAsync());
     }
 
     protected override async void OnAppearing()
