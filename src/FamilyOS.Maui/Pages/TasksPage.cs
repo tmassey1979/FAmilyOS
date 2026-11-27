@@ -185,7 +185,7 @@ public sealed class TasksPage : ContentPage
         var tags = new FlexLayout { Direction = Microsoft.Maui.Layouts.FlexDirection.Row, Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, AlignItems = Microsoft.Maui.Layouts.FlexAlignItems.Center };
         tags.Children.Add(CreateTaskChip(task.Priority, "BgSurfaceAlt", "TextPrimary"));
         if (!string.IsNullOrWhiteSpace(task.Category))
-            tags.Children.Add(CreateTaskChip(task.Category, "BgSurfaceElevated", "TextSecondary"));
+            tags.Children.Add(CreateTaskChip(task.Category, "BgSurfaceAlt", "TextPrimary"));
         if (task.IsOverdue)
             tags.Children.Add(CreateTaskChip("OVERDUE", "BgGlow", "AccentDanger"));
         if (task.IsRecurring)
@@ -301,6 +301,7 @@ public sealed class TasksPage : ContentPage
             StrokeThickness = 0,
             StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 12 },
             Content = label,
+            Margin = new Thickness(2),
             VerticalOptions = LayoutOptions.Center
         };
         chip.SetDynamicResource(VisualElement.BackgroundColorProperty, backgroundResource);
@@ -329,7 +330,6 @@ public sealed class TasksPage : ContentPage
         {
             ("accept", "Accept", true),
             ("decline", "Decline", false),
-            ("defer", "Defer", false),
             ("cancel", "Cancel", false)
         },
         "Accepted" => new[]
