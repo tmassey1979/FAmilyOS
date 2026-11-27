@@ -102,26 +102,32 @@ public class PulseQueryHandler : IRequestHandler<GetPulseQuery, PulseDto>
         {
             nextAction = new NextActionDto("Task", inProgress.Id, inProgress.Title, "In progress", "Resume", null);
         }
-        else if (nextAction is null)
+        else
         {
-            var today = DateTime.UtcNow.Date;
-            // Accepted work must remain visible even when it has no due date.
-            // Prefer accepted work over tasks that still need acceptance.
+            // Pulse task priority is based on the next due date, not acceptance order.
+            // Tasks without due dates are intentionally excluded from the "next due" slot.
+            // In-progress work above remains the highest priority.
+            var now = DateTime.UtcNow;
             var dueTask = await _db.Tasks.AsNoTracking()
                 .Where(t => t.FamilyId == familyId && t.AssigneeMemberId == memberId &&
-                            (t.Status == FamilyTaskStatus.Accepted || t.Status == FamilyTaskStatus.Assigned) &&
-                            (t.Status == FamilyTaskStatus.Accepted || t.DueDate == null || t.DueDate <= today.AddDays(1)))
-                .OrderBy(t => t.Status == FamilyTaskStatus.Accepted ? 0 : 1)
-                .ThenBy(t => t.DueDate)
+                            t.DueDate != null &&
+                            (t.Status == FamilyTaskStatus.Accepted ||
+                             t.Status == FamilyTaskStatus.Assigned ||
+                             t.Status == FamilyTaskStatus.Paused ||
+                             t.Status == FamilyTaskStatus.Deferred))
+                .OrderBy(t => t.DueDate)
                 .ThenBy(t => t.CreatedAtUtc)
                 .FirstOrDefaultAsync(ct);
 
             if (dueTask != null)
             {
-                var action = dueTask.Status == FamilyTaskStatus.Assigned ? "Accept" : "Start";
-                var dueLabel = dueTask.DueDate is null
-                    ? (dueTask.Status == FamilyTaskStatus.Accepted ? "Ready when you are" : "Needs acceptance")
-                    : dueTask.DueDate.Value.Date <= today ? "Due today" : "Due soon";
+                var action = dueTask.Status == FamilyTaskStatus.Assigned ? "Accept" :
+                    dueTask.Status == FamilyTaskStatus.Paused || dueTask.Status == FamilyTaskStatus.Deferred ? "Resume" : "Start";
+                var dueAt = dueTask.DueDate!.Value;
+                var dueLabel = dueAt < now ? "Overdue" :
+                    dueAt.Date == now.Date ? "Due today" :
+                    dueAt.Date == now.Date.AddDays(1) ? "Due tomorrow" :
+                    $"Due {dueAt.ToLocalTime():ddd, MMM d}";
                 nextAction = new NextActionDto("Task", dueTask.Id, dueTask.Title, dueLabel, action, dueLabel);
             }
         }
