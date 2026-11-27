@@ -6,6 +6,7 @@
     <!-- Cool modern light: clean panels + electric cyan -->
     <Color x:Key="BgPage">#EEF2F7</Color>
     <Color x:Key="BgSurface">#FFFFFF</Color>
+    <Color x:Key="BgGlow">#E0F2FE</Color>
     <Color x:Key="BgSurfaceAlt">#E2E8F0</Color>
     <Color x:Key="BorderSubtle">#CBD5E1</Color>
     <Color x:Key="BorderAccent">#22D3EE55</Color>

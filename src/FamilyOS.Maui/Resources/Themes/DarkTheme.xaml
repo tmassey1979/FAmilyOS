@@ -6,6 +6,7 @@
     <!-- Merge-2 command center dark -->
     <Color x:Key="BgPage">#0A0E14</Color>
     <Color x:Key="BgSurface">#121A2B</Color>
+    <Color x:Key="BgGlow">#152033</Color>
     <Color x:Key="BgSurfaceAlt">#1A2438</Color>
     <Color x:Key="BorderSubtle">#2A3A55</Color>
     <Color x:Key="BorderAccent">#22D3EE40</Color>
