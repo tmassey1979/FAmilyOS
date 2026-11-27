@@ -200,6 +200,8 @@ public partial class TaskCommandHandlers :
             return null;
         }
         task.SetPlannedTimes(ParseTime(cmd.PlannedStartTime), ParseTime(cmd.PlannedEndTime), cmd.EstimatedDurationMinutes);
+        if (task.Status is FamilyTaskStatus.Accepted or FamilyTaskStatus.InProgress or FamilyTaskStatus.Paused or FamilyTaskStatus.Deferred)
+            await EnsureTaskCalendarEventAsync(task, ct);
         await _db.SaveChangesAsync(ct);
         return await ToDto(task, ct);
     }
