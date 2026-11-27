@@ -279,7 +279,7 @@ public sealed class TasksPage : ContentPage
         var card = new Border
         {
             Padding = new Thickness(16, 15),
-            StrokeThickness = 0,
+            StrokeThickness = 1,
             StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 18 },
             Content = content
         };
