@@ -12,8 +12,8 @@
     <sys:Double x:Key="SpaceXl">32</sys:Double>
     <sys:Double x:Key="SpaceXxl">48</sys:Double>
 
-    <sys:Double x:Key="ControlHeightMin">48</sys:Double>
-    <sys:Double x:Key="ControlHeightSm">36</sys:Double>
+    <sys:Double x:Key="ControlHeightMin">52</sys:Double>
+    <sys:Double x:Key="ControlHeightSm">40</sys:Double>
     <sys:Double x:Key="IconSizeSm">16</sys:Double>
     <sys:Double x:Key="IconSizeMd">24</sys:Double>
     <sys:Double x:Key="IconSizeLg">32</sys:Double>
@@ -21,14 +21,16 @@
     <sys:Double x:Key="AvatarSizeMd">40</sys:Double>
     <sys:Double x:Key="AvatarSizeLg">64</sys:Double>
 
-    <sys:Double x:Key="RadiusSm">8</sys:Double>
-    <sys:Double x:Key="RadiusMd">12</sys:Double>
-    <sys:Double x:Key="RadiusLg">16</sys:Double>
+    <sys:Double x:Key="RadiusSm">10</sys:Double>
+    <sys:Double x:Key="RadiusMd">14</sys:Double>
+    <sys:Double x:Key="RadiusLg">18</sys:Double>
+    <sys:Double x:Key="RadiusXl">24</sys:Double>
     <sys:Double x:Key="RadiusFull">999</sys:Double>
     <sys:Double x:Key="BorderWidthHairline">1</sys:Double>
+    <sys:Double x:Key="BorderWidthAccent">1.5</sys:Double>
 
     <Thickness x:Key="ThicknessPage">16</Thickness>
     <Thickness x:Key="ThicknessCard">16</Thickness>
-    <Thickness x:Key="ThicknessButtonPadding">24,0</Thickness>
+    <Thickness x:Key="ThicknessButtonPadding">28,0</Thickness>
 
 </ResourceDictionary>
