@@ -411,7 +411,7 @@ public sealed class HomePage : ContentPage
 
         if (action is null)
         {
-            await Shell.Current.GoToAsync(nameof(TasksPage));
+            await Shell.Current.GoToAsync($"{nameof(TasksPage)}?scope=family");
             return;
         }
 
