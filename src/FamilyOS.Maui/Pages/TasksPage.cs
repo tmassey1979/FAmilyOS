@@ -706,10 +706,10 @@ public sealed class TasksPage : ContentPage
 
                 _ = action switch
                 {
-                    "defer" => await _tasks.DeferAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
-                    "skip" => await _tasks.SkipAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
-                    "cancel" => await _tasks.CancelAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
-                    "decline" => await _tasks.DeclineAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
+                    "defer" => await _tasks.DeferAsync(task.Id, string.IsNullOrWhiteSpace(note) ? null : note),
+                    "skip" => await _tasks.SkipAsync(task.Id, string.IsNullOrWhiteSpace(note) ? null : note),
+                    "cancel" => await _tasks.CancelAsync(task.Id, string.IsNullOrWhiteSpace(note) ? null : note),
+                    "decline" => await _tasks.DeclineAsync(task.Id, string.IsNullOrWhiteSpace(note) ? null : note),
                     _ => throw new InvalidOperationException()
                 };
             }
