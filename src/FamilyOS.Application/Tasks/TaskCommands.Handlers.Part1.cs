@@ -97,6 +97,8 @@ public partial class TaskCommandHandlers :
 
         if (cmd.AssignToMemberId.HasValue)
         {
+            if (task.DueDate is null)
+                throw new ValidationException("DueDate", "A due date is required before assigning a task.");
             await EnsureMemberInFamily(cmd.AssignToMemberId.Value, ct);
             task.Assign(cmd.AssignToMemberId.Value, _current.MemberId!.Value);
             if (cmd.AssignToMemberId.Value != _current.MemberId)
@@ -206,6 +208,8 @@ public partial class TaskCommandHandlers :
         await _current.EnsureLoadedAsync(ct);
         EnsureCanAssign();
         var task = await GetTaskForFamily(cmd.TaskId, ct);
+        if (task.DueDate is null)
+            throw new ValidationException("DueDate", "Set a due date before assigning this task.");
         await EnsureMemberInFamily(cmd.AssignToMemberId, ct);
         task.Assign(cmd.AssignToMemberId, _current.MemberId!.Value);
 
@@ -235,6 +239,8 @@ public partial class TaskCommandHandlers :
     {
         await _current.EnsureLoadedAsync(ct);
         var task = await GetTaskForFamily(cmd.TaskId, ct);
+        if (task.DueDate is null)
+            throw new ValidationException("DueDate", "This task needs a due date before it can be accepted.");
         task.Accept(_current.MemberId!.Value);
         await EnsureTaskCalendarEventAsync(task, ct);
         await _db.SaveChangesAsync(ct);
