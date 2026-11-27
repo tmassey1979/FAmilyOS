@@ -60,9 +60,11 @@ def generate_menu_icons() -> int:
         written += 1
         print(f"  menu {dest.relative_to(ROOT)} ({dest.stat().st_size}b)")
 
-    # home
+    # home — consistent rounded, outlined navigation glyph
     im = blank(); d = ImageDraw.Draw(im)
-    d.polygon([(64, 20), (108, 56), (96, 56), (96, 100), (32, 100), (32, 56), (20, 56)], fill=MENU_ICON)
+    d.line([(18, 60), (64, 22), (110, 60)], fill=MENU_ICON, width=7, joint="curve")
+    d.line([(30, 52), (30, 104), (98, 104), (98, 52)], fill=MENU_ICON, width=7, joint="curve")
+    d.rounded_rectangle([52, 72, 76, 104], radius=4, outline=MENU_ICON, width=6)
     save("menu_home.png", im)
 
     # tasks
@@ -83,10 +85,14 @@ def generate_menu_icons() -> int:
         d.ellipse([x - 4, y - 4, x + 4, y + 4], fill=MENU_ICON)
     save("menu_calendar.png", im)
 
-    # family
+    # family — three connected people, readable at tab-bar size
     im = blank(); d = ImageDraw.Draw(im)
-    d.ellipse([44, 24, 84, 64], outline=MENU_ICON, width=6)
-    d.arc([28, 64, 100, 120], 200, 340, fill=MENU_ICON, width=6)
+    d.ellipse([47, 18, 81, 52], outline=MENU_ICON, width=6)
+    d.ellipse([14, 38, 44, 68], outline=MENU_ICON, width=5)
+    d.ellipse([84, 38, 114, 68], outline=MENU_ICON, width=5)
+    d.arc([34, 54, 94, 118], 195, 345, fill=MENU_ICON, width=7)
+    d.arc([2, 67, 56, 119], 200, 340, fill=MENU_ICON, width=6)
+    d.arc([72, 67, 126, 119], 200, 340, fill=MENU_ICON, width=6)
     save("menu_family.png", im)
 
     # more
@@ -149,11 +155,12 @@ def generate_menu_icons() -> int:
     d.polygon([(48, 92), (72, 60), (100, 92)], fill=MENU_ICON)
     save("menu_gallery.png", im)
 
-    # map pin
+    # map pin — clean locator outline with a distinct center point
     im = blank(); d = ImageDraw.Draw(im)
-    d.ellipse([40, 24, 88, 72], outline=MENU_ICON, width=6)
-    d.polygon([(40, 56), (64, 108), (88, 56)], fill=MENU_ICON)
-    d.ellipse([54, 40, 74, 60], fill=MENU_ICON)
+    d.arc([30, 14, 98, 88], 180, 360, fill=MENU_ICON, width=7)
+    d.line([(30, 51), (64, 112), (98, 51)], fill=MENU_ICON, width=7, joint="curve")
+    d.ellipse([48, 32, 80, 64], outline=MENU_ICON, width=6)
+    d.ellipse([59, 43, 69, 53], fill=MENU_ICON)
     save("menu_map.png", im)
 
     # shopping
