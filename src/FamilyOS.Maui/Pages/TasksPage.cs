@@ -721,11 +721,11 @@ public sealed class TasksPage : ContentPage
             {
                 if (action == "accept" && task.DueDate is null)
                 {
-                    var duePick = await PickDateTimeAsync("Set task due date", DateTime.Today.AddHours(17), allowClear: false);
-                    if (!duePick.Confirmed || !duePick.Value.HasValue)
-                        return;
-                    await _tasks.UpdateDetailsAsync(task.Id, new UpdateTaskDetailsBody(
-                        DueDate: duePick.Value.Value.ToUniversalTime()));
+                    await DisplayAlertAsync(
+                        "Due date needed",
+                        "This task needs a due date before it can be accepted. Ask a parent or owner to set one.",
+                        "OK");
+                    return;
                 }
 
                 await _tasks.RunActionAsync(task.Id, action);
