@@ -202,7 +202,7 @@ public sealed class HomePage : ContentPage
                 };
                 btn.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
                 btn.Clicked += async (_, _) => await HandleNextActionAsync(next);
-                _pulseSection.Children.Add(PulseCard("Next up", next.Subtitle ?? next.Title, next.DueLabel, btn));
+                _pulseSection.Children.Add(PulseCard("Next up", next.Title, next.DueLabel, btn));
             }
             else
             {
