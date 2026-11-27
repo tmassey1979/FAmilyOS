@@ -154,42 +154,98 @@ public sealed class TasksPage : ContentPage
 
     private void AddTask(FamilyTaskDto task)
     {
-        var stack = new VerticalStackLayout { Spacing = 7 };
-        var title = new Label { Text = task.Title, FontSize = 17, FontAttributes = FontAttributes.Bold };
+        var content = new VerticalStackLayout { Spacing = 12 };
+
+        // Header: title gets the visual priority; status is a compact, consistent chip.
+        var title = new Label
+        {
+            Text = task.Title,
+            FontSize = 17,
+            FontAttributes = FontAttributes.Bold,
+            LineBreakMode = LineBreakMode.WordWrap,
+            VerticalOptions = LayoutOptions.Center
+        };
         title.SetDynamicResource(VisualElement.StyleProperty, "TextBodyStrong");
-        stack.Children.Add(title);
 
-        var details = new List<string> { task.Status, task.Priority };
-        if (_showFamilyTasks && !string.IsNullOrWhiteSpace(task.AssignedToName))
-            details.Add($"Assigned to {task.AssignedToName}");
-        if (!string.IsNullOrWhiteSpace(task.Category)) details.Add(task.Category);
-        if (task.IsOverdue) details.Add("Overdue");
-        if (task.IsRecurring) details.Add(task.RecurrenceFrequency is { Length: > 0 } f ? $"↻ {f}" : "↻ Recurring");
-        if (task.DueDate is { } due) details.Add($"Due {due.ToLocalTime():g}");
-        if (task.EstimatedDurationMinutes is { } est) details.Add($"Est {est} min");
-        if (task.ActualDurationMinutes is { } act) details.Add($"Actual {act} min");
-        if (!string.IsNullOrWhiteSpace(task.PlannedStartTime) || !string.IsNullOrWhiteSpace(task.PlannedEndTime))
-            details.Add($"Planned {FormatPlannedTime(task.PlannedStartTime)}–{FormatPlannedTime(task.PlannedEndTime)}");
-        if (task.VarianceMinutes is { } variance)
-            details.Add(variance == 0 ? "On plan" : variance > 0 ? $"+{variance} min vs plan" : $"{variance} min vs plan");
+        var status = CreateTaskChip(FormatTaskStatus(task.Status), "BgGlow", "AccentPrimary");
+        var header = new Grid
+        {
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(GridLength.Star),
+                new ColumnDefinition(GridLength.Auto)
+            },
+            ColumnSpacing = 10
+        };
+        header.Add(title, 0, 0);
+        header.Add(status, 1, 0);
+        content.Children.Add(header);
 
-        var meta = new Label { Text = string.Join(" · ", details), FontSize = 12, LineBreakMode = LineBreakMode.WordWrap };
-        meta.SetDynamicResource(VisualElement.StyleProperty, "TextCaption");
-        stack.Children.Add(meta);
+        // Small, scannable metadata chips instead of one long, crowded sentence.
+        var tags = new HorizontalStackLayout { Spacing = 7, Wrap = true };
+        tags.Children.Add(CreateTaskChip(task.Priority, "BgSurfaceElevated", "TextSecondary"));
+        if (!string.IsNullOrWhiteSpace(task.Category))
+            tags.Children.Add(CreateTaskChip(task.Category, "BgSurfaceElevated", "TextSecondary"));
+        if (task.IsOverdue)
+            tags.Children.Add(CreateTaskChip("OVERDUE", "BgGlow", "AccentDanger"));
+        if (task.IsRecurring)
+            tags.Children.Add(CreateTaskChip(
+                task.RecurrenceFrequency is { Length: > 0 } frequency ? $"↻ {frequency}" : "↻ RECURRING",
+                "BgSurfaceElevated", "TextSecondary"));
+        content.Children.Add(tags);
 
         if (!string.IsNullOrWhiteSpace(task.Description))
         {
-            var desc = new Label { Text = task.Description, FontSize = 13, LineBreakMode = LineBreakMode.WordWrap };
-            desc.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
-            stack.Children.Add(desc);
+            var description = new Label
+            {
+                Text = task.Description,
+                FontSize = 13,
+                LineBreakMode = LineBreakMode.WordWrap,
+                MaxLines = 3
+            };
+            description.SetDynamicResource(VisualElement.StyleProperty, "TextBody");
+            content.Children.Add(description);
         }
 
-        // Assignment ≠ acceptance: Assigned/Reassigned must Accept before Start.
+        // Two-column information grid keeps assignment and timing easy to scan.
+        var info = new Grid
+        {
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(GridLength.Star),
+                new ColumnDefinition(GridLength.Star)
+            },
+            RowDefinitions =
+            {
+                new RowDefinition(GridLength.Auto),
+                new RowDefinition(GridLength.Auto)
+            },
+            ColumnSpacing = 12,
+            RowSpacing = 10
+        };
+        var infoIndex = 0;
+        if (_showFamilyTasks && !string.IsNullOrWhiteSpace(task.AssignedToName))
+            AddTaskInfo(info, infoIndex++, "ASSIGNED TO", task.AssignedToName);
+        if (task.DueDate is { } due)
+            AddTaskInfo(info, infoIndex++, "DUE", due.ToLocalTime().ToString("ddd, MMM d · h:mm tt", CultureInfo.CurrentCulture));
+        if (!string.IsNullOrWhiteSpace(task.PlannedStartTime) || !string.IsNullOrWhiteSpace(task.PlannedEndTime))
+            AddTaskInfo(info, infoIndex++, "SCHEDULED", $"{FormatPlannedTime(task.PlannedStartTime)} – {FormatPlannedTime(task.PlannedEndTime)}");
+        else if (task.EstimatedDurationMinutes is { } estimate)
+            AddTaskInfo(info, infoIndex++, "ESTIMATED", $"{estimate} minutes");
+        if (task.ActualDurationMinutes is { } actual)
+            AddTaskInfo(info, infoIndex++, "TIME SPENT", $"{actual} minutes");
+        if (task.VarianceMinutes is { } variance)
+            AddTaskInfo(info, infoIndex++, "SCHEDULE VARIANCE",
+                variance == 0 ? "On plan" : variance > 0 ? $"+{variance} min" : $"{variance} min");
+        if (infoIndex > 0)
+            content.Children.Add(info);
+
         var actions = new FlexLayout
         {
             Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap,
             Direction = Microsoft.Maui.Layouts.FlexDirection.Row,
-            JustifyContent = Microsoft.Maui.Layouts.FlexJustify.Start
+            JustifyContent = Microsoft.Maui.Layouts.FlexJustify.Start,
+            AlignItems = Microsoft.Maui.Layouts.FlexAlignItems.Center
         };
         foreach (var (action, label, primary) in ActionsFor(task.Status))
             actions.Children.Add(MakeActionButton(task.Id, action, label, primary));
@@ -197,16 +253,71 @@ public sealed class TasksPage : ContentPage
         var isTerminal = task.Status is "Completed" or "Cancelled" or "Declined" or "Skipped";
         var canEdit = _showFamilyTasks && !isTerminal;
         var canPlan = task.Status is "Accepted" or "InProgress" or "Paused" or "Deferred";
-        var canAssign = _showFamilyTasks && task.Status is "Created" or "Assigned" or "Reassigned" or "Declined";
+        var canAssign = _showFamilyTasks &&
+            task.Status is "Created" or "Assigned" or "Reassigned" or "Declined";
         if (canEdit) actions.Children.Add(MakeDetailsButton(task));
         if (canPlan) actions.Children.Add(MakeScheduleButton(task));
         if (canAssign) actions.Children.Add(MakeAssignButton(task));
         actions.Children.Add(MakeHistoryButton(task.Id, task.Title));
-        stack.Children.Add(actions);
+        content.Children.Add(new BoxView { HeightRequest = 1, Opacity = 0.18 });
+        content.Children.Add(actions);
 
-        var border = new Border { Padding = 14, Content = stack };
-        border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
-        _items.Children.Add(border);
+        var card = new Border
+        {
+            Padding = new Thickness(16, 15),
+            StrokeThickness = 0,
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 18 },
+            Content = content
+        };
+        card.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
+        _items.Children.Add(card);
+    }
+
+    private static string FormatTaskStatus(string status)
+    {
+        if (string.IsNullOrWhiteSpace(status)) return "UNKNOWN";
+        var spaced = System.Text.RegularExpressions.Regex.Replace(status, "([a-z])([A-Z])", "$1 $2");
+        return spaced.ToUpperInvariant();
+    }
+
+    private static Border CreateTaskChip(string text, string backgroundResource, string foregroundResource)
+    {
+        var label = new Label
+        {
+            Text = text,
+            FontSize = 10,
+            FontAttributes = FontAttributes.Bold,
+            CharacterSpacing = 0.25,
+            VerticalTextAlignment = TextAlignment.Center,
+            LineBreakMode = LineBreakMode.TailTruncation
+        };
+        label.SetDynamicResource(Label.TextColorProperty, foregroundResource);
+        var chip = new Border
+        {
+            Padding = new Thickness(9, 5),
+            StrokeThickness = 0,
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 12 },
+            Content = label,
+            VerticalOptions = LayoutOptions.Center
+        };
+        chip.SetDynamicResource(VisualElement.BackgroundColorProperty, backgroundResource);
+        return chip;
+    }
+
+    private static void AddTaskInfo(Grid grid, int index, string label, string value)
+    {
+        var caption = new Label { Text = label, FontSize = 9, CharacterSpacing = 0.7 };
+        caption.SetDynamicResource(Label.TextColorProperty, "TextMuted");
+        var text = new Label
+        {
+            Text = value,
+            FontSize = 12,
+            FontAttributes = FontAttributes.Bold,
+            LineBreakMode = LineBreakMode.WordWrap
+        };
+        text.SetDynamicResource(VisualElement.StyleProperty, "TextBodyStrong");
+        var stack = new VerticalStackLayout { Spacing = 2, Children = { caption, text } };
+        grid.Add(stack, index % 2, index / 2);
     }
 
     private static (string action, string label, bool primary)[] ActionsFor(string status) => status switch
@@ -251,7 +362,7 @@ public sealed class TasksPage : ContentPage
 
     private Button MakeActionButton(Guid taskId, string action, string label, bool primary)
     {
-        var button = new Button { Text = label, FontSize = 12, Margin = new Thickness(0, 4, 8, 0) };
+        var button = new Button { Text = label, FontSize = 12, HeightRequest = 38, CornerRadius = 19, Padding = new Thickness(14, 0), Margin = new Thickness(0, 2, 8, 2) };
         button.SetDynamicResource(VisualElement.StyleProperty, primary ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle");
         button.Clicked += async (_, _) => await ExecuteAsync(taskId, action);
         return button;
@@ -259,7 +370,7 @@ public sealed class TasksPage : ContentPage
 
     private Button MakeDetailsButton(FamilyTaskDto task)
     {
-        var button = new Button { Text = "Edit details", FontSize = 12, Margin = new Thickness(0, 4, 8, 0) };
+        var button = new Button { Text = "Edit", FontSize = 12, HeightRequest = 36, CornerRadius = 18, Padding = new Thickness(13, 0), Margin = new Thickness(0, 2, 8, 2) };
         button.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         button.Clicked += async (_, _) => await EditTaskAsync(task);
         return button;
@@ -267,7 +378,7 @@ public sealed class TasksPage : ContentPage
 
     private Button MakeScheduleButton(FamilyTaskDto task)
     {
-        var button = new Button { Text = "Plan time", FontSize = 12, Margin = new Thickness(0, 4, 8, 0) };
+        var button = new Button { Text = "Schedule", FontSize = 12, HeightRequest = 36, CornerRadius = 18, Padding = new Thickness(13, 0), Margin = new Thickness(0, 2, 8, 2) };
         button.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         button.Clicked += async (_, _) => await SetPlannedTimesAsync(task);
         return button;
@@ -449,7 +560,7 @@ public sealed class TasksPage : ContentPage
 
     private Button MakeAssignButton(FamilyTaskDto task)
     {
-        var button = new Button { Text = "Assign", FontSize = 12, Margin = new Thickness(0, 4, 8, 0) };
+        var button = new Button { Text = "Assign", FontSize = 12, HeightRequest = 36, CornerRadius = 18, Padding = new Thickness(13, 0), Margin = new Thickness(0, 2, 8, 2) };
         button.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
         button.Clicked += async (_, _) => await ReassignTaskAsync(task);
         return button;
@@ -514,7 +625,7 @@ public sealed class TasksPage : ContentPage
 
     private Button MakeHistoryButton(Guid taskId, string title)
     {
-        var button = new Button { Text = "History", FontSize = 12, Margin = new Thickness(0, 4, 8, 0) };
+        var button = new Button { Text = "History", FontSize = 12, HeightRequest = 36, CornerRadius = 18, Padding = new Thickness(13, 0), Margin = new Thickness(0, 2, 8, 2) };
         button.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
         button.Clicked += async (_, _) => await ShowHistoryAsync(taskId, title);
         return button;
