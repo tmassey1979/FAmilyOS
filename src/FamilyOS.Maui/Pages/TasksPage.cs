@@ -182,8 +182,8 @@ public sealed class TasksPage : ContentPage
         content.Children.Add(header);
 
         // Small, scannable metadata chips instead of one long, crowded sentence.
-        var tags = new HorizontalStackLayout { Spacing = 7, Wrap = true };
-        tags.Children.Add(CreateTaskChip(task.Priority, "BgSurfaceElevated", "TextSecondary"));
+        var tags = new FlexLayout { Direction = Microsoft.Maui.Layouts.FlexDirection.Row, Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap, AlignItems = Microsoft.Maui.Layouts.FlexAlignItems.Center };
+        tags.Children.Add(CreateTaskChip(task.Priority, "BgSurfaceAlt", "TextPrimary"));
         if (!string.IsNullOrWhiteSpace(task.Category))
             tags.Children.Add(CreateTaskChip(task.Category, "BgSurfaceElevated", "TextSecondary"));
         if (task.IsOverdue)
@@ -217,6 +217,7 @@ public sealed class TasksPage : ContentPage
             },
             RowDefinitions =
             {
+                new RowDefinition(GridLength.Auto),
                 new RowDefinition(GridLength.Auto),
                 new RowDefinition(GridLength.Auto)
             },
@@ -259,7 +260,9 @@ public sealed class TasksPage : ContentPage
         if (canPlan) actions.Children.Add(MakeScheduleButton(task));
         if (canAssign) actions.Children.Add(MakeAssignButton(task));
         actions.Children.Add(MakeHistoryButton(task.Id, task.Title));
-        content.Children.Add(new BoxView { HeightRequest = 1, Opacity = 0.18 });
+        var separator = new BoxView { HeightRequest = 1, Opacity = 0.55 };
+        separator.SetDynamicResource(VisualElement.BackgroundColorProperty, "BorderSubtle");
+        content.Children.Add(separator);
         content.Children.Add(actions);
 
         var card = new Border
