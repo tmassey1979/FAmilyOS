@@ -194,9 +194,13 @@ public sealed class TasksPage : ContentPage
         foreach (var (action, label, primary) in ActionsFor(task.Status))
             actions.Children.Add(MakeActionButton(task.Id, action, label, primary));
 
-        actions.Children.Add(MakeDetailsButton(task));
-        actions.Children.Add(MakeScheduleButton(task));
-        actions.Children.Add(MakeAssignButton(task));
+        var isTerminal = task.Status is "Completed" or "Cancelled" or "Declined" or "Skipped";
+        var canEdit = _showFamilyTasks && !isTerminal;
+        var canPlan = task.Status is "Accepted" or "InProgress" or "Paused" or "Deferred";
+        var canAssign = _showFamilyTasks && task.Status is "Created" or "Assigned" or "Reassigned" or "Declined";
+        if (canEdit) actions.Children.Add(MakeDetailsButton(task));
+        if (canPlan) actions.Children.Add(MakeScheduleButton(task));
+        if (canAssign) actions.Children.Add(MakeAssignButton(task));
         actions.Children.Add(MakeHistoryButton(task.Id, task.Title));
         stack.Children.Add(actions);
 
