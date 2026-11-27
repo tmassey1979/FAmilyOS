@@ -8,7 +8,7 @@ namespace FamilyOS.Maui.Pages;
 /// authority for task visibility, assignment, and allowed state transitions.
 /// Assignment is distinct from acceptance: "Assigned" requires Accept before Start.
 /// </summary>
-public sealed class TasksPage : ContentPage
+public sealed class TasksPage : ContentPage, IQueryAttributable
 {
     private readonly TasksApiClient _tasks;
     private readonly FamilyApiClient _family;
@@ -19,6 +19,7 @@ public sealed class TasksPage : ContentPage
     private readonly Button _refresh;
     private readonly Button _create;
     private readonly Button _scope;
+    private readonly Label _heading;
     private bool _showFamilyTasks;
     private bool _loading;
 
@@ -37,15 +38,15 @@ public sealed class TasksPage : ContentPage
         _create = new Button { Text = "New task" };
         _create.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
         _create.Clicked += async (_, _) => await CreateTaskAsync();
-        var heading = new Label { Text = "My tasks", FontSize = 26, FontAttributes = FontAttributes.Bold };
-        heading.SetDynamicResource(VisualElement.StyleProperty, "TextDisplay");
+        _heading = new Label { Text = "My tasks", FontSize = 26, FontAttributes = FontAttributes.Bold };
+        _heading.SetDynamicResource(VisualElement.StyleProperty, "TextDisplay");
         _scope = new Button { Text = "Family tasks", FontSize = 12 };
         _scope.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         _scope.Clicked += async (_, _) =>
         {
             _showFamilyTasks = !_showFamilyTasks;
             _scope.Text = _showFamilyTasks ? "My tasks" : "Family tasks";
-            heading.Text = _showFamilyTasks ? "Household tasks" : "My tasks";
+            _heading.Text = _showFamilyTasks ? "Household tasks" : "My tasks";
             await LoadAsync();
         };
 
@@ -60,7 +61,7 @@ public sealed class TasksPage : ContentPage
         var header = new Grid
         {
             ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
-            Children = { heading, toolbar }
+            Children = { _heading, toolbar }
         };
         Grid.SetColumn(toolbar, 1);
 
@@ -88,10 +89,21 @@ public sealed class TasksPage : ContentPage
         };
     }
 
+    public void ApplyQueryAttributes(IDictionary<string, object> query)
+    {
+        if (query.TryGetValue("scope", out var scope) &&
+            string.Equals(scope?.ToString(), "family", StringComparison.OrdinalIgnoreCase))
+        {
+            _showFamilyTasks = true;
+            _scope.Text = "My tasks";
+            _heading.Text = "Household tasks";
+        }
+    }
+
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (_items.Children.Count == 0 && !_loading)
+        if (!_loading)
             await LoadAsync();
     }
 
@@ -190,6 +202,8 @@ public sealed class TasksPage : ContentPage
             tags.Children.Add(CreateTaskChip(task.Category, "BgSurfaceAlt", "TextPrimary"));
         if (task.IsOverdue)
             tags.Children.Add(CreateTaskChip("OVERDUE", "BgGlow", "AccentDanger"));
+        if (task.DueDate is null && task.Status is not ("Completed" or "Cancelled" or "Declined" or "Skipped"))
+            tags.Children.Add(CreateTaskChip("DUE DATE NEEDED", "BgGlow", "AccentDanger"));
         if (task.IsRecurring)
             tags.Children.Add(CreateTaskChip(
                 task.RecurrenceFrequency is { Length: > 0 } frequency ? $"↻ {frequency}" : "↻ RECURRING",
@@ -231,6 +245,8 @@ public sealed class TasksPage : ContentPage
             AddTaskInfo(info, infoIndex++, "ASSIGNED TO", task.AssignedToName);
         if (task.DueDate is { } due)
             AddTaskInfo(info, infoIndex++, "DUE", due.ToLocalTime().ToString("ddd, MMM d · h:mm tt", CultureInfo.CurrentCulture));
+        else if (task.Status is not ("Completed" or "Cancelled" or "Declined" or "Skipped"))
+            AddTaskInfo(info, infoIndex++, "DUE", "Needs a due date");
         if (!string.IsNullOrWhiteSpace(task.PlannedStartTime) || !string.IsNullOrWhiteSpace(task.PlannedEndTime))
             AddTaskInfo(info, infoIndex++, "SCHEDULED", $"{FormatPlannedTime(task.PlannedStartTime)} – {FormatPlannedTime(task.PlannedEndTime)}");
         else if (task.EstimatedDurationMinutes is { } estimate)
@@ -255,13 +271,13 @@ public sealed class TasksPage : ContentPage
             .Where(x => x.primary || x.action is "complete" or "pause" or "resume")
             .ToArray();
         foreach (var (action, label, primary) in visibleActions)
-            actions.Children.Add(MakeActionButton(task.Id, action, label, primary));
+            actions.Children.Add(MakeActionButton(task, action, label, primary));
 
         var isTerminal = task.Status is "Completed" or "Cancelled" or "Declined" or "Skipped";
         var canEdit = _showFamilyTasks && !isTerminal;
         var canPlan = task.Status is "Accepted" or "InProgress" or "Paused" or "Deferred";
         var canAssign = _showFamilyTasks &&
-            task.Status is "Created" or "Assigned" or "Reassigned" or "Declined";
+            task.Status is ("Created" or "Assigned" or "Reassigned" or "Declined");
         var moreOptions = allActions
             .Where(x => !visibleActions.Any(v => v.action == x.action))
             .Select(x => (x.label, x.action))
@@ -405,11 +421,11 @@ public sealed class TasksPage : ContentPage
         return button;
     }
 
-    private Button MakeActionButton(Guid taskId, string action, string label, bool primary)
+    private Button MakeActionButton(FamilyTaskDto task, string action, string label, bool primary)
     {
         var button = new Button { Text = label, FontSize = 12, HeightRequest = 38, CornerRadius = 19, Padding = new Thickness(14, 0), Margin = new Thickness(0, 2, 8, 2) };
         button.SetDynamicResource(VisualElement.StyleProperty, primary ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle");
-        button.Clicked += async (_, _) => await ExecuteAsync(taskId, action);
+        button.Clicked += async (_, _) => await ExecuteAsync(task, action);
         return button;
     }
 
@@ -621,7 +637,8 @@ public sealed class TasksPage : ContentPage
         if (priority is null or "Cancel") return;
         if (priority == "Keep current") priority = task.Priority;
         var duePick = await PickDateTimeAsync("Due date and time",
-            task.DueDate?.ToLocalTime() ?? DateTime.Today.AddHours(17), allowClear: true);
+            task.DueDate?.ToLocalTime() ?? DateTime.Today.AddHours(17),
+            allowClear: !task.AssignedToMemberId.HasValue);
         if (!duePick.Confirmed) return;
         DateTime? dueDate = duePick.Value?.ToUniversalTime();
         var clearDueDate = !dueDate.HasValue;
@@ -660,6 +677,15 @@ public sealed class TasksPage : ContentPage
             if (selectedIndex < 0) return;
             var member = members[selectedIndex];
 
+            if (task.DueDate is null)
+            {
+                var duePick = await PickDateTimeAsync("Set due date before assigning",
+                    DateTime.Today.AddDays(1).AddHours(17), allowClear: false);
+                if (!duePick.Confirmed || !duePick.Value.HasValue) return;
+                await _tasks.UpdateDetailsAsync(task.Id, new UpdateTaskDetailsBody(
+                    DueDate: duePick.Value.Value.ToUniversalTime()));
+            }
+
             await _tasks.ReassignAsync(task.Id, member.Id);
             _status.Text = $"Task assigned to {member.DisplayName}.";
             await LoadAsync();
@@ -676,7 +702,7 @@ public sealed class TasksPage : ContentPage
         return button;
     }
 
-    private async Task ExecuteAsync(Guid taskId, string action)
+    private async Task ExecuteAsync(FamilyTaskDto task, string action)
     {
         try
         {
@@ -696,18 +722,27 @@ public sealed class TasksPage : ContentPage
 
                 _ = action switch
                 {
-                    "defer" => await _tasks.DeferAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
-                    "skip" => await _tasks.SkipAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
-                    "cancel" => await _tasks.CancelAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
-                    "decline" => await _tasks.DeclineAsync(taskId, string.IsNullOrWhiteSpace(note) ? null : note),
+                    "defer" => await _tasks.DeferAsync(task.Id, string.IsNullOrWhiteSpace(note) ? null : note),
+                    "skip" => await _tasks.SkipAsync(task.Id, string.IsNullOrWhiteSpace(note) ? null : note),
+                    "cancel" => await _tasks.CancelAsync(task.Id, string.IsNullOrWhiteSpace(note) ? null : note),
+                    "decline" => await _tasks.DeclineAsync(task.Id, string.IsNullOrWhiteSpace(note) ? null : note),
                     _ => throw new InvalidOperationException()
                 };
             }
             else
             {
-                await _tasks.RunActionAsync(taskId, action);
+                if (action == "accept" && task.DueDate is null)
+                {
+                    await DisplayAlertAsync(
+                        "Due date needed",
+                        "This task needs a due date before it can be accepted. Ask a parent or owner to set one.",
+                        "OK");
+                    return;
+                }
+
+                await _tasks.RunActionAsync(task.Id, action);
                 if (action == "accept")
-                    await ConfigureAcceptedTaskScheduleAsync(taskId);
+                    await ConfigureAcceptedTaskScheduleAsync(task.Id);
             }
 
             if (action == "complete")
@@ -789,7 +824,7 @@ public sealed class TasksPage : ContentPage
             var priority = new Picker { Title = "Priority", ItemsSource = new List<string> { "Low", "Normal", "High", "Urgent" }, SelectedIndex = 1 };
             var assignee = new Picker { Title = "Assign to", ItemsSource = new List<string> { "Leave unassigned" }.Concat(members.Select(m => m.DisplayName)).ToList(), SelectedIndex = 0 };
             var estimate = new Entry { Placeholder = "Estimated minutes (optional)", Keyboard = Keyboard.Numeric, MaxLength = 5 };
-            var dueEnabled = new Switch { IsToggled = false };
+            var dueEnabled = new Switch { IsToggled = true };
             var dueDate = new DatePicker { Date = DateTime.Today.AddDays(1), Format = "ddd, MMM d, yyyy" };
             var dueTime = new TimePicker { Time = new TimeSpan(17, 0, 0), Format = "h:mm tt" };
             var plannedStartEnabled = new Switch { IsToggled = false };
@@ -862,6 +897,11 @@ public sealed class TasksPage : ContentPage
                 var selectedMemberIndex = assignee.SelectedIndex - 1;
                 Guid? assigneeId = selectedMemberIndex >= 0 && selectedMemberIndex < members.Count
                     ? members[selectedMemberIndex].Id : null;
+                if (assigneeId.HasValue && !dueEnabled.IsToggled)
+                {
+                    await DisplayAlertAsync("Due date required", "Assigned tasks need a due date so they appear in the right order on Family Pulse.", "OK");
+                    return;
+                }
                 try
                 {
                     await _tasks.CreateTaskAsync(new CreateTaskBody(
