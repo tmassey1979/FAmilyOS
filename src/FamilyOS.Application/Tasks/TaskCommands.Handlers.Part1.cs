@@ -238,12 +238,6 @@ public partial class TaskCommandHandlers :
         task.Accept(_current.MemberId!.Value);
         await EnsureTaskCalendarEventAsync(task, ct);
         await _db.SaveChangesAsync(ct);
-        if (task.CalendarEventId is Guid eventId)
-        {
-            var calendarEvent = await _db.CalendarEvents.FirstOrDefaultAsync(e => e.Id == eventId, ct);
-            if (calendarEvent is not null)
-                await GoogleCalendarSync.TryPushEventAsync(_db, null, calendarEvent, ct);
-        }
         return await ToDto(task, ct);
     }
 
