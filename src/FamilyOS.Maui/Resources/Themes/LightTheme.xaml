@@ -3,20 +3,21 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
-    <!-- A cool, high-clarity light mode that keeps the same brand character. -->
-    <Color x:Key="BgPage">#F4F7FC</Color>
+    <!-- Cool modern light: clean panels + electric cyan -->
+    <Color x:Key="BgPage">#EEF2F7</Color>
     <Color x:Key="BgSurface">#FFFFFF</Color>
-    <Color x:Key="BgSurfaceAlt">#EAF0F8</Color>
-    <Color x:Key="BgGlow">#E5F8FF</Color>
-    <Color x:Key="BorderSubtle">#D7E1EF</Color>
-    <Color x:Key="TextPrimary">#101A2B</Color>
-    <Color x:Key="TextMuted">#60718A</Color>
-    <Color x:Key="TextOnAccent">#081321</Color>
-    <Color x:Key="AccentPrimary">#008DA8</Color>
-    <Color x:Key="AccentSecondary">#6D5CE7</Color>
-    <Color x:Key="AccentDanger">#D83D5B</Color>
-    <Color x:Key="AccentSuccess">#087F61</Color>
-    <Color x:Key="AccentWarning">#956000</Color>
+    <Color x:Key="BgSurfaceAlt">#E2E8F0</Color>
+    <Color x:Key="BorderSubtle">#CBD5E1</Color>
+    <Color x:Key="BorderAccent">#22D3EE55</Color>
+    <Color x:Key="TextPrimary">#0B1220</Color>
+    <Color x:Key="TextMuted">#64748B</Color>
+    <Color x:Key="TextOnAccent">#041018</Color>
+    <Color x:Key="AccentPrimary">#0891B2</Color>
+    <Color x:Key="AccentSecondary">#7C3AED</Color>
+    <Color x:Key="AccentGlow">#22D3EE</Color>
+    <Color x:Key="AccentDanger">#E11D48</Color>
+    <Color x:Key="AccentSuccess">#059669</Color>
+    <Color x:Key="AccentWarning">#D97706</Color>
     <Color x:Key="OverlayScrim">#00000066</Color>
 
 </ResourceDictionary>
