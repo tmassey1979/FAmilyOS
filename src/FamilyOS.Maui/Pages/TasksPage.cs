@@ -8,7 +8,7 @@ namespace FamilyOS.Maui.Pages;
 /// authority for task visibility, assignment, and allowed state transitions.
 /// Assignment is distinct from acceptance: "Assigned" requires Accept before Start.
 /// </summary>
-public sealed class TasksPage : ContentPage
+public sealed class TasksPage : ContentPage, IQueryAttributable
 {
     private readonly TasksApiClient _tasks;
     private readonly FamilyApiClient _family;
@@ -19,6 +19,7 @@ public sealed class TasksPage : ContentPage
     private readonly Button _refresh;
     private readonly Button _create;
     private readonly Button _scope;
+    private readonly Label _heading;
     private bool _showFamilyTasks;
     private bool _loading;
 
@@ -37,15 +38,15 @@ public sealed class TasksPage : ContentPage
         _create = new Button { Text = "New task" };
         _create.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
         _create.Clicked += async (_, _) => await CreateTaskAsync();
-        var heading = new Label { Text = "My tasks", FontSize = 26, FontAttributes = FontAttributes.Bold };
-        heading.SetDynamicResource(VisualElement.StyleProperty, "TextDisplay");
+        _heading = new Label { Text = "My tasks", FontSize = 26, FontAttributes = FontAttributes.Bold };
+        _heading.SetDynamicResource(VisualElement.StyleProperty, "TextDisplay");
         _scope = new Button { Text = "Family tasks", FontSize = 12 };
         _scope.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
         _scope.Clicked += async (_, _) =>
         {
             _showFamilyTasks = !_showFamilyTasks;
             _scope.Text = _showFamilyTasks ? "My tasks" : "Family tasks";
-            heading.Text = _showFamilyTasks ? "Household tasks" : "My tasks";
+            _heading.Text = _showFamilyTasks ? "Household tasks" : "My tasks";
             await LoadAsync();
         };
 
@@ -60,7 +61,7 @@ public sealed class TasksPage : ContentPage
         var header = new Grid
         {
             ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
-            Children = { heading, toolbar }
+            Children = { _heading, toolbar }
         };
         Grid.SetColumn(toolbar, 1);
 
@@ -88,10 +89,21 @@ public sealed class TasksPage : ContentPage
         };
     }
 
+    public void ApplyQueryAttributes(IDictionary<string, object> query)
+    {
+        if (query.TryGetValue("scope", out var scope) &&
+            string.Equals(scope?.ToString(), "family", StringComparison.OrdinalIgnoreCase))
+        {
+            _showFamilyTasks = true;
+            _scope.Text = "My tasks";
+            _heading.Text = "Household tasks";
+        }
+    }
+
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (_items.Children.Count == 0 && !_loading)
+        if (!_loading)
             await LoadAsync();
     }
 
