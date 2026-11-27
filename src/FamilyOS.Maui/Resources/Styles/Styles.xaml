@@ -10,95 +10,121 @@
     <Style x:Key="FoPrimaryButtonStyle" TargetType="Button">
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource AccentPrimary}, Dark={StaticResource AccentPrimary}}" />
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextOnAccent}, Dark={StaticResource TextOnAccent}}" />
-        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontSize" Value="16" />
         <Setter Property="FontAttributes" Value="Bold" />
-        <Setter Property="CornerRadius" Value="18" />
+        <Setter Property="CornerRadius" Value="14" />
         <Setter Property="MinimumHeightRequest" Value="52" />
-        <Setter Property="Padding" Value="22,0" />
-        <Setter Property="CharacterSpacing" Value="0.25" />
-        <Setter Property="BorderWidth" Value="1" />
-        <Setter Property="BorderColor" Value="{AppThemeBinding Light={StaticResource AccentPrimary}, Dark={StaticResource AccentPrimary}}" />
-        <Setter Property="Shadow">
-            <Setter.Value><Shadow Brush="#6600B8D9" Offset="0,4" Radius="14" Opacity="0.24" /></Setter.Value>
-        </Setter>
+        <Setter Property="Padding" Value="28,0" />
+        <Setter Property="BorderWidth" Value="0" />
     </Style>
+
     <Style x:Key="FoSecondaryButtonStyle" TargetType="Button">
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BgSurfaceAlt}, Dark={StaticResource BgSurfaceAlt}}" />
-        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimary}, Dark={StaticResource TextPrimary}}" />
-        <Setter Property="FontSize" Value="15" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource AccentPrimary}, Dark={StaticResource AccentGlow}}" />
+        <Setter Property="FontSize" Value="16" />
         <Setter Property="FontAttributes" Value="Bold" />
-        <Setter Property="CornerRadius" Value="16" />
-        <Setter Property="MinimumHeightRequest" Value="50" />
-        <Setter Property="Padding" Value="20,0" />
-        <Setter Property="BorderWidth" Value="1" />
-        <Setter Property="BorderColor" Value="{AppThemeBinding Light={StaticResource BorderSubtle}, Dark={StaticResource BorderSubtle}}" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="MinimumHeightRequest" Value="52" />
+        <Setter Property="Padding" Value="28,0" />
+        <Setter Property="BorderColor" Value="{AppThemeBinding Light={StaticResource AccentPrimary}, Dark={StaticResource AccentPrimary}}" />
+        <Setter Property="BorderWidth" Value="1.5" />
     </Style>
+
     <Style x:Key="FoDangerButtonStyle" TargetType="Button">
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource AccentDanger}, Dark={StaticResource AccentDanger}}" />
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextOnAccent}, Dark={StaticResource TextOnAccent}}" />
-        <Setter Property="FontSize" Value="15" />
+        <Setter Property="FontSize" Value="16" />
         <Setter Property="FontAttributes" Value="Bold" />
-        <Setter Property="CornerRadius" Value="16" />
-        <Setter Property="MinimumHeightRequest" Value="50" />
-        <Setter Property="Padding" Value="20,0" />
-        <Setter Property="BorderWidth" Value="1" />
-        <Setter Property="BorderColor" Value="{AppThemeBinding Light={StaticResource AccentDanger}, Dark={StaticResource AccentDanger}}" />
-        <Setter Property="CharacterSpacing" Value="0.2" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="MinimumHeightRequest" Value="52" />
+        <Setter Property="Padding" Value="28,0" />
+        <Setter Property="BorderWidth" Value="0" />
     </Style>
+
     <Style x:Key="FoGhostButtonStyle" TargetType="Button">
         <Setter Property="BackgroundColor" Value="Transparent" />
-        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource AccentPrimary}, Dark={StaticResource AccentPrimary}}" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource AccentPrimary}, Dark={StaticResource AccentGlow}}" />
         <Setter Property="FontSize" Value="15" />
         <Setter Property="FontAttributes" Value="Bold" />
-        <Setter Property="MinimumHeightRequest" Value="46" />
-        <Setter Property="Padding" Value="16,0" />
-        <Setter Property="CharacterSpacing" Value="0.2" />
+        <Setter Property="MinimumHeightRequest" Value="48" />
+        <Setter Property="Padding" Value="12,0" />
+        <Setter Property="BorderWidth" Value="0" />
     </Style>
+
+    <Style x:Key="FoAccentButtonStyle" TargetType="Button">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource AccentSecondary}, Dark={StaticResource AccentSecondary}}" />
+        <Setter Property="TextColor" Value="#F8FAFC" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="FontAttributes" Value="Bold" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="MinimumHeightRequest" Value="52" />
+        <Setter Property="Padding" Value="28,0" />
+        <Setter Property="BorderWidth" Value="0" />
+    </Style>
+
     <Style x:Key="FoCardFrameStyle" TargetType="Border">
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BgSurface}, Dark={StaticResource BgSurface}}" />
         <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource BorderSubtle}, Dark={StaticResource BorderSubtle}}" />
         <Setter Property="StrokeThickness" Value="1" />
-        <Setter Property="Shadow">
-            <Setter.Value>
-                <Shadow Brush="#55000000" Offset="0,6" Radius="18" Opacity="0.22" />
-            </Setter.Value>
-        </Setter>
         <Setter Property="Padding" Value="16" />
         <Setter Property="StrokeShape">
             <Setter.Value>
-                <RoundRectangle CornerRadius="22" />
+                <RoundRectangle CornerRadius="16" />
             </Setter.Value>
         </Setter>
     </Style>
-    <Style x:Key="FoEntryStyle" TargetType="Entry">
+
+    <Style x:Key="FoCardAccentFrameStyle" TargetType="Border">
         <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BgSurface}, Dark={StaticResource BgSurface}}" />
-        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimary}, Dark={StaticResource TextPrimary}}" />
-        <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource TextMuted}, Dark={StaticResource TextMuted}}" />
-        <Setter Property="FontSize" Value="16" />
-        <Setter Property="MinimumHeightRequest" Value="48" />
+        <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource AccentPrimary}, Dark={StaticResource AccentPrimary}}" />
+        <Setter Property="StrokeThickness" Value="1.5" />
+        <Setter Property="Padding" Value="16" />
+        <Setter Property="StrokeShape">
+            <Setter.Value>
+                <RoundRectangle CornerRadius="16" />
+            </Setter.Value>
+        </Setter>
     </Style>
 
-    <Style x:Key="FoEditorStyle" TargetType="Editor">
-        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BgSurface}, Dark={StaticResource BgSurface}}" />
+    <Style x:Key="FoEntryStyle" TargetType="Entry">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BgSurface}, Dark={StaticResource BgSurfaceAlt}}" />
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimary}, Dark={StaticResource TextPrimary}}" />
         <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource TextMuted}, Dark={StaticResource TextMuted}}" />
         <Setter Property="FontSize" Value="16" />
-        <Setter Property="MinimumHeightRequest" Value="96" />
+        <Setter Property="MinimumHeightRequest" Value="52" />
     </Style>
-    <Style x:Key="FoPickerStyle" TargetType="Picker">
-        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BgSurface}, Dark={StaticResource BgSurface}}" />
-        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimary}, Dark={StaticResource TextPrimary}}" />
-        <Setter Property="TitleColor" Value="{AppThemeBinding Light={StaticResource TextMuted}, Dark={StaticResource TextMuted}}" />
-        <Setter Property="FontSize" Value="16" />
-        <Setter Property="MinimumHeightRequest" Value="48" />
-    </Style>
-    <Style x:Key="FoSearchBarStyle" TargetType="SearchBar">
-        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BgSurfaceAlt}, Dark={StaticResource BgSurfaceAlt}}" />
+
+    <Style TargetType="Entry" ApplyToDerivedTypes="True">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BgSurface}, Dark={StaticResource BgSurfaceAlt}}" />
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimary}, Dark={StaticResource TextPrimary}}" />
         <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource TextMuted}, Dark={StaticResource TextMuted}}" />
-        <Setter Property="CancelButtonColor" Value="{AppThemeBinding Light={StaticResource AccentPrimary}, Dark={StaticResource AccentPrimary}}" />
         <Setter Property="FontSize" Value="16" />
-        <Setter Property="MinimumHeightRequest" Value="48" />
+        <Setter Property="MinimumHeightRequest" Value="52" />
+    </Style>
+
+    <Style TargetType="Editor" ApplyToDerivedTypes="True">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BgSurface}, Dark={StaticResource BgSurfaceAlt}}" />
+        <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource TextPrimary}, Dark={StaticResource TextPrimary}}" />
+        <Setter Property="PlaceholderColor" Value="{AppThemeBinding Light={StaticResource TextMuted}, Dark={StaticResource TextMuted}}" />
+        <Setter Property="FontSize" Value="16" />
+    </Style>
+
+    <Style TargetType="Shell" ApplyToDerivedTypes="True">
+        <Setter Property="BackgroundColor" Value="{AppThemeBinding Light={StaticResource BgPage}, Dark={StaticResource BgPage}}" />
+        <Setter Property="Shell.ForegroundColor" Value="{AppThemeBinding Light={StaticResource AccentPrimary}, Dark={StaticResource AccentGlow}}" />
+        <Setter Property="Shell.TitleColor" Value="{AppThemeBinding Light={StaticResource TextPrimary}, Dark={StaticResource TextPrimary}}" />
+        <Setter Property="Shell.DisabledColor" Value="{AppThemeBinding Light={StaticResource TextMuted}, Dark={StaticResource TextMuted}}" />
+        <Setter Property="Shell.UnselectedColor" Value="{AppThemeBinding Light={StaticResource TextMuted}, Dark={StaticResource TextMuted}}" />
+        <Setter Property="Shell.TabBarBackgroundColor" Value="{AppThemeBinding Light={StaticResource BgSurface}, Dark={StaticResource BgSurface}}" />
+        <Setter Property="Shell.TabBarForegroundColor" Value="{AppThemeBinding Light={StaticResource AccentPrimary}, Dark={StaticResource AccentPrimary}}" />
+        <Setter Property="Shell.TabBarTitleColor" Value="{AppThemeBinding Light={StaticResource AccentPrimary}, Dark={StaticResource AccentGlow}}" />
+        <Setter Property="Shell.TabBarUnselectedColor" Value="{AppThemeBinding Light={StaticResource TextMuted}, Dark={StaticResource TextMuted}}" />
+        <Setter Property="Shell.NavBarHasShadow" Value="False" />
+    </Style>
+
+    <Style TargetType="NavigationPage" ApplyToDerivedTypes="True">
+        <Setter Property="BarBackgroundColor" Value="{AppThemeBinding Light={StaticResource BgSurface}, Dark={StaticResource BgSurface}}" />
+        <Setter Property="BarTextColor" Value="{AppThemeBinding Light={StaticResource TextPrimary}, Dark={StaticResource TextPrimary}}" />
     </Style>
 
 </ResourceDictionary>
