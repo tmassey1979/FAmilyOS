@@ -105,17 +105,23 @@ public class PulseQueryHandler : IRequestHandler<GetPulseQuery, PulseDto>
         else if (nextAction is null)
         {
             var today = DateTime.UtcNow.Date;
+            // Accepted work must remain visible even when it has no due date.
+            // Prefer accepted work over tasks that still need acceptance.
             var dueTask = await _db.Tasks.AsNoTracking()
                 .Where(t => t.FamilyId == familyId && t.AssigneeMemberId == memberId &&
                             (t.Status == FamilyTaskStatus.Accepted || t.Status == FamilyTaskStatus.Assigned) &&
-                            t.DueDate != null && t.DueDate <= today.AddDays(1))
-                .OrderBy(t => t.DueDate)
+                            (t.Status == FamilyTaskStatus.Accepted || t.DueDate == null || t.DueDate <= today.AddDays(1)))
+                .OrderBy(t => t.Status == FamilyTaskStatus.Accepted ? 0 : 1)
+                .ThenBy(t => t.DueDate)
+                .ThenBy(t => t.CreatedAtUtc)
                 .FirstOrDefaultAsync(ct);
 
             if (dueTask != null)
             {
                 var action = dueTask.Status == FamilyTaskStatus.Assigned ? "Accept" : "Start";
-                var dueLabel = dueTask.DueDate!.Value.Date <= today ? "Due today" : "Due soon";
+                var dueLabel = dueTask.DueDate is null
+                    ? (dueTask.Status == FamilyTaskStatus.Accepted ? "Ready when you are" : "Needs acceptance")
+                    : dueTask.DueDate.Value.Date <= today ? "Due today" : "Due soon";
                 nextAction = new NextActionDto("Task", dueTask.Id, dueTask.Title, dueLabel, action, dueLabel);
             }
         }
