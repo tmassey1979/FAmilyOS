@@ -9,6 +9,7 @@ public sealed class HomePage : ContentPage
 {
     private readonly PulseApiClient _pulse;
     private readonly FamilyApiClient _family;
+    private readonly TasksApiClient _tasks;
     private readonly PulseRefreshSignal _pulseRefresh;
     private readonly HorizontalStackLayout _members = new() { Spacing = 14 };
     private readonly Label _greeting = new() { FontSize = 28, FontAttributes = FontAttributes.Bold };
@@ -30,10 +31,11 @@ public sealed class HomePage : ContentPage
     private bool _loading;
     private Guid? _selectedMemberId;
 
-    public HomePage(PulseApiClient pulse, FamilyApiClient family, PulseRefreshSignal pulseRefresh)
+    public HomePage(PulseApiClient pulse, FamilyApiClient family, TasksApiClient tasks, PulseRefreshSignal pulseRefresh)
     {
         _pulse = pulse;
         _family = family;
+        _tasks = tasks;
         _pulseRefresh = pulseRefresh;
         _pulseRefresh.RefreshRequested += OnPulseRefreshRequested;
         Title = "Home";
@@ -199,8 +201,8 @@ public sealed class HomePage : ContentPage
                         : $"{next.PrimaryAction}: {next.Title}"
                 };
                 btn.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
-                btn.Clicked += async (_, _) => await OpenKindAsync(next.Kind);
-                _pulseSection.Children.Add(PulseCard("Next up", next.Subtitle ?? next.Title, next.DueLabel, btn));
+                btn.Clicked += async (_, _) => await HandleNextActionAsync(next);
+                _pulseSection.Children.Add(PulseCard("Next up", next.Title, next.DueLabel, btn));
             }
             else
             {
@@ -388,6 +390,45 @@ public sealed class HomePage : ContentPage
     {
         var part = displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
         return string.IsNullOrWhiteSpace(part) ? displayName : part;
+    }
+
+    private async Task HandleNextActionAsync(PulseNextActionDto next)
+    {
+        if (!string.Equals(next.Kind, "Task", StringComparison.OrdinalIgnoreCase))
+        {
+            await OpenKindAsync(next.Kind);
+            return;
+        }
+
+        var action = next.PrimaryAction.Trim().ToLowerInvariant() switch
+        {
+            "accept" => "accept",
+            "start" => "start",
+            "resume" => "resume",
+            "complete" => "complete",
+            _ => null
+        };
+
+        if (action is null)
+        {
+            await Shell.Current.GoToAsync($"{nameof(TasksPage)}?scope=family");
+            return;
+        }
+
+        try
+        {
+            await _tasks.RunActionAsync(next.EntityId, action);
+            _status.Text = action == "complete" ? "Task completed." : "Task updated.";
+            _pulseRefresh.RequestRefresh();
+        }
+        catch (FamilyApiException ex)
+        {
+            _status.Text = ex.Message;
+        }
+        catch (Exception)
+        {
+            _status.Text = "Could not update that task. Open Tasks to try again.";
+        }
     }
 
     private static async Task OpenKindAsync(string kind)

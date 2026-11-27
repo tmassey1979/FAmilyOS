@@ -113,6 +113,8 @@ public partial class TaskCommandHandlers :
         await _current.EnsureLoadedAsync(ct);
         EnsureCanAssign();
         var task = await GetTaskForFamily(cmd.TaskId, ct);
+        if (task.DueDate is null)
+            throw new ValidationException("DueDate", "Set a due date before reassigning this task.");
         await EnsureMemberInFamily(cmd.NewAssigneeMemberId, ct);
         task.Reassign(cmd.NewAssigneeMemberId, _current.MemberId!.Value);
         await _db.SaveChangesAsync(ct);
@@ -178,7 +180,11 @@ public partial class TaskCommandHandlers :
         if (cmd.Priority.HasValue)
             task.SetPriority(cmd.Priority.Value);
         if (cmd.ClearDueDate)
+        {
+            if (task.AssigneeMemberId.HasValue)
+                throw new ValidationException("DueDate", "A task must keep its due date while it is assigned. Unassign it before clearing the date.");
             task.SetDueDate(null);
+        }
         else if (cmd.DueDate.HasValue)
             task.SetDueDate(cmd.DueDate);
         await _db.SaveChangesAsync(ct);

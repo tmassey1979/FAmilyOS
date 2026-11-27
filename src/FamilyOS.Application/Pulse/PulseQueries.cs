@@ -115,7 +115,7 @@ public class PulseQueryHandler : IRequestHandler<GetPulseQuery, PulseDto>
             var action = !isAssignedToCurrentMember ? "View" :
                 dueTask.Status == FamilyTaskStatus.Assigned ? "Accept" :
                 dueTask.Status == FamilyTaskStatus.InProgress ? "Complete" :
-                dueTask.Status == FamilyTaskStatus.Paused || dueTask.Status == FamilyTaskStatus.Deferred ? "Resume" : "Start";
+                dueTask.Status == FamilyTaskStatus.Paused ? "Resume" : "Start";
             var dueAtLocal = dueTask.DueDate!.Value.ToLocalTime();
             var dueLabel = dueAtLocal < nowLocal ? "Overdue" :
                 dueAtLocal.Date == nowLocal.Date ? "Due today" :
