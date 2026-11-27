@@ -3,7 +3,8 @@ using FamilyOS.Maui.Services;
 namespace FamilyOS.Maui.Pages;
 
 /// <summary>
-/// Household home shell: member strip, Pulse command center, and rearrangeable module grid.
+/// Household home: presence strip, tactical Pulse banner, rearrangeable module grid.
+/// Merge-2 sci-fi command chrome (deep charcoal + cyan accents).
 /// </summary>
 public sealed class HomePage : ContentPage
 {
@@ -52,6 +53,15 @@ public sealed class HomePage : ContentPage
             Content = _members
         };
 
+        var brand = new Label
+        {
+            Text = "◈  FAMILY OS",
+            FontSize = 12,
+            FontAttributes = FontAttributes.Bold,
+            CharacterSpacing = 1.4
+        };
+        brand.SetDynamicResource(Label.TextColorProperty, "AccentGlow");
+
         var topRow = new Grid
         {
             ColumnDefinitions =
@@ -60,10 +70,11 @@ public sealed class HomePage : ContentPage
                 new ColumnDefinition(GridLength.Auto)
             }
         };
-        var brand = new Label { Text = "FamilyOS", FontSize = 13, FontAttributes = FontAttributes.Bold };
-        brand.SetDynamicResource(Label.TextColorProperty, "TextMuted");
         topRow.Add(brand, 0, 0);
         topRow.Add(_editToggle, 1, 0);
+
+        var accent = new BoxView { HeightRequest = 1.5, Opacity = 0.55 };
+        accent.SetDynamicResource(BoxView.ColorProperty, "AccentPrimary");
 
         var page = new VerticalStackLayout
         {
@@ -72,11 +83,12 @@ public sealed class HomePage : ContentPage
             Children =
             {
                 topRow,
+                accent,
                 membersScroll,
                 _greeting,
                 _status,
                 _pulseSection,
-                SectionLabel("Modules"),
+                SectionLabel("COMMAND MODULES"),
                 _moduleGrid
             }
         };
@@ -91,30 +103,21 @@ public sealed class HomePage : ContentPage
         RebuildModuleGrid();
     }
 
-    private void OnPulseRefreshRequested(object? sender, EventArgs e)
-    {
+    private void OnPulseRefreshRequested(object? sender, EventArgs e) =>
         MainThread.BeginInvokeOnMainThread(async () => await LoadAsync());
-    }
 
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (!_loading)
-            await LoadAsync();
+        if (!_loading) await LoadAsync();
     }
 
     private async Task LoadAsync()
     {
         if (_loading) return;
         _loading = true;
-        try
-        {
-            await Task.WhenAll(LoadMembersAsync(), LoadPulseAsync());
-        }
-        finally
-        {
-            _loading = false;
-        }
+        try { await Task.WhenAll(LoadMembersAsync(), LoadPulseAsync()); }
+        finally { _loading = false; }
     }
 
     private async Task LoadMembersAsync()
@@ -126,9 +129,7 @@ public sealed class HomePage : ContentPage
             foreach (var member in family.Members.Where(m => m.IsActive).OrderBy(m => m.DisplayName))
                 _members.Children.Add(BuildMemberChip(member, member.Id == family.CurrentMemberId));
         }
-        catch
-        {
-        }
+        catch { /* optional */ }
     }
 
     private View BuildMemberChip(FamilyMemberDto member, bool isSelf)
@@ -137,27 +138,26 @@ public sealed class HomePage : ContentPage
             .Take(2).Select(p => char.ToUpperInvariant(p[0])));
         if (string.IsNullOrEmpty(initials)) initials = "?";
 
+        var selected = _selectedMemberId == member.Id;
         var avatar = new Border
         {
             WidthRequest = 56,
             HeightRequest = 56,
-            StrokeThickness = _selectedMemberId == member.Id ? 3 : 0,
-            
-            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 26 },
+            StrokeThickness = selected ? 2.5 : 1,
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 28 },
             Content = new Label
             {
                 Text = initials,
                 FontAttributes = FontAttributes.Bold,
                 FontSize = 16,
                 HorizontalTextAlignment = TextAlignment.Center,
-                VerticalTextAlignment = TextAlignment.Center,
-                
+                VerticalTextAlignment = TextAlignment.Center
             }
         };
-        avatar.SetDynamicResource(Border.StrokeProperty, "AccentPrimary");
+        avatar.SetDynamicResource(Border.StrokeProperty, selected ? "AccentPrimary" : "BorderSubtle");
+        avatar.SetDynamicResource(VisualElement.BackgroundColorProperty, "BgSurfaceAlt");
         if (avatar.Content is Label avatarLabel)
-            avatarLabel.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
-        avatar.SetDynamicResource(VisualElement.BackgroundColorProperty, "BgGlow");
+            avatarLabel.SetDynamicResource(Label.TextColorProperty, selected ? "AccentGlow" : "TextPrimary");
 
         var name = new Label
         {
@@ -175,7 +175,10 @@ public sealed class HomePage : ContentPage
             await LoadMembersAsync();
             _status.Text = $"Focused on {member.DisplayName}";
             if (member.Id != default)
-                await Shell.Current.GoToAsync($"//map?memberId={member.Id}");
+            {
+                try { await Shell.Current.GoToAsync($"//map?memberId={member.Id}"); }
+                catch { /* map optional */ }
+            }
         };
         stack.GestureRecognizers.Add(tap);
         return stack;
@@ -183,7 +186,7 @@ public sealed class HomePage : ContentPage
 
     private async Task LoadPulseAsync()
     {
-        _status.Text = "Loading household…";
+        _status.Text = "Syncing household…";
         _pulseSection.Children.Clear();
         try
         {
@@ -202,11 +205,11 @@ public sealed class HomePage : ContentPage
                 };
                 btn.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
                 btn.Clicked += async (_, _) => await HandleNextActionAsync(next);
-                _pulseSection.Children.Add(PulseCard("Next up", next.Title, next.DueLabel, btn));
+                _pulseSection.Children.Add(PulseCard("NEXT UP", next.Title, next.DueLabel, btn, accent: true));
             }
             else
             {
-                _pulseSection.Children.Add(PulseCard("Pulse", "You're caught up — nothing urgent right now.", null, null));
+                _pulseSection.Children.Add(PulseCard("PULSE", "You're mostly clear — nothing urgent right now.", null, null, accent: false));
             }
 
             var stats = new Grid
@@ -256,7 +259,6 @@ public sealed class HomePage : ContentPage
         var rows = (_modules.Count + cols - 1) / cols;
         for (var r = 0; r < rows; r++)
             _moduleGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-
         for (var i = 0; i < _modules.Count; i++)
             _moduleGrid.Add(BuildModuleTile(_modules[i], i), i % cols, i / cols);
     }
@@ -268,23 +270,20 @@ public sealed class HomePage : ContentPage
             Text = module.Glyph,
             FontSize = 26,
             HorizontalTextAlignment = TextAlignment.Center,
-            VerticalTextAlignment = TextAlignment.Center,
-            
+            VerticalTextAlignment = TextAlignment.Center
         };
 
         var iconWell = new Border
         {
             WidthRequest = 56,
             HeightRequest = 56,
-            
-            StrokeThickness = 0,
+            StrokeThickness = 1,
             HorizontalOptions = LayoutOptions.Center,
             StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 18 },
             Content = glyph
         };
-        iconWell.SetDynamicResource(VisualElement.BackgroundColorProperty, "BgGlow");
+        iconWell.SetDynamicResource(VisualElement.BackgroundColorProperty, "BgSurfaceAlt");
         iconWell.SetDynamicResource(Border.StrokeProperty, "BorderSubtle");
-        iconWell.StrokeThickness = 1;
         glyph.SetDynamicResource(Label.TextColorProperty, "AccentPrimary");
 
         var title = new Label
@@ -337,11 +336,11 @@ public sealed class HomePage : ContentPage
         return border;
     }
 
-    private static View PulseCard(string eyebrow, string body, string? meta, View? action)
+    private static View PulseCard(string eyebrow, string body, string? meta, View? action, bool accent)
     {
         var stack = new VerticalStackLayout { Spacing = 8 };
-        var eye = new Label { Text = eyebrow.ToUpperInvariant(), FontSize = 11, FontAttributes = FontAttributes.Bold };
-        eye.SetDynamicResource(Label.TextColorProperty, "AccentPrimary");
+        var eye = new Label { Text = eyebrow, FontSize = 11, FontAttributes = FontAttributes.Bold, CharacterSpacing = 1.2 };
+        eye.SetDynamicResource(Label.TextColorProperty, "AccentGlow");
         stack.Children.Add(eye);
         var main = new Label { Text = body, FontSize = 16, LineBreakMode = LineBreakMode.WordWrap };
         main.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
@@ -353,8 +352,23 @@ public sealed class HomePage : ContentPage
             stack.Children.Add(m);
         }
         if (action is not null) stack.Children.Add(action);
-        var border = new Border { Padding = 18, Content = stack };
-        border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
+
+        var rail = new BoxView { WidthRequest = 3 };
+        rail.SetDynamicResource(BoxView.ColorProperty, accent ? "AccentPrimary" : "BorderSubtle");
+        var row = new Grid
+        {
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(GridLength.Auto),
+                new ColumnDefinition(GridLength.Star)
+            },
+            ColumnSpacing = 12
+        };
+        row.Add(rail, 0, 0);
+        row.Add(stack, 1, 0);
+
+        var border = new Border { Padding = 16, Content = row };
+        border.SetDynamicResource(VisualElement.StyleProperty, accent ? "FoCardAccentFrameStyle" : "FoCardFrameStyle");
         return border;
     }
 
@@ -367,7 +381,7 @@ public sealed class HomePage : ContentPage
             FontAttributes = FontAttributes.Bold,
             HorizontalTextAlignment = TextAlignment.Center
         };
-        v.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
+        v.SetDynamicResource(Label.TextColorProperty, value > 0 ? "AccentGlow" : "TextPrimary");
         var l = new Label { Text = label, FontSize = 11, HorizontalTextAlignment = TextAlignment.Center };
         l.SetDynamicResource(Label.TextColorProperty, "TextMuted");
         var border = new Border
@@ -381,8 +395,15 @@ public sealed class HomePage : ContentPage
 
     private static Label SectionLabel(string text)
     {
-        var label = new Label { Text = text, FontSize = 13, FontAttributes = FontAttributes.Bold, Margin = new Thickness(2, 8, 0, 0) };
-        label.SetDynamicResource(Label.TextColorProperty, "TextMuted");
+        var label = new Label
+        {
+            Text = text,
+            FontSize = 11,
+            FontAttributes = FontAttributes.Bold,
+            CharacterSpacing = 1.4,
+            Margin = new Thickness(2, 8, 0, 0)
+        };
+        label.SetDynamicResource(Label.TextColorProperty, "AccentGlow");
         return label;
     }
 
@@ -421,14 +442,8 @@ public sealed class HomePage : ContentPage
             _status.Text = action == "complete" ? "Task completed." : "Task updated.";
             _pulseRefresh.RequestRefresh();
         }
-        catch (FamilyApiException ex)
-        {
-            _status.Text = ex.Message;
-        }
-        catch (Exception)
-        {
-            _status.Text = "Could not update that task. Open Tasks to try again.";
-        }
+        catch (FamilyApiException ex) { _status.Text = ex.Message; }
+        catch { _status.Text = "Could not update that task. Open Tasks to try again."; }
     }
 
     private static async Task OpenKindAsync(string kind)
