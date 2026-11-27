@@ -113,6 +113,8 @@ public partial class TaskCommandHandlers :
         await _current.EnsureLoadedAsync(ct);
         EnsureCanAssign();
         var task = await GetTaskForFamily(cmd.TaskId, ct);
+        if (task.DueDate is null)
+            throw new ValidationException("DueDate", "Set a due date before reassigning this task.");
         await EnsureMemberInFamily(cmd.NewAssigneeMemberId, ct);
         task.Reassign(cmd.NewAssigneeMemberId, _current.MemberId!.Value);
         await _db.SaveChangesAsync(ct);
