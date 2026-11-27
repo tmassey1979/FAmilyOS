@@ -3,14 +3,14 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="FamilyOS.Maui.Controls.FoChip">
     <Border x:Name="Root"
-            StrokeThickness="1"
-            Padding="12,6"
+            StrokeThickness="1.5"
+            Padding="14,8"
             HorizontalOptions="Start">
         <Border.StrokeShape>
-            <RoundRectangle CornerRadius="16" />
+            <RoundRectangle CornerRadius="999" />
         </Border.StrokeShape>
         <Label x:Name="Label"
-               FontSize="14"
+               FontSize="13"
                FontAttributes="Bold"
                VerticalOptions="Center"
                LineBreakMode="TailTruncation" />

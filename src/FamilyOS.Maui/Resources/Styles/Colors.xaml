@@ -3,25 +3,38 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
 
-    <!-- Brand palette: midnight, ion cyan, and restrained ultraviolet. -->
-    <Color x:Key="PaletteNavy950">#030712</Color>
-    <Color x:Key="PaletteSlate800">#0A1020</Color>
-    <Color x:Key="PaletteSlate700">#0E1A2E</Color>
-    <Color x:Key="PaletteSlate600">#1B3552</Color>
-    <Color x:Key="PaletteSky400">#45F3FF</Color>
-    <Color x:Key="PaletteViolet400">#B18CFF</Color>
-    <Color x:Key="PaletteSlate50">#EAF6FF</Color>
-    <Color x:Key="PaletteSlate400">#8CA7C5</Color>
-    <Color x:Key="PaletteRed400">#FF5D7D</Color>
-    <Color x:Key="PaletteGreen400">#47F0B2</Color>
-    <Color x:Key="PaletteAmber400">#FFC66D</Color>
-    <Color x:Key="PaletteCream">#F4F7FC</Color>
+    <!-- Sci-fi / command-center palette (dark-first) -->
+    <Color x:Key="PaletteVoid">#070B14</Color>
+    <Color x:Key="PaletteNavy950">#0B1220</Color>
+    <Color x:Key="PaletteSlate900">#0F172A</Color>
+    <Color x:Key="PaletteSlate800">#152033</Color>
+    <Color x:Key="PaletteSlate700">#1E2A40</Color>
+    <Color x:Key="PaletteSlate600">#2A3A55</Color>
+    <Color x:Key="PaletteCyan400">#22D3EE</Color>
+    <Color x:Key="PaletteCyan300">#67E8F9</Color>
+    <Color x:Key="PaletteViolet400">#A78BFA</Color>
+    <Color x:Key="PaletteMagenta400">#E879F9</Color>
+    <Color x:Key="PaletteSlate50">#F1F5F9</Color>
+    <Color x:Key="PaletteSlate400">#94A3B8</Color>
+    <Color x:Key="PaletteRose400">#FB7185</Color>
+    <Color x:Key="PaletteEmerald400">#34D399</Color>
+    <Color x:Key="PaletteAmber400">#FBBF24</Color>
     <Color x:Key="PaletteWhite">#FFFFFF</Color>
-    <Color x:Key="PaletteNavyText">#04101A</Color>
-    <Color x:Key="PaletteSlate500">#60718A</Color>
-    <Color x:Key="PaletteCreamAlt">#EAF0F8</Color>
-    <Color x:Key="PaletteBorderLight">#D7E1EF</Color>
+    <Color x:Key="PaletteInk">#041018</Color>
+    <Color x:Key="PaletteCoolPage">#EEF2F7</Color>
+    <Color x:Key="PaletteCoolSurface">#FFFFFF</Color>
+    <Color x:Key="PaletteCoolAlt">#E2E8F0</Color>
+    <Color x:Key="PaletteBorderLight">#CBD5E1</Color>
     <Color x:Key="PaletteScrimLight">#00000066</Color>
     <Color x:Key="PaletteScrimDark">#000000B3</Color>
+
+    <!-- Legacy aliases kept for any remaining references -->
+    <Color x:Key="PaletteSky400">#22D3EE</Color>
+    <Color x:Key="PaletteRed400">#FB7185</Color>
+    <Color x:Key="PaletteGreen400">#34D399</Color>
+    <Color x:Key="PaletteCream">#EEF2F7</Color>
+    <Color x:Key="PaletteNavyText">#0B1220</Color>
+    <Color x:Key="PaletteSlate500">#64748B</Color>
+    <Color x:Key="PaletteCreamAlt">#E2E8F0</Color>
 
 </ResourceDictionary>
