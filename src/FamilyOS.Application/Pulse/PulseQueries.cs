@@ -92,47 +92,36 @@ public class PulseQueryHandler : IRequestHandler<GetPulseQuery, PulseDto>
             }
         }
 
-        var inProgress = await _db.Tasks.AsNoTracking()
-            .Where(t => t.FamilyId == familyId && t.AssigneeMemberId == memberId && t.Status == FamilyTaskStatus.InProgress)
+        // Pulse's primary task is the earliest-due actionable task in the visible scope.
+        // In-progress tasks participate in the same due-date ordering as accepted/assigned work.
+        // A missing due date never wins the "next due" slot.
+        var nowLocal = DateTime.Now;
+        var dueTask = await _db.Tasks.AsNoTracking()
+            .Where(t => t.FamilyId == familyId &&
+                        ((role == FamilyRole.Owner || role == FamilyRole.Adult) || t.AssigneeMemberId == memberId) &&
+                        t.DueDate != null &&
+                        (t.Status == FamilyTaskStatus.Assigned ||
+                         t.Status == FamilyTaskStatus.Accepted ||
+                         t.Status == FamilyTaskStatus.InProgress ||
+                         t.Status == FamilyTaskStatus.Paused ||
+                         t.Status == FamilyTaskStatus.Deferred))
             .OrderBy(t => t.DueDate)
+            .ThenBy(t => t.CreatedAtUtc)
             .FirstOrDefaultAsync(ct);
 
-        // Personal in-progress always wins over approval queue
-        if (inProgress != null)
+        if (dueTask != null)
         {
-            nextAction = new NextActionDto("Task", inProgress.Id, inProgress.Title, "In progress", "Resume", null);
-        }
-        else
-        {
-            // Pulse task priority is based on the next due date, not acceptance order.
-            // Tasks without due dates are intentionally excluded from the "next due" slot.
-            // In-progress work above remains the highest priority.
-            var now = DateTime.UtcNow;
-            var dueTask = await _db.Tasks.AsNoTracking()
-                .Where(t => t.FamilyId == familyId &&
-                            ((role == FamilyRole.Owner || role == FamilyRole.Adult) || t.AssigneeMemberId == memberId) &&
-                            t.DueDate != null &&
-                            (t.Status == FamilyTaskStatus.Accepted ||
-                             t.Status == FamilyTaskStatus.Assigned ||
-                             t.Status == FamilyTaskStatus.Paused ||
-                             t.Status == FamilyTaskStatus.Deferred))
-                .OrderBy(t => t.DueDate)
-                .ThenBy(t => t.CreatedAtUtc)
-                .FirstOrDefaultAsync(ct);
-
-            if (dueTask != null)
-            {
-                var isAssignedToCurrentMember = dueTask.AssigneeMemberId == memberId;
-                var action = !isAssignedToCurrentMember ? "View" :
-                    dueTask.Status == FamilyTaskStatus.Assigned ? "Accept" :
-                    dueTask.Status == FamilyTaskStatus.Paused || dueTask.Status == FamilyTaskStatus.Deferred ? "Resume" : "Start";
-                var dueAt = dueTask.DueDate!.Value;
-                var dueLabel = dueAt < now ? "Overdue" :
-                    dueAt.Date == now.Date ? "Due today" :
-                    dueAt.Date == now.Date.AddDays(1) ? "Due tomorrow" :
-                    $"Due {dueAt.ToLocalTime():ddd, MMM d}";
-                nextAction = new NextActionDto("Task", dueTask.Id, dueTask.Title, dueLabel, action, dueLabel);
-            }
+            var isAssignedToCurrentMember = dueTask.AssigneeMemberId == memberId;
+            var action = !isAssignedToCurrentMember ? "View" :
+                dueTask.Status == FamilyTaskStatus.Assigned ? "Accept" :
+                dueTask.Status == FamilyTaskStatus.InProgress ? "Complete" :
+                dueTask.Status == FamilyTaskStatus.Paused || dueTask.Status == FamilyTaskStatus.Deferred ? "Resume" : "Start";
+            var dueAtLocal = dueTask.DueDate!.Value.ToLocalTime();
+            var dueLabel = dueAtLocal < nowLocal ? "Overdue" :
+                dueAtLocal.Date == nowLocal.Date ? "Due today" :
+                dueAtLocal.Date == nowLocal.Date.AddDays(1) ? "Due tomorrow" :
+                $"Due {dueAtLocal:ddd, MMM d}";
+            nextAction = new NextActionDto("Task", dueTask.Id, dueTask.Title, dueLabel, action, dueLabel);
         }
 
         var attention = new List<AttentionItemDto>();
