@@ -1,48 +1,46 @@
-using Xunit;
-
 namespace FamilyOS.Maui.Tests;
 
 /// <summary>
 /// Validates design-token contract without requiring a MAUI device host.
-/// Keeps the FamilyOS visual token contract consistent as resources evolve.
+/// Sci-fi command-center palette (dark-first electric cyan).
 /// </summary>
 public class ThemeTokenTests
 {
-    public static readonly IReadOnlyDictionary<string, string> FamilyOsDarkColors =
+    public static readonly IReadOnlyDictionary<string, string> ExpoDarkColors =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["bg"] = "#030712",
-            ["surface"] = "#0A1020",
-            ["surfaceAlt"] = "#0E1A2E",
-            ["border"] = "#1B3552",
-            ["primary"] = "#45F3FF",
-            ["text"] = "#EAF6FF",
-            ["textMuted"] = "#8CA7C5",
-            ["danger"] = "#FF5D7D",
-            ["success"] = "#47F0B2",
-            ["warning"] = "#FFC66D",
+            ["bg"] = "#0A0E14",
+            ["surface"] = "#121A2B",
+            ["surfaceAlt"] = "#1A2438",
+            ["border"] = "#2A3A55",
+            ["primary"] = "#22D3EE",
+            ["text"] = "#F1F5F9",
+            ["textMuted"] = "#94A3B8",
+            ["danger"] = "#FB7185",
+            ["success"] = "#34D399",
+            ["warning"] = "#FBBF24",
         };
 
     public static readonly IReadOnlyDictionary<string, string> MauiDarkSemantic =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["BgPage"] = "#030712",
-            ["BgSurface"] = "#0A1020",
-            ["BgSurfaceAlt"] = "#0E1A2E",
-            ["BorderSubtle"] = "#1B3552",
-            ["AccentPrimary"] = "#45F3FF",
-            ["TextPrimary"] = "#EAF6FF",
-            ["TextMuted"] = "#8CA7C5",
-            ["AccentDanger"] = "#FF5D7D",
-            ["AccentSuccess"] = "#47F0B2",
-            ["AccentWarning"] = "#FFC66D",
+            ["BgPage"] = "#0A0E14",
+            ["BgSurface"] = "#121A2B",
+            ["BgSurfaceAlt"] = "#1A2438",
+            ["BorderSubtle"] = "#2A3A55",
+            ["AccentPrimary"] = "#22D3EE",
+            ["TextPrimary"] = "#F1F5F9",
+            ["TextMuted"] = "#94A3B8",
+            ["AccentDanger"] = "#FB7185",
+            ["AccentSuccess"] = "#34D399",
+            ["AccentWarning"] = "#FBBF24",
         };
 
     public static readonly IReadOnlyList<string> RequiredSemanticKeys =
     [
-        "BgPage", "BgSurface", "BgSurfaceAlt", "BgGlow", "BorderSubtle",
+        "BgPage", "BgSurface", "BgSurfaceAlt", "BorderSubtle",
         "TextPrimary", "TextMuted", "TextOnAccent",
-        "AccentPrimary", "AccentSecondary", "AccentDanger", "AccentSuccess", "AccentWarning",
+        "AccentPrimary", "AccentDanger", "AccentSuccess", "AccentWarning",
         "OverlayScrim"
     ];
 
@@ -53,18 +51,18 @@ public class ThemeTokenTests
     ];
 
     [Fact]
-    public void FamilyOS_dark_palette_matches_MAUI_semantic_tokens()
+    public void Expo_dark_palette_maps_1_to_1_onto_maui_dark_semantics()
     {
-        Assert.Equal(FamilyOsDarkColors["bg"], MauiDarkSemantic["BgPage"]);
-        Assert.Equal(FamilyOsDarkColors["surface"], MauiDarkSemantic["BgSurface"]);
-        Assert.Equal(FamilyOsDarkColors["surfaceAlt"], MauiDarkSemantic["BgSurfaceAlt"]);
-        Assert.Equal(FamilyOsDarkColors["border"], MauiDarkSemantic["BorderSubtle"]);
-        Assert.Equal(FamilyOsDarkColors["primary"], MauiDarkSemantic["AccentPrimary"]);
-        Assert.Equal(FamilyOsDarkColors["text"], MauiDarkSemantic["TextPrimary"]);
-        Assert.Equal(FamilyOsDarkColors["textMuted"], MauiDarkSemantic["TextMuted"]);
-        Assert.Equal(FamilyOsDarkColors["danger"], MauiDarkSemantic["AccentDanger"]);
-        Assert.Equal(FamilyOsDarkColors["success"], MauiDarkSemantic["AccentSuccess"]);
-        Assert.Equal(FamilyOsDarkColors["warning"], MauiDarkSemantic["AccentWarning"]);
+        Assert.Equal(ExpoDarkColors["bg"], MauiDarkSemantic["BgPage"]);
+        Assert.Equal(ExpoDarkColors["surface"], MauiDarkSemantic["BgSurface"]);
+        Assert.Equal(ExpoDarkColors["surfaceAlt"], MauiDarkSemantic["BgSurfaceAlt"]);
+        Assert.Equal(ExpoDarkColors["border"], MauiDarkSemantic["BorderSubtle"]);
+        Assert.Equal(ExpoDarkColors["primary"], MauiDarkSemantic["AccentPrimary"]);
+        Assert.Equal(ExpoDarkColors["text"], MauiDarkSemantic["TextPrimary"]);
+        Assert.Equal(ExpoDarkColors["textMuted"], MauiDarkSemantic["TextMuted"]);
+        Assert.Equal(ExpoDarkColors["danger"], MauiDarkSemantic["AccentDanger"]);
+        Assert.Equal(ExpoDarkColors["success"], MauiDarkSemantic["AccentSuccess"]);
+        Assert.Equal(ExpoDarkColors["warning"], MauiDarkSemantic["AccentWarning"]);
     }
 
     [Fact]
@@ -109,6 +107,9 @@ public class ThemeTokenTests
             var path = FindRepoFile($"src/FamilyOS.Maui/Controls/{name}.xaml");
             Assert.True(File.Exists(path), $"Missing control {name}");
         }
+
+        var uiKit = FindRepoFile("src/FamilyOS.Maui/Controls/Ui.cs");
+        Assert.True(File.Exists(uiKit), "Missing shared Ui.cs command kit");
     }
 
     [Fact]
@@ -127,6 +128,15 @@ public class ThemeTokenTests
             Assert.True(File.Exists(FindRepoFile(rel)), $"Missing {rel}");
     }
 
+    [Fact]
+    public void Button_styles_are_declared()
+    {
+        var path = FindRepoFile("src/FamilyOS.Maui/Resources/Styles/Styles.xaml");
+        var xaml = File.ReadAllText(path);
+        foreach (var key in new[] { "FoPrimaryButtonStyle", "FoSecondaryButtonStyle", "FoDangerButtonStyle", "FoGhostButtonStyle", "FoAccentButtonStyle", "FoCardFrameStyle", "FoCardAccentFrameStyle" })
+            Assert.Contains($"x:Key=\"{key}\"", xaml, StringComparison.Ordinal);
+    }
+
     private static string FindRepoFile(string relative)
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
@@ -135,19 +145,20 @@ public class ThemeTokenTests
             var candidate = Path.Combine(dir.FullName, relative);
             if (File.Exists(candidate))
                 return candidate;
-            candidate = Path.Combine(dir.FullName, "..", relative);
-            if (File.Exists(Path.GetFullPath(candidate)))
-                return Path.GetFullPath(candidate);
+            if (File.Exists(Path.Combine(dir.FullName, "FamilyOS.sln")) ||
+                File.Exists(Path.Combine(dir.FullName, "Directory.Build.props")))
+            {
+                candidate = Path.Combine(dir.FullName, relative);
+                if (File.Exists(candidate))
+                    return candidate;
+            }
             dir = dir.Parent;
         }
-        dir = new DirectoryInfo(Directory.GetCurrentDirectory());
-        while (dir is not null)
-        {
-            var candidate = Path.Combine(dir.FullName, relative);
-            if (File.Exists(candidate))
-                return candidate;
-            dir = dir.Parent;
-        }
-        throw new FileNotFoundException($"Could not locate {relative} from test host.");
+
+        var fromCwd = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relative));
+        if (File.Exists(fromCwd))
+            return fromCwd;
+
+        throw new FileNotFoundException($"Could not locate {relative}");
     }
 }
