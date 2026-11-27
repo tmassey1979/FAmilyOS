@@ -3,6 +3,7 @@ namespace FamilyOS.Maui.Services;
 /// <summary>
 /// Runtime theme preference. Updates Application.UserAppTheme and overlays semantic
 /// color keys so pages using {StaticResource BgPage} etc. reflect the active theme.
+/// Sci-fi / command-center palette: deep space + electric cyan.
 /// </summary>
 public enum AppThemePreference
 {
@@ -24,37 +25,39 @@ public sealed class ThemeService : IThemeService
 
     private static readonly Dictionary<string, Color> Light = new(StringComparer.Ordinal)
     {
-        ["BgPage"] = Color.FromArgb("#F4F7FC"),
+        ["BgPage"] = Color.FromArgb("#EEF2F7"),
         ["BgSurface"] = Color.FromArgb("#FFFFFF"),
-        ["BgSurfaceAlt"] = Color.FromArgb("#EAF0F8"),
-        ["BgGlow"] = Color.FromArgb("#E5F8FF"),
-        ["BorderSubtle"] = Color.FromArgb("#D7E1EF"),
-        ["TextPrimary"] = Color.FromArgb("#101A2B"),
-        ["TextMuted"] = Color.FromArgb("#60718A"),
-        ["TextOnAccent"] = Color.FromArgb("#081321"),
-        ["AccentPrimary"] = Color.FromArgb("#008DA8"),
-        ["AccentSecondary"] = Color.FromArgb("#6D5CE7"),
-        ["AccentDanger"] = Color.FromArgb("#D83D5B"),
-        ["AccentSuccess"] = Color.FromArgb("#087F61"),
-        ["AccentWarning"] = Color.FromArgb("#956000"),
+        ["BgSurfaceAlt"] = Color.FromArgb("#E2E8F0"),
+        ["BorderSubtle"] = Color.FromArgb("#CBD5E1"),
+        ["BorderAccent"] = Color.FromArgb("#22D3EE55"),
+        ["TextPrimary"] = Color.FromArgb("#0B1220"),
+        ["TextMuted"] = Color.FromArgb("#64748B"),
+        ["TextOnAccent"] = Color.FromArgb("#041018"),
+        ["AccentPrimary"] = Color.FromArgb("#0891B2"),
+        ["AccentSecondary"] = Color.FromArgb("#7C3AED"),
+        ["AccentGlow"] = Color.FromArgb("#22D3EE"),
+        ["AccentDanger"] = Color.FromArgb("#E11D48"),
+        ["AccentSuccess"] = Color.FromArgb("#059669"),
+        ["AccentWarning"] = Color.FromArgb("#D97706"),
         ["OverlayScrim"] = Color.FromArgb("#00000066"),
     };
 
     private static readonly Dictionary<string, Color> Dark = new(StringComparer.Ordinal)
     {
-        ["BgPage"] = Color.FromArgb("#030712"),
-        ["BgSurface"] = Color.FromArgb("#0A1020"),
-        ["BgSurfaceAlt"] = Color.FromArgb("#0E1A2E"),
-        ["BgGlow"] = Color.FromArgb("#071A2C"),
-        ["BorderSubtle"] = Color.FromArgb("#1B3552"),
-        ["TextPrimary"] = Color.FromArgb("#EAF6FF"),
-        ["TextMuted"] = Color.FromArgb("#8CA7C5"),
-        ["TextOnAccent"] = Color.FromArgb("#04101A"),
-        ["AccentPrimary"] = Color.FromArgb("#45F3FF"),
-        ["AccentSecondary"] = Color.FromArgb("#B18CFF"),
-        ["AccentDanger"] = Color.FromArgb("#FF5D7D"),
-        ["AccentSuccess"] = Color.FromArgb("#47F0B2"),
-        ["AccentWarning"] = Color.FromArgb("#FFC66D"),
+        ["BgPage"] = Color.FromArgb("#0A0E14"),
+        ["BgSurface"] = Color.FromArgb("#121A2B"),
+        ["BgSurfaceAlt"] = Color.FromArgb("#1A2438"),
+        ["BorderSubtle"] = Color.FromArgb("#2A3A55"),
+        ["BorderAccent"] = Color.FromArgb("#22D3EE40"),
+        ["TextPrimary"] = Color.FromArgb("#F1F5F9"),
+        ["TextMuted"] = Color.FromArgb("#94A3B8"),
+        ["TextOnAccent"] = Color.FromArgb("#041018"),
+        ["AccentPrimary"] = Color.FromArgb("#22D3EE"),
+        ["AccentSecondary"] = Color.FromArgb("#A78BFA"),
+        ["AccentGlow"] = Color.FromArgb("#67E8F9"),
+        ["AccentDanger"] = Color.FromArgb("#FB7185"),
+        ["AccentSuccess"] = Color.FromArgb("#34D399"),
+        ["AccentWarning"] = Color.FromArgb("#FBBF24"),
         ["OverlayScrim"] = Color.FromArgb("#000000B3"),
     };
 
@@ -64,10 +67,11 @@ public sealed class ThemeService : IThemeService
 
     public ThemeService()
     {
+        // Default Dark so the sci-fi command palette is the first impression.
         var stored = Preferences.Default.Get(PreferenceKey, nameof(AppThemePreference.Dark));
         Preference = Enum.TryParse<AppThemePreference>(stored, out var p)
             ? p
-            : AppThemePreference.System;
+            : AppThemePreference.Dark;
         Apply(Preference);
     }
 
