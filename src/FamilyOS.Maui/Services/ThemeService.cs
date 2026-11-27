@@ -28,6 +28,7 @@ public sealed class ThemeService : IThemeService
         ["BgPage"] = Color.FromArgb("#EEF2F7"),
         ["BgSurface"] = Color.FromArgb("#FFFFFF"),
         ["BgSurfaceAlt"] = Color.FromArgb("#E2E8F0"),
+        ["BgGlow"] = Color.FromArgb("#E0F2FE"),
         ["BorderSubtle"] = Color.FromArgb("#CBD5E1"),
         ["BorderAccent"] = Color.FromArgb("#22D3EE55"),
         ["TextPrimary"] = Color.FromArgb("#0B1220"),
@@ -47,6 +48,7 @@ public sealed class ThemeService : IThemeService
         ["BgPage"] = Color.FromArgb("#0A0E14"),
         ["BgSurface"] = Color.FromArgb("#121A2B"),
         ["BgSurfaceAlt"] = Color.FromArgb("#1A2438"),
+        ["BgGlow"] = Color.FromArgb("#152033"),
         ["BorderSubtle"] = Color.FromArgb("#2A3A55"),
         ["BorderAccent"] = Color.FromArgb("#22D3EE40"),
         ["TextPrimary"] = Color.FromArgb("#F1F5F9"),
@@ -67,7 +69,6 @@ public sealed class ThemeService : IThemeService
 
     public ThemeService()
     {
-        // Default Dark so the sci-fi command palette is the first impression.
         var stored = Preferences.Default.Get(PreferenceKey, nameof(AppThemePreference.Dark));
         Preference = Enum.TryParse<AppThemePreference>(stored, out var p)
             ? p
