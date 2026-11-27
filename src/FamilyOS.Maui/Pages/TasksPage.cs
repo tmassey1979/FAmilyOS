@@ -250,7 +250,11 @@ public sealed class TasksPage : ContentPage
             JustifyContent = Microsoft.Maui.Layouts.FlexJustify.Start,
             AlignItems = Microsoft.Maui.Layouts.FlexAlignItems.Center
         };
-        foreach (var (action, label, primary) in ActionsFor(task.Status))
+        var allActions = ActionsFor(task.Status);
+        var visibleActions = allActions
+            .Where(x => x.primary || x.action is "complete" or "pause" or "resume")
+            .ToArray();
+        foreach (var (action, label, primary) in visibleActions)
             actions.Children.Add(MakeActionButton(task.Id, action, label, primary));
 
         var isTerminal = task.Status is "Completed" or "Cancelled" or "Declined" or "Skipped";
@@ -258,10 +262,15 @@ public sealed class TasksPage : ContentPage
         var canPlan = task.Status is "Accepted" or "InProgress" or "Paused" or "Deferred";
         var canAssign = _showFamilyTasks &&
             task.Status is "Created" or "Assigned" or "Reassigned" or "Declined";
-        if (canEdit) actions.Children.Add(MakeDetailsButton(task));
-        if (canPlan) actions.Children.Add(MakeScheduleButton(task));
-        if (canAssign) actions.Children.Add(MakeAssignButton(task));
-        actions.Children.Add(MakeHistoryButton(task.Id, task.Title));
+        var moreOptions = allActions
+            .Where(x => !visibleActions.Any(v => v.action == x.action))
+            .Select(x => (x.label, x.action))
+            .ToList();
+        if (canEdit) moreOptions.Add(("Edit details", "edit"));
+        if (canPlan) moreOptions.Add(("Schedule", "schedule"));
+        if (canAssign) moreOptions.Add(("Assign", "assign"));
+        moreOptions.Add(("History", "history"));
+        actions.Children.Add(MakeMoreButton(task, moreOptions));
         var separator = new BoxView { HeightRequest = 1, Opacity = 0.55 };
         separator.SetDynamicResource(VisualElement.BackgroundColorProperty, "BorderSubtle");
         content.Children.Add(separator);
@@ -364,6 +373,37 @@ public sealed class TasksPage : ContentPage
         },
         _ => Array.Empty<(string, string, bool)>()
     };
+
+    private Button MakeMoreButton(FamilyTaskDto task, List<(string label, string action)> options)
+    {
+        var button = new Button
+        {
+            Text = "More",
+            FontSize = 12,
+            HeightRequest = 36,
+            CornerRadius = 18,
+            Padding = new Thickness(13, 0),
+            Margin = new Thickness(0, 2, 8, 2)
+        };
+        button.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
+        button.Clicked += async (_, _) =>
+        {
+            var labels = options.Select(o => o.label).ToArray();
+            var selected = await DisplayActionSheetAsync("Task actions", "Close", null, labels);
+            var choice = options.FirstOrDefault(o => o.label == selected);
+            if (choice.action is null) return;
+
+            switch (choice.action)
+            {
+                case "edit": await EditTaskAsync(task); break;
+                case "schedule": await SetPlannedTimesAsync(task); break;
+                case "assign": await ReassignTaskAsync(task); break;
+                case "history": await ShowHistoryAsync(task.Id, task.Title); break;
+                default: await ExecuteAsync(task.Id, choice.action); break;
+            }
+        };
+        return button;
+    }
 
     private Button MakeActionButton(Guid taskId, string action, string label, bool primary)
     {
