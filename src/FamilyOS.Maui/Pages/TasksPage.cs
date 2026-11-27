@@ -255,7 +255,7 @@ public sealed class TasksPage : ContentPage
             .Where(x => x.primary || x.action is "complete" or "pause" or "resume")
             .ToArray();
         foreach (var (action, label, primary) in visibleActions)
-            actions.Children.Add(MakeActionButton(task.Id, action, label, primary));
+            actions.Children.Add(MakeActionButton(task, action, label, primary));
 
         var isTerminal = task.Status is "Completed" or "Cancelled" or "Declined" or "Skipped";
         var canEdit = _showFamilyTasks && !isTerminal;
@@ -405,11 +405,11 @@ public sealed class TasksPage : ContentPage
         return button;
     }
 
-    private Button MakeActionButton(Guid taskId, string action, string label, bool primary)
+    private Button MakeActionButton(FamilyTaskDto task, string action, string label, bool primary)
     {
         var button = new Button { Text = label, FontSize = 12, HeightRequest = 38, CornerRadius = 19, Padding = new Thickness(14, 0), Margin = new Thickness(0, 2, 8, 2) };
         button.SetDynamicResource(VisualElement.StyleProperty, primary ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle");
-        button.Clicked += async (_, _) => await ExecuteAsync(taskId, action);
+        button.Clicked += async (_, _) => await ExecuteAsync(task, action);
         return button;
     }
 
@@ -621,7 +621,8 @@ public sealed class TasksPage : ContentPage
         if (priority is null or "Cancel") return;
         if (priority == "Keep current") priority = task.Priority;
         var duePick = await PickDateTimeAsync("Due date and time",
-            task.DueDate?.ToLocalTime() ?? DateTime.Today.AddHours(17), allowClear: true);
+            task.DueDate?.ToLocalTime() ?? DateTime.Today.AddHours(17),
+            allowClear: !task.AssignedToMemberId.HasValue);
         if (!duePick.Confirmed) return;
         DateTime? dueDate = duePick.Value?.ToUniversalTime();
         var clearDueDate = !dueDate.HasValue;
@@ -660,6 +661,15 @@ public sealed class TasksPage : ContentPage
             if (selectedIndex < 0) return;
             var member = members[selectedIndex];
 
+            if (task.DueDate is null)
+            {
+                var duePick = await PickDateTimeAsync("Set due date before assigning",
+                    DateTime.Today.AddDays(1).AddHours(17), allowClear: false);
+                if (!duePick.Confirmed || !duePick.Value.HasValue) return;
+                await _tasks.UpdateDetailsAsync(task.Id, new UpdateTaskDetailsBody(
+                    DueDate: duePick.Value.Value.ToUniversalTime()));
+            }
+
             await _tasks.ReassignAsync(task.Id, member.Id);
             _status.Text = $"Task assigned to {member.DisplayName}.";
             await LoadAsync();
@@ -676,7 +686,7 @@ public sealed class TasksPage : ContentPage
         return button;
     }
 
-    private async Task ExecuteAsync(Guid taskId, string action)
+    private async Task ExecuteAsync(FamilyTaskDto task, string action)
     {
         try
         {
@@ -705,9 +715,18 @@ public sealed class TasksPage : ContentPage
             }
             else
             {
-                await _tasks.RunActionAsync(taskId, action);
+                if (action == "accept" && task.DueDate is null)
+                {
+                    var duePick = await PickDateTimeAsync("Set task due date", DateTime.Today.AddHours(17), allowClear: false);
+                    if (!duePick.Confirmed || !duePick.Value.HasValue)
+                        return;
+                    await _tasks.UpdateDetailsAsync(task.Id, new UpdateTaskDetailsBody(
+                        DueDate: duePick.Value.Value.ToUniversalTime()));
+                }
+
+                await _tasks.RunActionAsync(task.Id, action);
                 if (action == "accept")
-                    await ConfigureAcceptedTaskScheduleAsync(taskId);
+                    await ConfigureAcceptedTaskScheduleAsync(task.Id);
             }
 
             if (action == "complete")
