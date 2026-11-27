@@ -789,7 +789,7 @@ public sealed class TasksPage : ContentPage
             var priority = new Picker { Title = "Priority", ItemsSource = new List<string> { "Low", "Normal", "High", "Urgent" }, SelectedIndex = 1 };
             var assignee = new Picker { Title = "Assign to", ItemsSource = new List<string> { "Leave unassigned" }.Concat(members.Select(m => m.DisplayName)).ToList(), SelectedIndex = 0 };
             var estimate = new Entry { Placeholder = "Estimated minutes (optional)", Keyboard = Keyboard.Numeric, MaxLength = 5 };
-            var dueEnabled = new Switch { IsToggled = false };
+            var dueEnabled = new Switch { IsToggled = true };
             var dueDate = new DatePicker { Date = DateTime.Today.AddDays(1), Format = "ddd, MMM d, yyyy" };
             var dueTime = new TimePicker { Time = new TimeSpan(17, 0, 0), Format = "h:mm tt" };
             var plannedStartEnabled = new Switch { IsToggled = false };
@@ -862,6 +862,11 @@ public sealed class TasksPage : ContentPage
                 var selectedMemberIndex = assignee.SelectedIndex - 1;
                 Guid? assigneeId = selectedMemberIndex >= 0 && selectedMemberIndex < members.Count
                     ? members[selectedMemberIndex].Id : null;
+                if (assigneeId.HasValue && !dueEnabled.IsToggled)
+                {
+                    await DisplayAlertAsync("Due date required", "Assigned tasks need a due date so they appear in the right order on Family Pulse.", "OK");
+                    return;
+                }
                 try
                 {
                     await _tasks.CreateTaskAsync(new CreateTaskBody(
