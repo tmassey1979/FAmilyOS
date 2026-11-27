@@ -180,7 +180,11 @@ public partial class TaskCommandHandlers :
         if (cmd.Priority.HasValue)
             task.SetPriority(cmd.Priority.Value);
         if (cmd.ClearDueDate)
+        {
+            if (task.AssigneeMemberId.HasValue)
+                throw new ValidationException("DueDate", "A task must keep its due date while it is assigned. Unassign it before clearing the date.");
             task.SetDueDate(null);
+        }
         else if (cmd.DueDate.HasValue)
             task.SetDueDate(cmd.DueDate);
         await _db.SaveChangesAsync(ct);
