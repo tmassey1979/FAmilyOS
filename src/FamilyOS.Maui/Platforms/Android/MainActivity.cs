@@ -2,6 +2,7 @@ using Android.App;
 using Android.Content.PM;
 using Android.Views;
 using Android.Widget;
+using NativeView = Android.Views.View;
 
 namespace FamilyOS.Maui;
 
@@ -55,7 +56,7 @@ public class MainActivity : MauiAppCompatActivity
         bottomNavigation.RequestLayout();
     }
 
-    private static ViewGroup? FindBottomNavigation(View view)
+    private static ViewGroup? FindBottomNavigation(NativeView view)
     {
         if (view is ViewGroup group)
         {
@@ -74,7 +75,7 @@ public class MainActivity : MauiAppCompatActivity
 
     private int _navigationIconSize;
 
-    private void SizeNavigationIcons(View view)
+    private void SizeNavigationIcons(NativeView view)
     {
         if (view is ImageView image)
         {
