@@ -37,7 +37,6 @@ public class MainActivity : MauiAppCompatActivity
         var height = (int)Android.Util.TypedValue.ApplyDimension(
             Android.Util.ComplexUnitType.Dip, 84, Resources!.DisplayMetrics!);
 
-        bottomNavigation.MinimumHeight = height;
         if (bottomNavigation.LayoutParameters is { } layout)
         {
             layout.Height = height;
@@ -49,7 +48,11 @@ public class MainActivity : MauiAppCompatActivity
         for (var i = 0; i < bottomNavigation.ChildCount; i++)
         {
             if (bottomNavigation.GetChildAt(i) is not ViewGroup item) continue;
-            item.MinimumHeight = height;
+            if (item.LayoutParameters is { } itemLayout)
+            {
+                itemLayout.Height = height;
+                item.LayoutParameters = itemLayout;
+            }
             SizeNavigationIcons(item);
         }
 
@@ -73,15 +76,13 @@ public class MainActivity : MauiAppCompatActivity
         return null;
     }
 
-    private int _navigationIconSize;
-
     private void SizeNavigationIcons(NativeView view)
     {
         if (view is ImageView image)
         {
-            _navigationIconSize = (int)Android.Util.TypedValue.ApplyDimension(
+            var iconSize = (int)Android.Util.TypedValue.ApplyDimension(
                 Android.Util.ComplexUnitType.Dip, 28, Resources!.DisplayMetrics!);
-            image.LayoutParameters = new ViewGroup.LayoutParams(_navigationIconSize, _navigationIconSize);
+            image.LayoutParameters = new ViewGroup.LayoutParams(iconSize, iconSize);
             return;
         }
 
