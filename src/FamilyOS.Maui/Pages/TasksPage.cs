@@ -12,6 +12,7 @@ public sealed class TasksPage : ContentPage
 {
     private readonly TasksApiClient _tasks;
     private readonly FamilyApiClient _family;
+    private readonly PulseRefreshSignal _pulseRefresh;
     private readonly VerticalStackLayout _items;
     private readonly VerticalStackLayout _recurrences;
     private readonly Label _status;
@@ -21,10 +22,11 @@ public sealed class TasksPage : ContentPage
     private bool _showFamilyTasks;
     private bool _loading;
 
-    public TasksPage(TasksApiClient tasks, FamilyApiClient family)
+    public TasksPage(TasksApiClient tasks, FamilyApiClient family, PulseRefreshSignal pulseRefresh)
     {
         _tasks = tasks;
         _family = family;
+        _pulseRefresh = pulseRefresh;
         Title = "Tasks";
 
         _status = new Label { Text = "Loading your tasks…", FontSize = 14 };
@@ -667,6 +669,9 @@ public sealed class TasksPage : ContentPage
                 if (action == "accept")
                     await ConfigureAcceptedTaskScheduleAsync(taskId);
             }
+
+            if (action == "complete")
+                _pulseRefresh.RequestRefresh();
 
             _status.Text = action switch
             {
