@@ -2,44 +2,40 @@
 <ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="FamilyOS.Maui.Controls.FoAppBar">
-    <Border x:Name="BarBorder"
-            StrokeThickness="0"
-            Padding="16,12"
-            BackgroundColor="{AppThemeBinding Light={StaticResource BgSurface}, Dark={StaticResource BgSurface}}">
-        <Grid ColumnDefinitions="Auto,Auto,*,Auto"
-              ColumnSpacing="12"
-              MinimumHeightRequest="{StaticResource ControlHeightMin}">
-            <Button x:Name="LeadingButton"
-                    Grid.Column="0"
-                    Text="‹"
-                    Style="{StaticResource FoGhostButtonStyle}"
-                    MinimumWidthRequest="48"
-                    IsVisible="False"
-                    Clicked="OnLeadingClicked"
-                    SemanticProperties.Description="Back" />
-            <Image x:Name="MarkImage"
-                   Grid.Column="1"
-                   Source="logo_mark.png"
-                   WidthRequest="28"
-                   HeightRequest="28"
-                   Aspect="AspectFit"
-                   VerticalOptions="Center"
-                   SemanticProperties.Description="FamilyOS" />
-            <VerticalStackLayout Grid.Column="2" VerticalOptions="Center" Spacing="2">
-                <Label x:Name="TitleLabel"
-                       Style="{StaticResource TextHeading}"
-                       LineBreakMode="TailTruncation"
-                       MaxLines="1" />
-                <Label x:Name="SubtitleLabel"
-                       Style="{StaticResource TextCaption}"
-                       IsVisible="False"
-                       LineBreakMode="TailTruncation"
-                       MaxLines="1" />
-            </VerticalStackLayout>
-            <HorizontalStackLayout x:Name="TrailingHost"
-                                   Grid.Column="3"
-                                   Spacing="4"
-                                   VerticalOptions="Center" />
-        </Grid>
-    </Border>
+    <VerticalStackLayout Spacing="0">
+        <Border x:Name="BarBorder"
+                StrokeThickness="0"
+                Padding="16,14"
+                BackgroundColor="{AppThemeBinding Light={StaticResource BgSurface}, Dark={StaticResource BgSurface}}">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" MinimumHeightRequest="{StaticResource ControlHeightMin}">
+                <Button x:Name="LeadingButton"
+                        Grid.Column="0"
+                        Text="‹"
+                        Style="{StaticResource FoGhostButtonStyle}"
+                        MinimumWidthRequest="48"
+                        IsVisible="False"
+                        Clicked="OnLeadingClicked"
+                        SemanticProperties.Description="Back" />
+                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="2">
+                    <Label x:Name="TitleLabel"
+                           Style="{StaticResource TextHeading}"
+                           LineBreakMode="TailTruncation"
+                           MaxLines="1" />
+                    <Label x:Name="SubtitleLabel"
+                           Style="{StaticResource TextCaption}"
+                           IsVisible="False"
+                           LineBreakMode="TailTruncation"
+                           MaxLines="1" />
+                </VerticalStackLayout>
+                <HorizontalStackLayout x:Name="TrailingHost"
+                                       Grid.Column="2"
+                                       Spacing="4"
+                                       VerticalOptions="Center" />
+            </Grid>
+        </Border>
+        <BoxView HeightRequest="1.5"
+                 HorizontalOptions="Fill"
+                 Color="{AppThemeBinding Light={StaticResource AccentPrimary}, Dark={StaticResource AccentPrimary}}"
+                 Opacity="0.55" />
+    </VerticalStackLayout>
 </ContentView>

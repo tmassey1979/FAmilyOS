@@ -22,6 +22,9 @@ public partial class FoBadge : ContentView
 
     private void ApplyTone()
     {
+        var resources = Application.Current?.Resources;
+        if (resources is null) return;
+
         var key = Tone switch
         {
             FoBadgeTone.Success => "AccentSuccess",
@@ -30,22 +33,26 @@ public partial class FoBadge : ContentView
             FoBadgeTone.Info => "AccentPrimary",
             _ => "BgSurfaceAlt"
         };
-        var resources = Application.Current!.Resources;
-        BadgeBorder.StrokeThickness = 0;
-        BadgeBorder.Stroke = Colors.Transparent;
+
+        BadgeBorder.BackgroundColor = resources.TryGetValue(key, out var bg) && bg is Color c
+            ? c
+            : Colors.Gray;
+
         if (Tone == FoBadgeTone.Neutral)
         {
-            BadgeBorder.BackgroundColor = (Color)resources["BgSurfaceAlt"];
-            BadgeLabel.TextColor = (Color)resources["TextMuted"];
+            BadgeLabel.TextColor = resources.TryGetValue("TextPrimary", out var tp) && tp is Color tpc ? tpc : Colors.White;
+            BadgeBorder.StrokeThickness = 1;
+            if (resources.TryGetValue("BorderSubtle", out var br) && br is Color bc)
+                BadgeBorder.Stroke = bc;
         }
         else
         {
-            var accent = (Color)resources[key];
-            BadgeBorder.BackgroundColor = accent.WithAlpha(0.14f);
-            BadgeBorder.Stroke = accent.WithAlpha(0.45f);
-            BadgeBorder.StrokeThickness = 1;
-            BadgeLabel.TextColor = accent;
+            BadgeLabel.TextColor = resources.TryGetValue("TextOnAccent", out var ink) && ink is Color ik
+                ? ik
+                : Color.FromArgb("#041018");
+            BadgeBorder.StrokeThickness = 0;
         }
+
         SemanticProperties.SetDescription(this, $"{Tone}: {Text}");
     }
 }
