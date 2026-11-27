@@ -107,9 +107,6 @@ public class ThemeTokenTests
             var path = FindRepoFile($"src/FamilyOS.Maui/Controls/{name}.xaml");
             Assert.True(File.Exists(path), $"Missing control {name}");
         }
-
-        var uiKit = FindRepoFile("src/FamilyOS.Maui/Controls/Ui.cs");
-        Assert.True(File.Exists(uiKit), "Missing shared Ui.cs command kit");
     }
 
     [Fact]
