@@ -193,7 +193,7 @@ public sealed class TasksPage : ContentPage
         if (task.IsRecurring)
             tags.Children.Add(CreateTaskChip(
                 task.RecurrenceFrequency is { Length: > 0 } frequency ? $"↻ {frequency}" : "↻ RECURRING",
-                "BgSurfaceElevated", "TextSecondary"));
+                "BgSurfaceAlt", "TextPrimary"));
         content.Children.Add(tags);
 
         if (!string.IsNullOrWhiteSpace(task.Description))
