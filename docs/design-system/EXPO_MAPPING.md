@@ -1,40 +1,45 @@
 # Expo → MAUI token mapping
 
-Source of truth for visual parity review. Expo values from `mobile/src/theme.ts` and `mobile/src/components/ui.tsx`.
+Source of truth for visual parity review. MAUI is now the **sci-fi command** reference; Expo should follow when mobile is refreshed.
 
-## Colors
+## Colors (dark)
 
-| Expo (`theme.ts`) | Value | MAUI semantic | MAUI dark raw |
-|-------------------|-------|---------------|---------------|
-| `colors.bg` | `#0F172A` | `BgPage` (Dark) | `PaletteNavy950` |
-| `colors.surface` | `#1E293B` | `BgSurface` (Dark) | `PaletteSlate800` |
-| `colors.surfaceAlt` | `#334155` | `BgSurfaceAlt` (Dark) | `PaletteSlate700` |
-| `colors.border` | `#475569` | `BorderSubtle` (Dark) | `PaletteSlate600` |
-| `colors.primary` | `#38BDF8` | `AccentPrimary` | `PaletteSky400` |
-| `colors.text` | `#F8FAFC` | `TextPrimary` (Dark) | `PaletteSlate50` |
-| `colors.textMuted` | `#94A3B8` | `TextMuted` (Dark) | `PaletteSlate400` |
-| `colors.danger` | `#F87171` | `AccentDanger` | `PaletteRed400` |
-| `colors.success` | `#4ADE80` | `AccentSuccess` | `PaletteGreen400` |
-| `colors.warning` | `#FBBF24` | `AccentWarning` | `PaletteAmber400` |
+| Semantic | Value | MAUI key |
+|----------|-------|----------|
+| page bg | `#0A0E14` | `BgPage` |
+| surface | `#121A2B` | `BgSurface` |
+| surface alt | `#1A2438` | `BgSurfaceAlt` |
+| border | `#2A3A55` | `BorderSubtle` |
+| primary | `#22D3EE` | `AccentPrimary` |
+| secondary | `#A78BFA` | `AccentSecondary` |
+| glow | `#67E8F9` | `AccentGlow` |
+| text | `#F1F5F9` | `TextPrimary` |
+| text muted | `#94A3B8` | `TextMuted` |
+| danger | `#FB7185` | `AccentDanger` |
+| success | `#34D399` | `AccentSuccess` |
+| warning | `#FBBF24` | `AccentWarning` |
 
-Light theme is an **evolution** for daytime readability (cream page, navy text) while keeping the same accent and status colors.
+Light theme uses cooler slate pages with deeper cyan (`#0891B2`) for outdoor readability.
 
 ## Spacing
 
-| Expo | Value | MAUI |
-|------|-------|------|
-| `spacing.xs` | 4 | `SpaceXs` |
-| `spacing.sm` | 8 | `SpaceSm` |
-| `spacing.md` | 16 | `SpaceMd` |
-| `spacing.lg` | 24 | `SpaceLg` |
-| `spacing.xl` | 32 | `SpaceXl` |
+| Token | Value |
+|-------|-------|
+| `SpaceXs` | 4 |
+| `SpaceSm` | 8 |
+| `SpaceMd` | 16 |
+| `SpaceLg` | 24 |
+| `SpaceXl` | 32 |
+| `ControlHeightMin` | 52 |
+| `RadiusMd` | 14 |
+| `RadiusLg` | 18 |
 
 ## Components
 
-| Expo (`ui.tsx`) | MAUI control |
-|----------------|--------------|
-| `Button` | `FoButton` |
-| `Card` | `FoCard` |
-| `Badge` | `FoBadge` |
-| `EmptyState` | `FoEmptyState` |
-| `SectionTitle` | `FoSectionTitle` |
+| Concept | MAUI control |
+|---------|--------------|
+| Button | `FoButton` (Primary / Secondary / Danger / Ghost / Accent) |
+| Card | `FoCard` (+ Tone: Default / Accent / Success / Warning / Danger) |
+| Badge | `FoBadge` |
+| EmptyState | `FoEmptyState` |
+| SectionTitle | `FoSectionTitle` |
