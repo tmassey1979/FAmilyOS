@@ -11,6 +11,7 @@ public static class MauiProgram
     {
         var builder = MauiApp.CreateBuilder();
         var diagnostics = new StartupDiagnosticsService();
+        diagnostics.BeginLaunch();
         diagnostics.RecordCheckpoint("MauiProgram.CreateMauiApp entered");
 
         builder.Services.AddSingleton(diagnostics);
