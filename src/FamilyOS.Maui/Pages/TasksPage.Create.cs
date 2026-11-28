@@ -37,7 +37,7 @@ public sealed partial class TasksPage
             });
 
             if (string.IsNullOrWhiteSpace(title)) return;
-            await _tasks.CreateTaskAsync(title.Trim(), notes, assigneeId, due);
+            await _tasks.CreateTaskAsync(new CreateTaskBody(title.Trim(), notes, AssignToMemberId: assigneeId, DueDate: due));
             _pulseRefresh.RequestRefresh();
             await LoadAsync();
         }
@@ -61,7 +61,7 @@ public sealed partial class TasksPage
         {
             var title = await DisplayPromptAsync("Recurring task", "Title", accept: "Create", cancel: "Cancel", maxLength: 120);
             if (string.IsNullOrWhiteSpace(title)) return;
-            await _tasks.CreateRecurrenceAsync(title.Trim(), "Weekly");
+            await _tasks.CreateRecurrenceAsync(new CreateRecurrenceBody(title.Trim(), "Weekly"));
             await LoadAsync();
         }
         catch (Exception ex)
