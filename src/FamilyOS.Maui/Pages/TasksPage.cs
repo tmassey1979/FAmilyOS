@@ -351,44 +351,51 @@ public sealed class TasksPage : ContentPage, IQueryAttributable
         grid.Add(stack, index % 2, index / 2);
     }
 
-    private static (string action, string label, bool primary)[] ActionsFor(string status) => status switch
-    {
-        "Assigned" or "Reassigned" => new[]
+    private static string NormalizeTaskStatus(string? status) =>
+        System.Text.RegularExpressions.Regex.Replace(
+            status?.Trim() ?? string.Empty,
+            @"[\\s_-]+",
+            string.Empty);
+
+    private static (string action, string label, bool primary)[] ActionsFor(string status) =>
+        NormalizeTaskStatus(status) switch
         {
-            ("accept", "Accept", true),
-            ("decline", "Decline", false),
-            ("cancel", "Cancel", false)
-        },
-        "Accepted" => new[]
-        {
-            ("start", "Start", true),
-            ("complete", "Complete", false),
-            ("decline", "Decline", false),
-            ("defer", "Defer", false),
-            ("skip", "Skip", false),
-            ("cancel", "Cancel", false)
-        },
-        "InProgress" => new[]
-        {
-            ("pause", "Pause", false),
-            ("complete", "Complete", true),
-            ("defer", "Defer", false),
-            ("cancel", "Cancel", false)
-        },
-        "Paused" => new[]
-        {
-            ("resume", "Resume", true),
-            ("complete", "Complete", false),
-            ("cancel", "Cancel", false)
-        },
-        "Deferred" => new[]
-        {
-            ("start", "Start", true),
-            ("skip", "Skip", false),
-            ("cancel", "Cancel", false)
-        },
-        _ => Array.Empty<(string, string, bool)>()
-    };
+            "Assigned" or "Reassigned" => new[]
+            {
+                ("accept", "Accept Task", true),
+                ("decline", "Decline", false),
+                ("cancel", "Cancel", false)
+            },
+            "Accepted" => new[]
+            {
+                ("start", "Start Task", true),
+                ("complete", "Complete Task", false),
+                ("decline", "Decline", false),
+                ("defer", "Defer", false),
+                ("skip", "Skip", false),
+                ("cancel", "Cancel", false)
+            },
+            "InProgress" => new[]
+            {
+                ("pause", "Pause", false),
+                ("complete", "Complete Task", true),
+                ("defer", "Defer", false),
+                ("cancel", "Cancel", false)
+            },
+            "Paused" => new[]
+            {
+                ("resume", "Resume Task", true),
+                ("complete", "Complete Task", false),
+                ("cancel", "Cancel", false)
+            },
+            "Deferred" => new[]
+            {
+                ("start", "Start Task", true),
+                ("skip", "Skip", false),
+                ("cancel", "Cancel", false)
+            },
+            _ => Array.Empty<(string, string, bool)>()
+        };
 
     private Button MakeMoreButton(FamilyTaskDto task, List<(string label, string action)> options)
     {
@@ -423,7 +430,7 @@ public sealed class TasksPage : ContentPage, IQueryAttributable
 
     private Button MakeActionButton(FamilyTaskDto task, string action, string label, bool primary)
     {
-        var button = new Button { Text = label, FontSize = 12, HeightRequest = 38, CornerRadius = 19, Padding = new Thickness(14, 0), Margin = new Thickness(0, 2, 8, 2) };
+        var button = new Button { Text = label, FontSize = 13, FontAttributes = FontAttributes.Bold, HeightRequest = 44, MinimumWidthRequest = 112, CornerRadius = 22, Padding = new Thickness(16, 0), Margin = new Thickness(0, 3, 8, 3) };
         button.SetDynamicResource(VisualElement.StyleProperty, primary ? "FoPrimaryButtonStyle" : "FoSecondaryButtonStyle");
         button.Clicked += async (_, _) => await ExecuteAsync(task, action);
         return button;
@@ -735,7 +742,7 @@ public sealed class TasksPage : ContentPage, IQueryAttributable
                 {
                     await DisplayAlertAsync(
                         "Due date needed",
-                        "This task needs a due date before it can be accepted. Ask a parent or owner to set one.",
+                        "A due date is required before this task can be accepted. Ask a parent or owner to use More → Edit details and set the due date, then tap Accept Task again.",
                         "OK");
                     return;
                 }
