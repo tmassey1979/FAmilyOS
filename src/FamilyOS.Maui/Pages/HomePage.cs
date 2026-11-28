@@ -409,7 +409,7 @@ public sealed class HomePage : ContentPage
         _moduleGrid.Add(border, col, row);
     }
 
-    private async Task OpenNextActionAsync(NextActionDto action)
+    private async Task OpenNextActionAsync(PulseNextActionDto action)
     {
         try
         {
