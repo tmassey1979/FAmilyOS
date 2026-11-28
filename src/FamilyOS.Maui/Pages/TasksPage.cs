@@ -747,9 +747,9 @@ public sealed class TasksPage : ContentPage, IQueryAttributable
                     return;
                 }
 
+                // Acceptance is a simple ownership transition. Scheduling stays optional
+                // under More → Schedule so it cannot interrupt the Accept → Start → Complete flow.
                 await _tasks.RunActionAsync(task.Id, action);
-                if (action == "accept")
-                    await ConfigureAcceptedTaskScheduleAsync(task.Id);
             }
 
             if (action == "complete")
