@@ -36,7 +36,14 @@ public sealed class HomePage : ContentPage
     private readonly Grid _moduleGrid = new()
     {
         ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Star) },
-        RowDefinitions = { new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto) },
+        RowDefinitions =
+        {
+            new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto),
+            new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto),
+            new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto),
+            new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto),
+            new RowDefinition(GridLength.Auto)
+        },
         ColumnSpacing = 10,
         RowSpacing = 10
     };
@@ -380,12 +387,26 @@ public sealed class HomePage : ContentPage
     private void BindModules(PulseDto pulse)
     {
         _moduleGrid.Children.Clear();
-        AddModule(0, 0, "Tasks", "Assigned work", "//tasks");
-        AddModule(1, 0, "Requests", "Approvals", "//requests");
-        AddModule(0, 1, "Calendar", "Coming up", "//calendar");
+
+        // Keep the full set of family-facing modules discoverable from Home.
+        // Secondary pages use the exact global routes registered by AppShell.
+        AddModule(0, 0, "Tasks", "Assigned work", nameof(TasksPage));
+        AddModule(1, 0, "Requests", "Approvals", nameof(RequestsPage));
+        AddModule(0, 1, "Calendar", "Coming up", nameof(CalendarPage));
         AddModule(1, 1, "Family", "Household", "//family");
-        AddModule(0, 2, "Meals", "Plan & shop", "//meals");
+        AddModule(0, 2, "Meals", "Plan & shop", nameof(MealsPage));
         AddModule(1, 2, "Map", "Locations", "//map");
+        AddModule(0, 3, "Recipes", "Family recipes", nameof(RecipesPage));
+        AddModule(1, 3, "Ingredients", "Pantry & ingredients", nameof(IngredientsPage));
+        AddModule(0, 4, "Shopping", "Shopping lists", nameof(ShoppingPage));
+        AddModule(1, 4, "Chat", "Family conversations", nameof(ChatPage));
+        AddModule(0, 5, "Notifications", "Updates & alerts", nameof(NotificationsPage));
+        AddModule(1, 5, "Outcomes", "Goals & progress", nameof(OutcomesPage));
+        AddModule(0, 6, "Location", "Location sharing", nameof(LocationPage));
+        AddModule(1, 6, "Check-ins", "Family check-ins", nameof(CheckInsPage));
+        AddModule(0, 7, "Emergency SOS", "Urgent help", nameof(EmergencySosPage));
+        AddModule(1, 7, "Saved Places", "Important places", nameof(SavedPlacesPage));
+        AddModule(0, 8, "Settings", "FamilyOS preferences", nameof(SettingsPage));
     }
 
     private void AddModule(int col, int row, string title, string subtitle, string route)
