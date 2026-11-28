@@ -1,6 +1,5 @@
 using FamilyOS.Maui.Controls;
-using FamilyOS.Maui.Models;
-using FamilyOS.Maui.Services.Api;
+using FamilyOS.Maui.Services;
 
 namespace FamilyOS.Maui.Pages;
 
@@ -53,7 +52,7 @@ public sealed class NotificationsPage : ContentPage
         _items.Children.Clear();
         try
         {
-            var list = await _notifications.MineAsync();
+            var list = await _notifications.GetMineAsync();
             if (list.Count == 0)
             {
                 _items.Children.Add(Ui.Empty("Inbox empty", "You are all caught up."));
