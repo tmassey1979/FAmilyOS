@@ -1,3 +1,6 @@
+using Microsoft.Maui.Controls.Shapes;
+using Microsoft.Maui.Layouts;
+
 namespace FamilyOS.Maui.Controls;
 
 /// <summary>
@@ -79,7 +82,7 @@ public static class Ui
         {
             Wrap = FlexWrap.Wrap,
             Direction = FlexDirection.Row,
-            AlignItems = Microsoft.Maui.Layouts.FlexAlignItems.Center
+            AlignItems = FlexAlignItems.Center
         };
         foreach (var (text, tone) in pills)
         {
