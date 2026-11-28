@@ -334,7 +334,7 @@ public sealed partial class TasksPage : ContentPage, IQueryAttributable
         _items.Children.Add(card);
     }
 
-    private void AddRecurrence(TaskRecurrenceDto recurrence)
+    private void AddRecurrence(RecurrenceDto recurrence)
     {
         var title = new Label { Text = recurrence.Title, FontSize = 15, FontAttributes = FontAttributes.Bold };
         title.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
@@ -518,12 +518,12 @@ public sealed partial class TasksPage : ContentPage, IQueryAttributable
         {
             switch (action)
             {
-                case "accept": await _tasks.AcceptAsync(task.Id); break;
+                case "accept": await _tasks.RunActionAsync(task.Id, "accept"); break;
                 case "decline": await _tasks.DeclineAsync(task.Id); break;
-                case "start": await _tasks.StartAsync(task.Id); break;
-                case "complete": await _tasks.CompleteAsync(task.Id); break;
-                case "pause": await _tasks.PauseAsync(task.Id); break;
-                case "resume": await _tasks.ResumeAsync(task.Id); break;
+                case "start": await _tasks.RunActionAsync(task.Id, "start"); break;
+                case "complete": await _tasks.RunActionAsync(task.Id, "complete"); break;
+                case "pause": await _tasks.RunActionAsync(task.Id, "pause"); break;
+                case "resume": await _tasks.RunActionAsync(task.Id, "resume"); break;
                 case "cancel": await _tasks.CancelAsync(task.Id); break;
                 case "defer": await _tasks.DeferAsync(task.Id); break;
                 case "skip": await _tasks.SkipAsync(task.Id); break;
@@ -542,7 +542,7 @@ public sealed partial class TasksPage : ContentPage, IQueryAttributable
         try
         {
             var history = await _tasks.GetHistoryAsync(taskId);
-            var lines = history.Select(h => $"{h.AtLocal:g} \u00B7 {h.Summary}").ToArray();
+            var lines = history.Select(h => $"{h.TimestampUtc.ToLocalTime():g} · {h.ActorName}: {h.Detail}").ToArray();
             await DisplayAlert(title, lines.Length == 0 ? "No history yet." : string.Join("\n", lines.Take(12)), "OK");
         }
         catch (Exception ex)

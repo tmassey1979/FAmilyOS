@@ -214,7 +214,7 @@ public sealed class HomePage : ContentPage
         _loading = true;
         try
         {
-            if (!_auth.IsAuthenticated)
+            if (string.IsNullOrWhiteSpace(await _auth.GetAccessTokenAsync()))
             {
                 ShowSignedOut();
                 return;
@@ -409,7 +409,7 @@ public sealed class HomePage : ContentPage
         _moduleGrid.Add(border, col, row);
     }
 
-    private async Task OpenNextActionAsync(NextActionDto action)
+    private async Task OpenNextActionAsync(PulseNextActionDto action)
     {
         try
         {
