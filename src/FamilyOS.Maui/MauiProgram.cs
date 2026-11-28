@@ -29,7 +29,10 @@ public static class MauiProgram
 
         // Shared HTTP + auth session used by all API clients.
         builder.Services.AddSingleton<HttpClient>();
-        builder.Services.AddSingleton<IAuthSessionService, KeycloakAuthService>();
+        // Register the concrete auth service because HomePage currently consumes it directly.
+        // Map the interface to the same singleton so all API clients share one auth session.
+        builder.Services.AddSingleton<KeycloakAuthService>();
+        builder.Services.AddSingleton<IAuthSessionService>(sp => sp.GetRequiredService<KeycloakAuthService>());
         builder.Services.AddSingleton<ClientLogService>();
         builder.Services.AddSingleton<AppShell>();
         builder.Services.AddTransient<HomePage>();
