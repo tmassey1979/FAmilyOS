@@ -1,35 +1,24 @@
 using FamilyOS.Maui.Controls;
-using FamilyOS.Maui.Services.Api;
 
 namespace FamilyOS.Maui.Pages;
 
 /// <summary>
-/// Session gate. Production path uses Keycloak OIDC/PKCE.
-/// DEBUG builds allow X-Dev-User for local API testing.
+/// Session gate placeholder for DEBUG / manual token entry.
+/// Production path uses Keycloak via OnboardingPage.
 /// </summary>
 public sealed class LoginPage : ContentPage
 {
-    private readonly IAuthSession _session;
-    private readonly Entry _devUser;
     private readonly Entry _baseUrl;
     private readonly Entry _token;
     private readonly Label _status;
 
-    public LoginPage(IAuthSession session)
+    public LoginPage()
     {
-        _session = session;
         Title = "Sign in";
 
-        _devUser = new Entry
-        {
-            Placeholder = "terry.owner",
-            Text = "terry.owner",
-            AutomationId = "devUser"
-        };
         _baseUrl = new Entry
         {
             Placeholder = "https://api.example.com",
-            Text = session.BaseUrl,
             AutomationId = "apiBase"
         };
         _token = new Entry
@@ -70,10 +59,8 @@ public sealed class LoginPage : ContentPage
                 Ui.Section("Connection"),
                 Ui.Caption("API base URL"),
                 _baseUrl,
-                Ui.Caption("Access token (preferred)"),
+                Ui.Caption("Access token"),
                 _token,
-                Ui.Caption("Or DEBUG dev user"),
-                _devUser,
                 continueBtn,
                 _status
             }
@@ -95,42 +82,22 @@ public sealed class LoginPage : ContentPage
 
     private async Task ContinueAsync()
     {
-        _session.SetBaseUrl(_baseUrl.Text?.Trim() ?? _session.BaseUrl);
-
-        var token = _token.Text?.Trim();
-        var dev = _devUser.Text?.Trim();
-
-        if (!string.IsNullOrWhiteSpace(token))
+        if (string.IsNullOrWhiteSpace(_token.Text))
         {
-            _session.SetAccessToken(token);
-            _session.SetDevUser(null);
-        }
-        else if (!string.IsNullOrWhiteSpace(dev))
-        {
-#if DEBUG
-            _session.SetDevUser(dev);
-            _session.SetAccessToken(null);
-#else
-            _status.Text = "Production builds require a JWT. Dev-user bypass is DEBUG only.";
-            return;
-#endif
-        }
-        else
-        {
-            _status.Text = "Enter a JWT or a DEBUG dev user.";
+            _status.Text = "Enter a JWT, or use Get started / Onboarding for Keycloak sign-in.";
             return;
         }
 
         try
         {
-            if (Application.Current is App app)
-                app.GoToShell();
+            if (Shell.Current is not null)
+                await Shell.Current.GoToAsync("//home");
+            else
+                _status.Text = "Shell is not ready. Restart the app after signing in.";
         }
         catch (Exception ex)
         {
             _status.Text = ex.Message;
         }
-
-        await Task.CompletedTask;
     }
 }
