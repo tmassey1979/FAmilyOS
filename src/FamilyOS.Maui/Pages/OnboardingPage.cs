@@ -21,11 +21,11 @@ public sealed class OnboardingPage : ContentPage
     private readonly Switch _annualBilling = new();
     private readonly Switch _locationModule = new();
     private readonly Switch _financeModule = new();
-    private readonly FoButton _signIn = new() { Title = "Sign in with FamilyOS", LoadingText = "Opening sign-in…" };
-    private readonly FoButton _activateTestPlan = new() { Title = "Activate test plan — no charge", LoadingText = "Activating test plan…" };
-    private readonly FoButton _create = new() { Title = "Create household", LoadingText = "Creating household…" };
-    private readonly FoButton _preview = new() { Title = "Check invite", LoadingText = "Checking invitation…", Variant = FoButtonVariant.Secondary };
-    private readonly FoButton _join = new() { Title = "Join household", LoadingText = "Joining household…" };
+    private readonly FoButton _signIn = new() { Title = "Sign in with FamilyOS" };
+    private readonly FoButton _activateTestPlan = new() { Title = "Activate test plan — no charge" };
+    private readonly FoButton _create = new() { Title = "Create household" };
+    private readonly FoButton _preview = new() { Title = "Check invite", Variant = FoButtonVariant.Secondary };
+    private readonly FoButton _join = new() { Title = "Join household" };
     private Border? _subscriptionCard;
     private Border? _createCard;
     private bool _signedIn;
