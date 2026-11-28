@@ -542,7 +542,7 @@ public sealed partial class TasksPage : ContentPage, IQueryAttributable
         try
         {
             var history = await _tasks.GetHistoryAsync(taskId);
-            var lines = history.Select(h => $"{h.AtLocal:g} \u00B7 {h.Summary}").ToArray();
+            var lines = history.Select(h => $"{h.TimestampUtc.ToLocalTime():g} · {h.ActorName}: {h.Detail}").ToArray();
             await DisplayAlert(title, lines.Length == 0 ? "No history yet." : string.Join("\n", lines.Take(12)), "OK");
         }
         catch (Exception ex)
