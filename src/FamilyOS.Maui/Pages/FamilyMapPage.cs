@@ -7,12 +7,10 @@ namespace FamilyOS.Maui.Pages;
 /// <summary>
 /// Full-screen household map with explicit location sharing controls.
 /// Sharing is opt-in; coordinates only leave the device when the user shares.
-/// Google Maps dark mode (API key in Preferences); labeled place markers.
+/// OpenStreetMap basemap; labeled place markers; no API key.
 /// </summary>
 public sealed class FamilyMapPage : ContentPage, IQueryAttributable
 {
-    public const string GoogleMapsApiKeyPreference = "familyos.maps.google_api_key";
-
     private readonly FamilyApiClient _api;
     private readonly DeviceLocationService _deviceLocation;
     private Location? _ownLocation;
@@ -56,7 +54,6 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
     private readonly Button _shareNow = new() { Text = "Share now", FontSize = 13 };
     private readonly Button _placesBtn = new() { Text = "Places", FontSize = 13 };
     private readonly Button _locationSettings = new() { Text = "Settings", FontSize = 13 };
-    private readonly Button _mapsKeyBtn = new() { Text = "Maps key", FontSize = 13 };
 
     public FamilyMapPage(FamilyApiClient api, DeviceLocationService deviceLocation)
     {
@@ -83,7 +80,6 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
         _shareNow.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
         _placesBtn.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
         _locationSettings.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
-        _mapsKeyBtn.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
         _shareLabel.Text = "Sharing: \u2026";
 
         _locate.Clicked += async (_, _) => await EnsureOwnLocationAsync(forcePrompt: true);
@@ -114,7 +110,6 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
         _shareNow.Clicked += async (_, _) => await ShareNowAsync();
         _placesBtn.Clicked += async (_, _) => await Shell.Current.GoToAsync(nameof(SavedPlacesPage));
         _locationSettings.Clicked += async (_, _) => await Shell.Current.GoToAsync(nameof(LocationPage));
-        _mapsKeyBtn.Clicked += async (_, _) => await EditGoogleMapsApiKeyAsync();
 
         var statusChip = new Border
         {
@@ -143,7 +138,7 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
                     new HorizontalStackLayout
                     {
                         Spacing = 8,
-                        Children = { _shareNow, _placesBtn, _locationSettings, _mapsKeyBtn }
+                        Children = { _shareNow, _placesBtn, _locationSettings }
                     }
                 }
             }
@@ -547,28 +542,8 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
         }
     }
 
-    private async Task EditGoogleMapsApiKeyAsync()
-    {
-        var current = Preferences.Default.Get(GoogleMapsApiKeyPreference, string.Empty);
-        var value = await DisplayPromptAsync(
-            "Google Maps API key",
-            "Paste a Maps JavaScript API key from Google Cloud (enable Maps JavaScript API + billing). Stored only on this device.",
-            accept: "Save",
-            cancel: "Cancel",
-            placeholder: "AIza...",
-            initialValue: current,
-            maxLength: 200);
-        if (value is null) return;
-        Preferences.Default.Set(GoogleMapsApiKeyPreference, value.Trim());
-        _status.Text = string.IsNullOrWhiteSpace(value.Trim())
-            ? "Google Maps key cleared."
-            : "Google Maps key saved on this device.";
-        await RefreshAsync();
-    }
-
     private static string BuildMapHtml(IReadOnlyList<FamilyLocationDto> locations, IReadOnlyList<SavedPlaceDto> places, IReadOnlyList<LocationHistoryPointDto>? history = null, Guid? selectedMemberId = null)
     {
-        var apiKey = Preferences.Default.Get(GoogleMapsApiKeyPreference, string.Empty)?.Trim() ?? string.Empty;
         var data = locations.Select(x => new MapPin(
             x.MemberId,
             x.DisplayName,
@@ -579,169 +554,105 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
         var json = JsonSerializer.Serialize(data, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var placeJson = JsonSerializer.Serialize(places, new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var historyJson = JsonSerializer.Serialize(history ?? [], new JsonSerializerOptions(JsonSerializerDefaults.Web));
-
-        if (string.IsNullOrWhiteSpace(apiKey))
-        {
-            return """
-            <!doctype html>
-            <html><head>
-              <meta name="viewport" content="width=device-width, initial-scale=1">
-              <style>
-                html,body{height:100%;margin:0;background:#0A0E14;color:#E2E8F0;font-family:-apple-system,system-ui,sans-serif}
-                .box{display:flex;align-items:center;justify-content:center;height:100%;padding:28px;text-align:center;line-height:1.5}
-                strong{color:#22D3EE}
-              </style>
-            </head><body>
-              <div class="box">
-                <div>
-                  <div style="font-size:18px;font-weight:700;margin-bottom:8px">Google Maps dark mode</div>
-                  <div style="color:#94A3B8;font-size:14px">
-                    Tap <strong>Maps key</strong> on this screen, paste a Google Cloud
-                    <strong>Maps JavaScript API</strong> key, then Save.
-                    Enable the API and billing on the key in Google Cloud Console.
-                  </div>
-                </div>
-              </div>
-            </body></html>
-            """;
-        }
-
         return $$"""
             <!doctype html>
             <html lang="en">
             <head>
               <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+              <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+                integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
               <style>
                 html, body, #map { height: 100%; width: 100%; margin: 0; padding: 0; background: #0A0E14; }
+                body { font-family: -apple-system, system-ui, sans-serif; }
+                .empty { display:flex; align-items:center; justify-content:center; height:100%; color:#94A3B8; font-size:15px; padding:24px; text-align:center; }
+                .leaflet-popup-content { line-height: 1.45; margin: 10px 12px; }
+                .leaflet-control-attribution { font-size: 10px; background: rgba(15,23,42,0.8) !important; color: #94A3B8 !important; }
+                .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #121A2B; color: #F1F5F9; box-shadow: 0 4px 16px rgba(0,0,0,0.45); }
+                .leaflet-container a.leaflet-popup-close-button { color: #94A3B8; }
+                .place-label {
+                  background: rgba(15, 23, 42, 0.92);
+                  border: 1px solid #22D3EE;
+                  color: #E2E8F0;
+                  font-size: 11px;
+                  font-weight: 600;
+                  padding: 3px 8px;
+                  border-radius: 999px;
+                  white-space: nowrap;
+                  box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+                  transform: translate(-50%, -120%);
+                }
+                .place-dot {
+                  width: 12px; height: 12px; border-radius: 50%;
+                  background: #22D3EE; border: 2px solid #0A0E14;
+                  box-shadow: 0 0 0 2px rgba(34,211,238,0.35);
+                }
               </style>
             </head>
             <body>
               <div id="map"></div>
+              <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+                integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
               <script>
                 const locations = {{json}};
                 const places = {{placeJson}};
                 const history = {{historyJson}};
                 const selectedMemberId = {{JsonSerializer.Serialize(selectedMemberId?.ToString())}};
-
-                const darkStyles = [
-                  { elementType: "geometry", stylers: [{ color: "#1d2c4d" }] },
-                  { elementType: "labels.text.fill", stylers: [{ color: "#8ec3b9" }] },
-                  { elementType: "labels.text.stroke", stylers: [{ color: "#1a3646" }] },
-                  { featureType: "administrative.country", elementType: "geometry.stroke", stylers: [{ color: "#4b6878" }] },
-                  { featureType: "administrative.land_parcel", elementType: "labels.text.fill", stylers: [{ color: "#64779e" }] },
-                  { featureType: "administrative.province", elementType: "geometry.stroke", stylers: [{ color: "#4b6878" }] },
-                  { featureType: "landscape.man_made", elementType: "geometry.stroke", stylers: [{ color: "#334e87" }] },
-                  { featureType: "landscape.natural", elementType: "geometry", stylers: [{ color: "#023e58" }] },
-                  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#283d6a" }] },
-                  { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#6f9ba5" }] },
-                  { featureType: "poi", elementType: "labels.text.stroke", stylers: [{ color: "#1d2c4d" }] },
-                  { featureType: "poi.park", elementType: "geometry.fill", stylers: [{ color: "#023e58" }] },
-                  { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#3C7680" }] },
-                  { featureType: "road", elementType: "geometry", stylers: [{ color: "#304a7d" }] },
-                  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#98a5be" }] },
-                  { featureType: "road", elementType: "labels.text.stroke", stylers: [{ color: "#1d2c4d" }] },
-                  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#2c6675" }] },
-                  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#255763" }] },
-                  { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#b0d5ce" }] },
-                  { featureType: "road.highway", elementType: "labels.text.stroke", stylers: [{ color: "#023e58" }] },
-                  { featureType: "transit", elementType: "labels.text.fill", stylers: [{ color: "#98a5be" }] },
-                  { featureType: "transit", elementType: "labels.text.stroke", stylers: [{ color: "#1d2c4d" }] },
-                  { featureType: "transit.line", elementType: "geometry.fill", stylers: [{ color: "#283d6a" }] },
-                  { featureType: "transit.station", elementType: "geometry", stylers: [{ color: "#3a4762" }] },
-                  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0e1626" }] },
-                  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#4e6d70" }] }
-                ];
-
-                function initMap() {
-                  const map = new google.maps.Map(document.getElementById('map'), {
-                    center: { lat: 39.5, lng: -98.35 },
-                    zoom: 4,
-                    styles: darkStyles,
-                    disableDefaultUI: false,
-                    zoomControl: true,
-                    mapTypeControl: false,
-                    streetViewControl: false,
-                    fullscreenControl: false,
-                    backgroundColor: '#0A0E14'
-                  });
-
-                  const bounds = new google.maps.LatLngBounds();
-                  let hasBounds = false;
-
-                  if (history && history.length > 1) {
-                    const path = history.map(p => ({ lat: p.latitude, lng: p.longitude }));
-                    path.forEach(p => { bounds.extend(p); hasBounds = true; });
-                    new google.maps.Polyline({
-                      path,
-                      geodesic: true,
-                      strokeColor: '#22D3EE',
-                      strokeOpacity: 0.9,
-                      strokeWeight: 4,
-                      map
-                    });
+                const map = L.map('map', { zoomControl: false, attributionControl: true }).setView([39.5, -98.35], 4);
+                L.control.zoom({ position: 'bottomright' }).addTo(map);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                  maxZoom: 19,
+                  attribution: '&copy; OpenStreetMap'
+                }).addTo(map);
+                if (locations.length === 0 && places.length === 0 && history.length === 0) {
+                  document.getElementById('map').innerHTML = '<div class="empty">Waiting for location\u2026</div>';
+                } else {
+                  const bounds = [];
+                  if (history.length > 1) {
+                    const routePoints = history.map(point => [point.latitude, point.longitude]);
+                    routePoints.forEach(point => bounds.push(point));
+                    L.polyline(routePoints, { color: '#22D3EE', weight: 4, opacity: 0.9 }).addTo(map);
                   }
-
                   for (const place of places) {
-                    const pos = { lat: place.latitude, lng: place.longitude };
-                    bounds.extend(pos); hasBounds = true;
-                    new google.maps.Circle({
-                      strokeColor: '#22D3EE',
-                      strokeOpacity: 0.9,
-                      strokeWeight: 2,
-                      fillColor: '#22D3EE',
-                      fillOpacity: 0.12,
-                      map,
-                      center: pos,
-                      radius: place.radiusMeters || 50
-                    });
+                    const point = [place.latitude, place.longitude];
+                    bounds.push(point);
+                    const placeName = place.name || 'Saved place';
+                    const radius = Math.round(place.radiusMeters || 0);
                     const alerts = [];
                     if (place.alertOnArrival) alerts.push('Arrive');
                     if (place.alertOnDeparture) alerts.push('Leave');
-                    const title = place.name || 'Saved place';
-                    const marker = new google.maps.Marker({
-                      position: pos,
-                      map,
-                      title,
-                      label: {
-                        text: title.length > 18 ? title.slice(0, 16) + '\u2026' : title,
-                        color: '#E2E8F0',
-                        fontSize: '11px',
-                        fontWeight: '600'
-                      }
+                    const popup = document.createElement('div');
+                    const nameEl = document.createElement('strong');
+                    nameEl.textContent = placeName;
+                    const detail = document.createElement('div');
+                    detail.textContent = 'Place \u00B7 ' + radius + ' m geofence' + (alerts.length ? ' \u00B7 ' + alerts.join('/') : '');
+                    popup.append(nameEl, detail);
+                    L.circle(point, { radius: place.radiusMeters, color: '#22D3EE', weight: 2, fillOpacity: 0.12 }).addTo(map);
+                    const icon = L.divIcon({
+                      className: '',
+                      html: '<div class="place-dot"></div><div class="place-label">' +
+                            placeName.replace(/</g,'<') + '</div>',
+                      iconSize: [0, 0],
+                      iconAnchor: [0, 0]
                     });
-                    const info = new google.maps.InfoWindow({
-                      content: '<div style="color:#0f172a"><strong>' + title +
-                        '</strong><div>Place \u00B7 ' + Math.round(place.radiusMeters || 0) + ' m' +
-                        (alerts.length ? ' \u00B7 ' + alerts.join('/') : '') + '</div></div>'
-                    });
-                    marker.addListener('click', () => info.open({ map, anchor: marker }));
+                    L.marker(point, { icon }).addTo(map).bindPopup(popup);
                   }
-
                   for (const item of locations) {
-                    const pos = { lat: item.latitude, lng: item.longitude };
-                    bounds.extend(pos); hasBounds = true;
+                    const point = [item.latitude, item.longitude];
+                    bounds.push(point);
+                    const popup = document.createElement('div');
+                    const name = document.createElement('strong');
+                    name.textContent = item.displayName || 'Member';
+                    const updated = document.createElement('div');
                     const ageMinutes = (Date.now() - new Date(item.updatedAtUtc).getTime()) / 60000;
                     const freshness = ageMinutes < 2 ? 'Live' : ageMinutes < 15 ? 'Recent' : ageMinutes < 60 ? 'Stale' : 'Old';
-                    const marker = new google.maps.Marker({
-                      position: pos,
-                      map,
-                      title: item.displayName || 'Member'
-                    });
-                    const info = new google.maps.InfoWindow({
-                      content: '<div style="color:#0f172a"><strong>' + (item.displayName || 'Member') +
-                        '</strong><div>' + freshness + ' \u00B7 ' + new Date(item.updatedAtUtc).toLocaleString() + '</div></div>'
-                    });
-                    marker.addListener('click', () => info.open({ map, anchor: marker }));
-                    if (selectedMemberId && item.memberId === selectedMemberId) info.open({ map, anchor: marker });
+                    updated.textContent = freshness + ' \u00B7 ' + new Date(item.updatedAtUtc).toLocaleString();
+                    popup.append(name, updated);
+                    const marker = L.marker(point).addTo(map).bindPopup(popup);
+                    if (selectedMemberId && item.memberId === selectedMemberId) marker.openPopup();
                   }
-
-                  if (hasBounds) map.fitBounds(bounds, 48);
+                  if (bounds.length) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
                 }
-
-                window.initMap = initMap;
-              </script>
-              <script async defer
-                src="https://maps.googleapis.com/maps/api/js?key={{apiKey}}&callback=initMap">
+                setTimeout(() => map.invalidateSize(), 120);
               </script>
             </body>
             </html>
