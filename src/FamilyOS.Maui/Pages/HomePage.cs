@@ -214,7 +214,7 @@ public sealed class HomePage : ContentPage
         _loading = true;
         try
         {
-            if (!_auth.IsAuthenticated)
+            if (string.IsNullOrWhiteSpace(await _auth.GetAccessTokenAsync()))
             {
                 ShowSignedOut();
                 return;
