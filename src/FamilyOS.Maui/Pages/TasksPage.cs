@@ -518,12 +518,12 @@ public sealed partial class TasksPage : ContentPage, IQueryAttributable
         {
             switch (action)
             {
-                case "accept": await _tasks.AcceptAsync(task.Id); break;
+                case "accept": await _tasks.RunActionAsync(task.Id, "accept"); break;
                 case "decline": await _tasks.DeclineAsync(task.Id); break;
-                case "start": await _tasks.StartAsync(task.Id); break;
-                case "complete": await _tasks.CompleteAsync(task.Id); break;
-                case "pause": await _tasks.PauseAsync(task.Id); break;
-                case "resume": await _tasks.ResumeAsync(task.Id); break;
+                case "start": await _tasks.RunActionAsync(task.Id, "start"); break;
+                case "complete": await _tasks.RunActionAsync(task.Id, "complete"); break;
+                case "pause": await _tasks.RunActionAsync(task.Id, "pause"); break;
+                case "resume": await _tasks.RunActionAsync(task.Id, "resume"); break;
                 case "cancel": await _tasks.CancelAsync(task.Id); break;
                 case "defer": await _tasks.DeferAsync(task.Id); break;
                 case "skip": await _tasks.SkipAsync(task.Id); break;
