@@ -334,7 +334,7 @@ public sealed partial class TasksPage : ContentPage, IQueryAttributable
         _items.Children.Add(card);
     }
 
-    private void AddRecurrence(TaskRecurrenceDto recurrence)
+    private void AddRecurrence(RecurrenceDto recurrence)
     {
         var title = new Label { Text = recurrence.Title, FontSize = 15, FontAttributes = FontAttributes.Bold };
         title.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
