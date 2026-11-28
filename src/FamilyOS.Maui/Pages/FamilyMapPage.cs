@@ -7,7 +7,7 @@ namespace FamilyOS.Maui.Pages;
 /// <summary>
 /// Full-screen household map with explicit location sharing controls.
 /// Sharing is opt-in; coordinates only leave the device when the user shares.
-/// Dark Matter basemap; labeled place markers; chrome kept clear of Leaflet controls.
+/// Esri dark gray basemap (no API key); labeled place markers; chrome clear of Leaflet controls.
 /// </summary>
 public sealed class FamilyMapPage : ContentPage, IQueryAttributable
 {
@@ -26,8 +26,8 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
         LineBreakMode = LineBreakMode.WordWrap,
         HorizontalTextAlignment = TextAlignment.Center
     };
-    private readonly Button _locate = new() { Text = "⌖", FontSize = 20, WidthRequest = 48, HeightRequest = 48 };
-    private readonly Button _refresh = new() { Text = "↻", FontSize = 20, WidthRequest = 48, HeightRequest = 48 };
+    private readonly Button _locate = new() { Text = "\u2316", FontSize = 20, WidthRequest = 48, HeightRequest = 48 };
+    private readonly Button _refresh = new() { Text = "\u21BB", FontSize = 20, WidthRequest = 48, HeightRequest = 48 };
     private readonly Picker _historyMember = new()
     {
         Title = "Member",
@@ -62,15 +62,26 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
         Title = "Map";
 
         _status.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
-        _status.Text = "Finding your location…";
-        _locate.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
-        _refresh.SetDynamicResource(VisualElement.StyleProperty, "FoSecondaryButtonStyle");
+        _status.Text = "Finding your location\u2026";
+
+        // Explicit FAB chrome so glyphs stay visible over the map
+        foreach (var fab in new[] { _locate, _refresh })
+        {
+            fab.BackgroundColor = Color.FromArgb("#121A2B");
+            fab.TextColor = Color.FromArgb("#22D3EE");
+            fab.CornerRadius = 14;
+            fab.BorderColor = Color.FromArgb("#22D3EE");
+            fab.BorderWidth = 1.5;
+            fab.Padding = 0;
+            fab.FontAttributes = FontAttributes.Bold;
+        }
+
         _showHistory.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
         _showTrips.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
         _shareNow.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
         _placesBtn.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
         _locationSettings.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
-        _shareLabel.Text = "Sharing: …";
+        _shareLabel.Text = "Sharing: \u2026";
 
         _locate.Clicked += async (_, _) => await EnsureOwnLocationAsync(forcePrompt: true);
         _refresh.Clicked += async (_, _) => await RefreshAsync();
@@ -180,7 +191,7 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
         root.Add(_map, 0, 0);
         root.Add(topOverlay, 0, 0);
         root.Add(fabColumn, 0, 0);
-        // Leave bottom-right free for Leaflet zoom (+/−)
+        // Leave bottom-right free for Leaflet zoom (+/\u2212)
         var bottomHost = new VerticalStackLayout
         {
             VerticalOptions = LayoutOptions.End,
@@ -259,8 +270,8 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
     private void UpdateShareUi()
     {
         _shareLabel.Text = _sharingEnabled
-            ? "Sharing on — household can see your pin when you share"
-            : "Sharing off — only you see your location on this device";
+            ? "Sharing on \u2014 household can see your pin when you share"
+            : "Sharing off \u2014 only you see your location on this device";
         _shareNow.IsEnabled = _sharingEnabled && _deviceLocation.IsEnabled;
         _shareToggle.IsEnabled = true;
     }
@@ -348,7 +359,7 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
                 return;
             }
 
-            _status.Text = "Getting your location…";
+            _status.Text = "Getting your location\u2026";
             _ownLocation = await _deviceLocation.GetCurrentLocationAsync();
             _ownLocationReadAtUtc = DateTimeOffset.UtcNow;
             if (_ownLocation is null)
@@ -362,7 +373,7 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
                 _ownLocation.Longitude,
                 _ownLocation.Accuracy ?? 0,
                 _ownLocation.Timestamp.UtcDateTime);
-            _status.Text = $"Shared {DateTime.Now:t} · {_ownLocation.Latitude:F5}, {_ownLocation.Longitude:F5}";
+            _status.Text = $"Shared {DateTime.Now:t} \u00B7 {_ownLocation.Latitude:F5}, {_ownLocation.Longitude:F5}";
             await RefreshAsync();
         }
         catch (Exception ex)
@@ -384,12 +395,12 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
             {
                 if (!await _deviceLocation.EnableAsync())
                 {
-                    _status.Text = "Location permission off — shared household pins still load.";
+                    _status.Text = "Location permission off \u2014 shared household pins still load.";
                     return;
                 }
             }
 
-            _status.Text = "Getting your location…";
+            _status.Text = "Getting your location\u2026";
             _ownLocation = await _deviceLocation.GetCurrentLocationAsync();
             _ownLocationReadAtUtc = DateTimeOffset.UtcNow;
             await RefreshAsync();
@@ -440,7 +451,7 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
             _historyStatus.IsVisible = true;
             _historyStatus.Text = history.Count < 2
                 ? $"{member.DisplayName}: not enough points in the last 24 hours."
-                : $"{member.DisplayName}: {history.Count} points · last 24 hours.";
+                : $"{member.DisplayName}: {history.Count} points \u00B7 last 24 hours.";
         }
         catch (Exception ex)
         {
@@ -458,7 +469,7 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
             _historyStatus.IsVisible = true;
             _historyStatus.Text = trips.Count == 0
                 ? $"{member.DisplayName}: no trips in the last 24 hours."
-                : string.Join(" · ", trips.Select((trip, index) =>
+                : string.Join(" \u00B7 ", trips.Select((trip, index) =>
                     $"#{index + 1} {trip.DistanceMeters / 1000:0.0} km"));
         }
         catch (Exception ex)
@@ -518,11 +529,11 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
 
             var ownVisible = _ownLocation is not null;
             if (valid.Count == 0)
-                _status.Text = ownVisible ? "Only you on the map — share to include household pins." : "No shared locations yet.";
+                _status.Text = ownVisible ? "Only you on the map \u2014 share to include household pins." : "No shared locations yet.";
             else if (ownVisible)
-                _status.Text = $"You · {Math.Max(0, valid.Count - 1)} shared · updated {DateTime.Now:t}";
+                _status.Text = $"You \u00B7 {Math.Max(0, valid.Count - 1)} shared \u00B7 updated {DateTime.Now:t}";
             else
-                _status.Text = $"{valid.Count} shared · latest {valid.Max(x => x.UpdatedAtUtc!.Value).ToLocalTime():t}";
+                _status.Text = $"{valid.Count} shared \u00B7 latest {valid.Max(x => x.UpdatedAtUtc!.Value).ToLocalTime():t}";
         }
         catch (Exception ex)
         {
@@ -592,12 +603,17 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
                 const selectedMemberId = {{JsonSerializer.Serialize(selectedMemberId?.ToString())}};
                 const map = L.map('map', { zoomControl: false, attributionControl: true }).setView([39.5, -98.35], 4);
                 L.control.zoom({ position: 'bottomright' }).addTo(map);
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                  maxZoom: 20,
-                  attribution: '&copy; OpenStreetMap &copy; CARTO'
+                // Esri dark canvas \u2014 free, no API key (Carto dark_all watermarks without a key)
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+                  maxZoom: 16,
+                  attribution: 'Tiles &copy; Esri'
+                }).addTo(map);
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+                  maxZoom: 16,
+                  attribution: ''
                 }).addTo(map);
                 if (locations.length === 0 && places.length === 0 && history.length === 0) {
-                  document.getElementById('map').innerHTML = '<div class="empty">Waiting for location…</div>';
+                  document.getElementById('map').innerHTML = '<div class="empty">Waiting for location\u2026</div>';
                 } else {
                   const bounds = [];
                   if (history.length > 1) {
@@ -617,7 +633,7 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
                     const nameEl = document.createElement('strong');
                     nameEl.textContent = placeName;
                     const detail = document.createElement('div');
-                    detail.textContent = 'Place · ' + radius + ' m geofence' + (alerts.length ? ' · ' + alerts.join('/') : '');
+                    detail.textContent = 'Place \u00B7 ' + radius + ' m geofence' + (alerts.length ? ' \u00B7 ' + alerts.join('/') : '');
                     popup.append(nameEl, detail);
                     L.circle(point, { radius: place.radiusMeters, color: '#22D3EE', weight: 2, fillOpacity: 0.12 }).addTo(map);
                     const icon = L.divIcon({
@@ -638,7 +654,7 @@ public sealed class FamilyMapPage : ContentPage, IQueryAttributable
                     const updated = document.createElement('div');
                     const ageMinutes = (Date.now() - new Date(item.updatedAtUtc).getTime()) / 60000;
                     const freshness = ageMinutes < 2 ? 'Live' : ageMinutes < 15 ? 'Recent' : ageMinutes < 60 ? 'Stale' : 'Old';
-                    updated.textContent = freshness + ' · ' + new Date(item.updatedAtUtc).toLocaleString();
+                    updated.textContent = freshness + ' \u00B7 ' + new Date(item.updatedAtUtc).toLocaleString();
                     popup.append(name, updated);
                     const marker = L.marker(point).addTo(map).bindPopup(popup);
                     if (selectedMemberId && item.memberId === selectedMemberId) marker.openPopup();
