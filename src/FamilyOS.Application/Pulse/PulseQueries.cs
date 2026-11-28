@@ -132,8 +132,8 @@ public class PulseQueryHandler : IRequestHandler<GetPulseQuery, PulseDto>
         }
 
         var waitingInfo = await _db.Requests.AsNoTracking()
-            .Where(r => r.FamilyId == familyId && r.Status == RequestStatus.InfoRequested &&
-                        r.RequestedByMemberId == memberId)
+            .Where(r => r.FamilyId == familyId && r.Status == RequestStatus.WaitingForInformation &&
+                        r.RequesterMemberId == memberId)
             .OrderBy(r => r.CreatedAtUtc)
             .Take(5)
             .ToListAsync(ct);

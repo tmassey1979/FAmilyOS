@@ -387,6 +387,9 @@ public sealed partial class TasksPage : ContentPage, IQueryAttributable
     private static (string action, string label, bool primary)[] ActionsFor(string status) =>
         NormalizeTaskStatus(status) switch
         {
+            // Older/unassigned tasks stay in Created until an adult assigns them.
+            // Make that first step visible instead of hiding it in the More menu.
+            "Created" => new[] { ("assign", "Assign Task", true) },
             "Assigned" or "Reassigned" => new[] { ("accept", "Accept Task", true), ("decline", "Decline", false) },
             "Accepted" => new[] { ("start", "Start Task", true), ("complete", "Complete", false) },
             "InProgress" => new[] { ("complete", "Complete Task", true), ("pause", "Pause", false) },
@@ -414,7 +417,13 @@ public sealed partial class TasksPage : ContentPage, IQueryAttributable
         {
             button.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
         }
-        button.Clicked += async (_, _) => await ExecuteAsync(task, action);
+        button.Clicked += async (_, _) =>
+        {
+            if (action == "assign")
+                await AssignTaskAsync(task);
+            else
+                await ExecuteAsync(task, action);
+        };
         return button;
     }
 
@@ -435,6 +444,72 @@ public sealed partial class TasksPage : ContentPage, IQueryAttributable
             else if (pick == "Cancel task") await ExecuteAsync(task, "cancel");
         };
         return button;
+    }
+
+    private async Task AssignTaskAsync(FamilyTaskDto task)
+    {
+        try
+        {
+            var family = await _family.GetFamilyAsync();
+            var members = family.Members
+                .Where(member => member.IsActive)
+                .OrderBy(member => member.DisplayName)
+                .ToList();
+
+            if (members.Count == 0)
+            {
+                await DisplayAlert("Assign task", "There are no active household members to assign this task to.", "OK");
+                return;
+            }
+
+            var choices = members.Select(member => member.DisplayName).ToArray();
+            var selected = await DisplayActionSheet("Assign task to", "Cancel", null, choices);
+            var memberIndex = Array.IndexOf(choices, selected);
+            if (memberIndex < 0)
+                return;
+
+            DateTime? dueDate = task.DueDate;
+            if (!dueDate.HasValue)
+            {
+                var enteredDate = await DisplayPromptAsync(
+                    "Due date required",
+                    "This older task has no due date. Enter one as YYYY-MM-DD to assign it:",
+                    "Save date",
+                    "Cancel",
+                    "YYYY-MM-DD",
+                    initialValue: DateTime.Today.AddDays(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+
+                if (string.IsNullOrWhiteSpace(enteredDate))
+                    return;
+
+                if (!DateTime.TryParseExact(
+                    enteredDate.Trim(),
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var parsedDate))
+                {
+                    await DisplayAlert("Invalid date", "Enter the date in YYYY-MM-DD format.", "OK");
+                    return;
+                }
+
+                dueDate = DateTime.SpecifyKind(parsedDate.Date.AddHours(17), DateTimeKind.Local).ToUniversalTime();
+                await _tasks.UpdateDetailsAsync(task.Id, new UpdateTaskDetailsBody(DueDate: dueDate));
+            }
+
+            var assignee = members[memberIndex];
+            await _tasks.AssignAsync(task.Id, assignee.Id);
+            _status.Text = $"Task assigned to {assignee.DisplayName}.";
+            await LoadAsync();
+        }
+        catch (FamilyApiException ex)
+        {
+            _status.Text = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Assignment failed", ex.Message, "OK");
+        }
     }
 
     private async Task ExecuteAsync(FamilyTaskDto task, string action)
