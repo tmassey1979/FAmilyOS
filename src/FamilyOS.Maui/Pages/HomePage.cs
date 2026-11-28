@@ -1,10 +1,11 @@
 using FamilyOS.Maui.Services;
+using Microsoft.Maui.Controls.Shapes;
 
 namespace FamilyOS.Maui.Pages;
 
 /// <summary>
-/// Household home: presence strip, tactical Pulse banner, rearrangeable module grid.
-/// Merge-2 sci-fi command chrome (deep charcoal + cyan accents).
+/// Merge-2 household command center: presence strip, tactical Pulse panel,
+/// stat strip, rearrangeable module grid — deep charcoal + cyan chrome.
 /// </summary>
 public sealed class HomePage : ContentPage
 {
@@ -12,9 +13,9 @@ public sealed class HomePage : ContentPage
     private readonly FamilyApiClient _family;
     private readonly TasksApiClient _tasks;
     private readonly PulseRefreshSignal _pulseRefresh;
-    private readonly HorizontalStackLayout _members = new() { Spacing = 14 };
-    private readonly Label _greeting = new() { FontSize = 28, FontAttributes = FontAttributes.Bold };
-    private readonly Label _status = new() { FontSize = 14 };
+    private readonly HorizontalStackLayout _members = new() { Spacing = 12 };
+    private readonly Label _greeting = new() { FontSize = 24, FontAttributes = FontAttributes.Bold };
+    private readonly Label _status = new() { FontSize = 13, LineBreakMode = LineBreakMode.WordWrap };
     private readonly VerticalStackLayout _pulseSection = new() { Spacing = 10 };
     private readonly Grid _moduleGrid = new()
     {
@@ -23,8 +24,8 @@ public sealed class HomePage : ContentPage
             new ColumnDefinition(GridLength.Star),
             new ColumnDefinition(GridLength.Star)
         },
-        ColumnSpacing = 12,
-        RowSpacing = 12
+        ColumnSpacing = 10,
+        RowSpacing = 10
     };
     private readonly Button _editToggle = new() { Text = "Edit" };
     private List<HomeModule> _modules = [];
@@ -50,17 +51,35 @@ public sealed class HomePage : ContentPage
         {
             Orientation = ScrollOrientation.Horizontal,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Never,
-            Content = _members
+            Content = _members,
+            HeightRequest = 78
         };
+
+        // Brand row — crest + wordmark + edit
+        var crest = new Label
+        {
+            Text = "◈",
+            FontSize = 16,
+            VerticalTextAlignment = TextAlignment.Center
+        };
+        crest.SetDynamicResource(Label.TextColorProperty, "AccentPrimary");
 
         var brand = new Label
         {
-            Text = "◈  FAMILY OS",
+            Text = "FAMILY OS",
             FontSize = 12,
             FontAttributes = FontAttributes.Bold,
-            CharacterSpacing = 1.4
+            CharacterSpacing = 2.0,
+            VerticalTextAlignment = TextAlignment.Center
         };
         brand.SetDynamicResource(Label.TextColorProperty, "AccentGlow");
+
+        var brandRow = new HorizontalStackLayout
+        {
+            Spacing = 8,
+            VerticalOptions = LayoutOptions.Center,
+            Children = { crest, brand }
+        };
 
         var topRow = new Grid
         {
@@ -68,25 +87,29 @@ public sealed class HomePage : ContentPage
             {
                 new ColumnDefinition(GridLength.Star),
                 new ColumnDefinition(GridLength.Auto)
-            }
+            },
+            Padding = new Thickness(0, 2, 0, 0)
         };
-        topRow.Add(brand, 0, 0);
+        topRow.Add(brandRow, 0, 0);
         topRow.Add(_editToggle, 1, 0);
 
-        var accent = new BoxView { HeightRequest = 1.5, Opacity = 0.55 };
-        accent.SetDynamicResource(BoxView.ColorProperty, "AccentPrimary");
+        // Cyan scan line under brand
+        var scanLine = new BoxView { HeightRequest = 2, Opacity = 0.85 };
+        scanLine.SetDynamicResource(BoxView.ColorProperty, "AccentPrimary");
+
+        // Greeting block sits inside a soft surface panel for weight
+        var greetingPanel = BuildGreetingPanel();
 
         var page = new VerticalStackLayout
         {
-            Padding = new Thickness(20, 12, 20, 28),
-            Spacing = 14,
+            Padding = new Thickness(16, 8, 16, 24),
+            Spacing = 12,
             Children =
             {
                 topRow,
-                accent,
+                scanLine,
                 membersScroll,
-                _greeting,
-                _status,
+                greetingPanel,
                 _pulseSection,
                 SectionLabel("COMMAND MODULES"),
                 _moduleGrid
@@ -101,6 +124,42 @@ public sealed class HomePage : ContentPage
 
         _modules = HomeModuleCatalog.GetOrdered();
         RebuildModuleGrid();
+    }
+
+    private View BuildGreetingPanel()
+    {
+        var stack = new VerticalStackLayout
+        {
+            Spacing = 4,
+            Children = { _greeting, _status }
+        };
+
+        // Left cyan bracket + surface — tactical weight without a full card border
+        var rail = new BoxView { WidthRequest = 3 };
+        rail.SetDynamicResource(BoxView.ColorProperty, "AccentPrimary");
+
+        var row = new Grid
+        {
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(GridLength.Auto),
+                new ColumnDefinition(GridLength.Star)
+            },
+            ColumnSpacing = 12
+        };
+        row.Add(rail, 0, 0);
+        row.Add(stack, 1, 0);
+
+        var border = new Border
+        {
+            Padding = new Thickness(14, 12),
+            StrokeThickness = 1,
+            StrokeShape = new RoundRectangle { CornerRadius = 14 },
+            Content = row
+        };
+        border.SetDynamicResource(VisualElement.BackgroundColorProperty, "BgSurface");
+        border.SetDynamicResource(Border.StrokeProperty, "BorderSubtle");
+        return border;
     }
 
     private void OnPulseRefreshRequested(object? sender, EventArgs e) =>
@@ -139,17 +198,18 @@ public sealed class HomePage : ContentPage
         if (string.IsNullOrEmpty(initials)) initials = "?";
 
         var selected = _selectedMemberId == member.Id;
+
         var avatar = new Border
         {
-            WidthRequest = 56,
-            HeightRequest = 56,
-            StrokeThickness = selected ? 2.5 : 1,
-            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 28 },
+            WidthRequest = 48,
+            HeightRequest = 48,
+            StrokeThickness = selected ? 2 : 1,
+            StrokeShape = new RoundRectangle { CornerRadius = 24 },
             Content = new Label
             {
                 Text = initials,
                 FontAttributes = FontAttributes.Bold,
-                FontSize = 16,
+                FontSize = 14,
                 HorizontalTextAlignment = TextAlignment.Center,
                 VerticalTextAlignment = TextAlignment.Center
             }
@@ -159,15 +219,44 @@ public sealed class HomePage : ContentPage
         if (avatar.Content is Label avatarLabel)
             avatarLabel.SetDynamicResource(Label.TextColorProperty, selected ? "AccentGlow" : "TextPrimary");
 
+        // Online-style presence dot (self = cyan, others = muted success)
+        var dot = new BoxView
+        {
+            WidthRequest = 10,
+            HeightRequest = 10,
+            CornerRadius = 5,
+            HorizontalOptions = LayoutOptions.End,
+            VerticalOptions = LayoutOptions.End,
+            Margin = new Thickness(0, 0, -1, -1)
+        };
+        dot.SetDynamicResource(BoxView.ColorProperty, isSelf || selected ? "AccentPrimary" : "AccentSuccess");
+
+        var avatarHost = new Grid
+        {
+            WidthRequest = 52,
+            HeightRequest = 52,
+            HorizontalOptions = LayoutOptions.Center
+        };
+        avatarHost.Add(avatar);
+        avatarHost.Add(dot);
+
         var name = new Label
         {
             Text = isSelf ? "You" : FirstName(member.DisplayName),
             FontSize = 11,
-            HorizontalTextAlignment = TextAlignment.Center
+            FontAttributes = selected ? FontAttributes.Bold : FontAttributes.None,
+            HorizontalTextAlignment = TextAlignment.Center,
+            LineBreakMode = LineBreakMode.TailTruncation
         };
-        name.SetDynamicResource(Label.TextColorProperty, "TextMuted");
+        name.SetDynamicResource(Label.TextColorProperty, selected ? "AccentGlow" : "TextMuted");
 
-        var stack = new VerticalStackLayout { Spacing = 4, WidthRequest = 64, Children = { avatar, name } };
+        var stack = new VerticalStackLayout
+        {
+            Spacing = 4,
+            WidthRequest = 60,
+            Children = { avatarHost, name }
+        };
+
         var tap = new TapGestureRecognizer();
         tap.Tapped += async (_, _) =>
         {
@@ -197,19 +286,46 @@ public sealed class HomePage : ContentPage
             if (pulse.NextAction is not null)
             {
                 var next = pulse.NextAction;
+                var actionLabel = string.IsNullOrWhiteSpace(next.PrimaryAction)
+                    ? "Open"
+                    : next.PrimaryAction.Trim();
+                // Title-case the verb for the CTA; keep task name in the card body only
+                if (actionLabel.Length > 0)
+                    actionLabel = char.ToUpperInvariant(actionLabel[0]) + actionLabel[1..].ToLowerInvariant();
+
                 var btn = new Button
                 {
-                    Text = string.IsNullOrWhiteSpace(next.PrimaryAction)
-                        ? next.Title
-                        : $"{next.PrimaryAction}: {next.Title}"
+                    Text = actionLabel,
+                    FontAttributes = FontAttributes.Bold,
+                    FontSize = 15,
+                    CornerRadius = 14,
+                    MinimumHeightRequest = 48,
+                    Padding = new Thickness(20, 0)
                 };
-                btn.SetDynamicResource(VisualElement.StyleProperty, "FoPrimaryButtonStyle");
+                btn.SetDynamicResource(Button.BackgroundColorProperty, "AccentPrimary");
+                btn.SetDynamicResource(Button.TextColorProperty, "TextOnAccent");
                 btn.Clicked += async (_, _) => await HandleNextActionAsync(next);
-                _pulseSection.Children.Add(PulseCard("NEXT UP", next.Title, next.DueLabel, btn, accent: true));
+
+                var isOverdue = !string.IsNullOrWhiteSpace(next.DueLabel)
+                    && next.DueLabel.Contains("overdue", StringComparison.OrdinalIgnoreCase);
+
+                _pulseSection.Children.Add(PulseCard(
+                    "NEXT UP",
+                    next.Title,
+                    next.DueLabel,
+                    btn,
+                    accent: true,
+                    overdue: isOverdue));
             }
             else
             {
-                _pulseSection.Children.Add(PulseCard("PULSE", "You're mostly clear — nothing urgent right now.", null, null, accent: false));
+                _pulseSection.Children.Add(PulseCard(
+                    "PULSE",
+                    "You're mostly clear — nothing urgent right now.",
+                    null,
+                    null,
+                    accent: false,
+                    overdue: false));
             }
 
             var stats = new Grid
@@ -268,28 +384,28 @@ public sealed class HomePage : ContentPage
         var glyph = new Label
         {
             Text = module.Glyph,
-            FontSize = 26,
+            FontSize = 22,
             HorizontalTextAlignment = TextAlignment.Center,
             VerticalTextAlignment = TextAlignment.Center
         };
+        glyph.SetDynamicResource(Label.TextColorProperty, "AccentPrimary");
 
         var iconWell = new Border
         {
-            WidthRequest = 56,
-            HeightRequest = 56,
+            WidthRequest = 48,
+            HeightRequest = 48,
             StrokeThickness = 1,
             HorizontalOptions = LayoutOptions.Center,
-            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 18 },
+            StrokeShape = new RoundRectangle { CornerRadius = 14 },
             Content = glyph
         };
-        iconWell.SetDynamicResource(VisualElement.BackgroundColorProperty, "BgSurfaceAlt");
+        iconWell.SetDynamicResource(VisualElement.BackgroundColorProperty, "BgPage");
         iconWell.SetDynamicResource(Border.StrokeProperty, "BorderSubtle");
-        glyph.SetDynamicResource(Label.TextColorProperty, "AccentPrimary");
 
         var title = new Label
         {
             Text = module.Title,
-            FontSize = 12,
+            FontSize = 13,
             FontAttributes = FontAttributes.Bold,
             HorizontalTextAlignment = TextAlignment.Center,
             LineBreakMode = LineBreakMode.TailTruncation
@@ -298,15 +414,15 @@ public sealed class HomePage : ContentPage
 
         var body = new VerticalStackLayout
         {
-            Spacing = 8,
-            Padding = new Thickness(10, 14),
+            Spacing = 10,
+            Padding = new Thickness(12, 16),
             Children = { iconWell, title }
         };
 
         if (_editMode)
         {
-            var left = new Button { Text = "\u2190", WidthRequest = 36, FontSize = 14 };
-            var right = new Button { Text = "\u2192", WidthRequest = 36, FontSize = 14 };
+            var left = new Button { Text = "←", WidthRequest = 36, FontSize = 14 };
+            var right = new Button { Text = "→", WidthRequest = 36, FontSize = 14 };
             left.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
             right.SetDynamicResource(VisualElement.StyleProperty, "FoGhostButtonStyle");
             left.Clicked += (_, _) => { HomeModuleCatalog.Move(_modules, index, -1); RebuildModuleGrid(); };
@@ -319,8 +435,16 @@ public sealed class HomePage : ContentPage
             });
         }
 
-        var border = new Border { Padding = 0, MinimumHeightRequest = 124, Content = body };
-        border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
+        var border = new Border
+        {
+            Padding = 0,
+            MinimumHeightRequest = 112,
+            StrokeThickness = 1,
+            StrokeShape = new RoundRectangle { CornerRadius = 16 },
+            Content = body
+        };
+        border.SetDynamicResource(VisualElement.BackgroundColorProperty, "BgSurface");
+        border.SetDynamicResource(Border.StrokeProperty, "BorderSubtle");
 
         if (!_editMode)
         {
@@ -336,25 +460,85 @@ public sealed class HomePage : ContentPage
         return border;
     }
 
-    private static View PulseCard(string eyebrow, string body, string? meta, View? action, bool accent)
+    private static View PulseCard(string eyebrow, string body, string? meta, View? action, bool accent, bool overdue)
     {
-        var stack = new VerticalStackLayout { Spacing = 8 };
-        var eye = new Label { Text = eyebrow, FontSize = 11, FontAttributes = FontAttributes.Bold, CharacterSpacing = 1.2 };
+        var stack = new VerticalStackLayout { Spacing = 6 };
+
+        var header = new Grid
+        {
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(GridLength.Star),
+                new ColumnDefinition(GridLength.Auto)
+            },
+            ColumnSpacing = 8
+        };
+
+        var eye = new Label
+        {
+            Text = eyebrow,
+            FontSize = 11,
+            FontAttributes = FontAttributes.Bold,
+            CharacterSpacing = 1.4,
+            VerticalTextAlignment = TextAlignment.Center
+        };
         eye.SetDynamicResource(Label.TextColorProperty, "AccentGlow");
-        stack.Children.Add(eye);
-        var main = new Label { Text = body, FontSize = 16, LineBreakMode = LineBreakMode.WordWrap };
+        header.Add(eye, 0, 0);
+
+        if (overdue)
+        {
+            var pillLabel = new Label
+            {
+                Text = "OVERDUE",
+                FontSize = 10,
+                FontAttributes = FontAttributes.Bold,
+                HorizontalTextAlignment = TextAlignment.Center,
+                VerticalTextAlignment = TextAlignment.Center
+            };
+            pillLabel.SetDynamicResource(Label.TextColorProperty, "TextOnAccent");
+            var pill = new Border
+            {
+                Padding = new Thickness(8, 3),
+                StrokeThickness = 0,
+                StrokeShape = new RoundRectangle { CornerRadius = 999 },
+                Content = pillLabel
+            };
+            pill.SetDynamicResource(VisualElement.BackgroundColorProperty, "AccentDanger");
+            header.Add(pill, 1, 0);
+        }
+
+        stack.Children.Add(header);
+
+        var main = new Label
+        {
+            Text = body,
+            FontSize = 17,
+            FontAttributes = FontAttributes.Bold,
+            LineBreakMode = LineBreakMode.WordWrap
+        };
         main.SetDynamicResource(Label.TextColorProperty, "TextPrimary");
         stack.Children.Add(main);
-        if (!string.IsNullOrWhiteSpace(meta))
+
+        if (!string.IsNullOrWhiteSpace(meta) && !overdue)
         {
             var m = new Label { Text = meta, FontSize = 12 };
             m.SetDynamicResource(Label.TextColorProperty, "TextMuted");
             stack.Children.Add(m);
         }
-        if (action is not null) stack.Children.Add(action);
+        else if (!string.IsNullOrWhiteSpace(meta) && overdue)
+        {
+            // Still show due context under title when overdue pill is present
+            var m = new Label { Text = meta, FontSize = 12 };
+            m.SetDynamicResource(Label.TextColorProperty, "AccentDanger");
+            stack.Children.Add(m);
+        }
 
-        var rail = new BoxView { WidthRequest = 3 };
-        rail.SetDynamicResource(BoxView.ColorProperty, accent ? "AccentPrimary" : "BorderSubtle");
+        if (action is not null)
+            stack.Children.Add(action);
+
+        var rail = new BoxView { WidthRequest = 4 };
+        rail.SetDynamicResource(BoxView.ColorProperty, overdue ? "AccentDanger" : accent ? "AccentPrimary" : "BorderSubtle");
+
         var row = new Grid
         {
             ColumnDefinitions =
@@ -367,13 +551,23 @@ public sealed class HomePage : ContentPage
         row.Add(rail, 0, 0);
         row.Add(stack, 1, 0);
 
-        var border = new Border { Padding = 16, Content = row };
-        border.SetDynamicResource(VisualElement.StyleProperty, accent ? "FoCardAccentFrameStyle" : "FoCardFrameStyle");
+        var border = new Border
+        {
+            Padding = new Thickness(14, 14),
+            StrokeThickness = accent || overdue ? 1.5 : 1,
+            StrokeShape = new RoundRectangle { CornerRadius = 16 },
+            Content = row
+        };
+        border.SetDynamicResource(VisualElement.BackgroundColorProperty, "BgSurface");
+        border.SetDynamicResource(Border.StrokeProperty,
+            overdue ? "AccentDanger" : accent ? "AccentPrimary" : "BorderSubtle");
         return border;
     }
 
     private static View MiniStat(int value, string label)
     {
+        var hot = value > 0;
+
         var v = new Label
         {
             Text = value.ToString(),
@@ -381,15 +575,25 @@ public sealed class HomePage : ContentPage
             FontAttributes = FontAttributes.Bold,
             HorizontalTextAlignment = TextAlignment.Center
         };
-        v.SetDynamicResource(Label.TextColorProperty, value > 0 ? "AccentGlow" : "TextPrimary");
-        var l = new Label { Text = label, FontSize = 11, HorizontalTextAlignment = TextAlignment.Center };
+        v.SetDynamicResource(Label.TextColorProperty, hot ? "AccentGlow" : "TextPrimary");
+
+        var l = new Label
+        {
+            Text = label,
+            FontSize = 11,
+            HorizontalTextAlignment = TextAlignment.Center
+        };
         l.SetDynamicResource(Label.TextColorProperty, "TextMuted");
+
         var border = new Border
         {
             Padding = new Thickness(6, 12),
+            StrokeThickness = hot ? 1.5 : 1,
+            StrokeShape = new RoundRectangle { CornerRadius = 14 },
             Content = new VerticalStackLayout { Spacing = 2, Children = { v, l } }
         };
-        border.SetDynamicResource(VisualElement.StyleProperty, "FoCardFrameStyle");
+        border.SetDynamicResource(VisualElement.BackgroundColorProperty, "BgSurface");
+        border.SetDynamicResource(Border.StrokeProperty, hot ? "AccentPrimary" : "BorderSubtle");
         return border;
     }
 
@@ -400,8 +604,8 @@ public sealed class HomePage : ContentPage
             Text = text,
             FontSize = 11,
             FontAttributes = FontAttributes.Bold,
-            CharacterSpacing = 1.4,
-            Margin = new Thickness(2, 8, 0, 0)
+            CharacterSpacing = 1.6,
+            Margin = new Thickness(2, 4, 0, 0)
         };
         label.SetDynamicResource(Label.TextColorProperty, "AccentGlow");
         return label;
