@@ -354,7 +354,7 @@ public sealed class TasksPage : ContentPage, IQueryAttributable
     private static string NormalizeTaskStatus(string? status) =>
         System.Text.RegularExpressions.Regex.Replace(
             status?.Trim() ?? string.Empty,
-            @"[\\s_-]+",
+            @"[\s_-]+",
             string.Empty);
 
     private static (string action, string label, bool primary)[] ActionsFor(string status) =>
